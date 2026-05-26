@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useNnaStore } from '../../store/nna.store';
-import { MapPin, Users, Briefcase, School, HeartPulse, Home, Plus, Trash2, AlertCircle, Zap, Calendar, X, Edit2 } from 'lucide-react';
+import { MapPin, Users, Briefcase, School, HeartPulse, Home, Plus, Trash2, AlertCircle, Zap, Calendar, X, Edit2, Search } from 'lucide-react';
 import { clsx } from 'clsx';
 import { InputField, SelectField, SectionHeader, FooterButtons } from '../../components/ui/FormFields';
 import { UbigeoFields } from '../../components/forms/UbigeoFields';
@@ -812,7 +812,7 @@ const normalizeTipoDoc = (value: unknown): string => {
 export const NnaCreatePage = () => {
     const navigate = useNavigate();
     const { id } = useParams();
-    const { createNna, updateExpediente, fetchExpediente, selectedExpediente, error: storeError, parametros, fetchParametros } = useNnaStore();
+    const { createNna, updateExpediente, fetchExpediente, selectedExpediente, error: storeError, parametros, fetchParametros, checkNnaDuplicates } = useNnaStore();
 
     useEffect(() => {
         fetchParametros();
@@ -827,6 +827,7 @@ export const NnaCreatePage = () => {
     const [currentNnaIndexForDuplicate, setCurrentNnaIndexForDuplicate] = useState<number>(0);
     const [showTutorModal, setShowTutorModal] = useState(false);
     const [editingFamiliarIndex, setEditingFamiliarIndex] = useState<number | null>(null);
+    const [isCheckingDuplicates, setIsCheckingDuplicates] = useState<boolean>(false);
     const [familiarModalData, setFamiliarModalData] = useState<FamiliarFormDataItem>({
         priApeTutApo: '',
         segApeTutApo: '',
@@ -865,16 +866,16 @@ export const NnaCreatePage = () => {
         defaultValues: {
              nnas: [{
                  nombres: '', apellidoPaterno: '', apellidoMaterno: '', numeroDoc: '', fechaNacimiento: '',
-                 tipoDoc: '1', sexo: '', estudiaActualmente: 'NO', tieneDiscapacidad: false,
+                 tipoDoc: '', sexo: '', estudiaActualmente: '', tieneDiscapacidad: false,
                  tienePartidaNacimiento: "true",
                  edad: '',
                  unidadEdad: 'ANIOS',
                  nacionalidad: 'PERUANA',
-                 lenMatNna: '10',
+                 lenMatNna: '',
                  lenMatEspNna: '',
-                 autIdeEtNna: '7',
+                 autIdeEtNna: '',
                  autIdeEtEspNna: '',
-                 certDiscapNna: '99',
+                 certDiscapNna: '',
                  detalleDiscapacidad: '',
                  usoTiempo: {} as Record<string, UsoTiempoDia>,
                  actividadesTiempoLibreLista: []
@@ -893,15 +894,15 @@ export const NnaCreatePage = () => {
              sexoApo: '',
              fechaNacApo: '',
              nacionalidadApo: 'PERUANA',
-             tipDocTutApo: '1',
+             tipDocTutApo: '',
              nroDocTutApo: '',
-             vinTutUsu: '1',
-             lenMatApo: '10',
+             vinTutUsu: '',
+             lenMatApo: '',
              lenMatEspApo: '',
-             autIdeEtApo: '7',
+             autIdeEtApo: '',
              autIdeEtEspApo: '',
-             tipoDiscapApo: '6',
-             certDiscapApo: '99',
+             tipoDiscapApo: '',
+             certDiscapApo: '',
              familiares: [],
              actividadesCalle: []
         }
@@ -1500,41 +1501,53 @@ export const NnaCreatePage = () => {
         }
     }, [isEditMode, selectedExpediente, reset, replaceActividadesCalle, replaceFamiliares]);
 
-    const checkDuplicates = (index: number) => {
+    const checkDuplicates = async (index: number, isManual: boolean = false) => {
         const nna = watch(`nnas.${index}`);
         if (!nna) {
             return;
         }
 
-        const otrosNnas = (nnasList || []).filter((_, i) => i !== index);
         const numeroDocNna = (nna.numeroDoc || '').trim();
-        const apellidoPaternoNna = (nna.apellidoPaterno || '').toLowerCase();
-        const apellidoMaternoNna = (nna.apellidoMaterno || '').toLowerCase();
-        const nombresNna = (nna.nombres || '').toLowerCase();
+        const apellidoPaternoNna = (nna.apellidoPaterno || '').trim();
+        const apellidoMaternoNna = (nna.apellidoMaterno || '').trim();
+        const nombresNna = (nna.nombres || '').trim();
 
-        let status: 'unique' | 'homonym' | 'duplicate' = 'unique';
-        const matches: NnaPersonalData[] = [];
-
-        for (const otro of otrosNnas) {
-            if (numeroDocNna && otro.numeroDoc === numeroDocNna) {
-                status = 'duplicate';
-                matches.push(otro);
-            } else if (
-                apellidoPaternoNna &&
-                apellidoMaternoNna &&
-                apellidoPaternoNna === (otro.apellidoPaterno || '').toLowerCase() &&
-                apellidoMaternoNna === (otro.apellidoMaterno || '').toLowerCase() &&
-                nombresNna.includes((otro.nombres || '').toLowerCase())
-            ) {
-                if (status !== 'duplicate') status = 'homonym';
-                matches.push(otro);
+        // Evitar validaciones vacías molestas al salir del campo
+        if (!numeroDocNna && !apellidoPaternoNna) {
+            if (isManual) {
+                alert("Por favor ingrese al menos el documento o el apellido paterno del NNA para verificar.");
             }
+            return;
         }
 
-        setCurrentNnaIndexForDuplicate(index);
-        setDuplicateCheckResults({ status, message: `${matches.length} coincidencia(s) encontrada(s)`, matches });
-        if (status === 'duplicate' || status === 'homonym') {
-            setShowDuplicateDrawer(true);
+        setIsCheckingDuplicates(true);
+        try {
+            const res = await checkNnaDuplicates({
+                nombres: nombresNna,
+                apellidoPaterno: apellidoPaternoNna,
+                apellidoMaterno: apellidoMaternoNna,
+                numeroDoc: numeroDocNna
+            });
+
+            setCurrentNnaIndexForDuplicate(index);
+            setDuplicateCheckResults({
+                status: res.status,
+                message: res.message || `${res.matches?.length || 0} coincidencia(s) encontrada(s)`,
+                matches: res.matches || []
+            });
+
+            if (res.status === 'duplicate' || res.status === 'homonym') {
+                setShowDuplicateDrawer(true);
+            } else if (isManual) {
+                alert("¡Ficha Única! No se encontraron homónimos ni duplicados en el sistema nacional.");
+            }
+        } catch (error) {
+            console.error("Error checking duplicates:", error);
+            if (isManual) {
+                alert("No se pudo conectar al servidor para validar duplicados.");
+            }
+        } finally {
+            setIsCheckingDuplicates(false);
         }
     };
 
@@ -1974,21 +1987,22 @@ export const NnaCreatePage = () => {
                                         <div className="mb-3 flex items-center justify-between">
                                             <DuplicateSemaphore
                                                 status={duplicateCheckResults?.status || 'unique'}
-                                                onClick={() => checkDuplicates(index)}
+                                                onClick={() => checkDuplicates(index, true)}
                                             />
                                             <button
                                                 type="button"
-                                                onClick={() => checkDuplicates(index)}
-                                                className="text-xs font-bold text-blue-600 hover:text-blue-800"
+                                                onClick={() => checkDuplicates(index, true)}
+                                                disabled={isCheckingDuplicates}
+                                                className="text-xs font-bold text-blue-600 hover:text-blue-800 disabled:text-gray-400 flex items-center gap-1"
                                             >
-                                                Verificar
+                                                {isCheckingDuplicates ? 'Validando...' : 'Verificar Nacional'}
                                             </button>
                                         </div>
 
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                            <InputField label="Apellido Paterno" register={register(`nnas.${index}.apellidoPaterno` as const, { required: true })} placeholder="Ap. Paterno" />
-                                            <InputField label="Apellido Materno" register={register(`nnas.${index}.apellidoMaterno` as const)} placeholder="Ap. Materno" />
-                                            <InputField label="Nombres" register={register(`nnas.${index}.nombres` as const, { required: true })} placeholder="Nombres" />
+                                            <InputField label="Apellido Paterno" register={register(`nnas.${index}.apellidoPaterno` as const, { required: true, onBlur: () => checkDuplicates(index, false) })} placeholder="Ap. Paterno" />
+                                            <InputField label="Apellido Materno" register={register(`nnas.${index}.apellidoMaterno` as const, { onBlur: () => checkDuplicates(index, false) })} placeholder="Ap. Materno" />
+                                            <InputField label="Nombres" register={register(`nnas.${index}.nombres` as const, { required: true, onBlur: () => checkDuplicates(index, false) })} placeholder="Nombres" />
 
                                             <div className="md:col-span-1">
                                                 <SelectField label="Sexo" register={register(`nnas.${index}.sexo` as const)} options={parametros?.OPCIONES_SEXO_2026 || [
@@ -2079,7 +2093,7 @@ export const NnaCreatePage = () => {
                                                     ]} />
 
                                                     <div className="md:col-span-2">
-                                                        <InputField label="Nº de Documento / DNI" register={register(`nnas.${index}.numeroDoc` as const)} placeholder="Ingrese número si tiene" />
+                                                        <InputField label="Nº de Documento / DNI" register={register(`nnas.${index}.numeroDoc` as const, { onBlur: () => checkDuplicates(index, false) })} placeholder="Ingrese número si tiene" />
                                                     </div>
 
                                                     <div className="flex flex-col justify-end pb-2">
@@ -2446,7 +2460,6 @@ export const NnaCreatePage = () => {
                                                   <h4 className="text-sm font-black text-purple-900 uppercase flex items-center gap-2">
                                                       <Users size={16} className="text-purple-700" /> Familiar / Adulto Responsable (SEC 2026)
                                                   </h4>
-                                                  
                                                   <button
                                                       type="button"
                                                       onClick={() => {
@@ -2455,24 +2468,24 @@ export const NnaCreatePage = () => {
                                                               segApeTutApo: '',
                                                               nomApeTutApo: '',
                                                               nombres: '',
-                                                              parentesco: 'Madre',
+                                                              parentesco: '',
                                                               dni: '',
                                                               telefono: '',
                                                               ocupacion: '',
-                                                              tipoDoc: '1',
-                                                              viveCon: 'SI',
-                                                              sexoApo: '2',
+                                                              tipoDoc: '',
+                                                              viveCon: '',
+                                                              sexoApo: '',
                                                               fechaNacApo: '',
                                                               nacionalidadApo: 'PERUANA',
-                                                              tipDocTutApo: '1',
+                                                              tipDocTutApo: '',
                                                               nroDocTutApo: '',
-                                                              vinTutUsu: '1',
-                                                              lenMatApo: '10',
+                                                              vinTutUsu: '',
+                                                              lenMatApo: '',
                                                               lenMatEspApo: '',
-                                                              autIdeEtApo: '7',
+                                                              autIdeEtApo: '',
                                                               autIdeEtEspApo: '',
-                                                              tipoDiscapApo: '6',
-                                                              certDiscapApo: '99',
+                                                              tipoDiscapApo: '',
+                                                              certDiscapApo: '',
                                                               esTutorPrincipal: 'false'
                                                           });
                                                           setEditingFamiliarIndex(null);
@@ -2789,7 +2802,7 @@ export const NnaCreatePage = () => {
                                 />
                                 <SelectField
                                     label="¿Vive con el NNA?"
-                                    value={familiarModalData.viveCon || 'NO'}
+                                    value={familiarModalData.viveCon || ''}
                                     onChange={(e) => setFamiliarModalData({ ...familiarModalData, viveCon: e.target.value })}
                                     options={[
                                         { value: 'SI', label: 'Sí' },
@@ -2855,7 +2868,7 @@ export const NnaCreatePage = () => {
 
                                 <SelectField
                                     label="Tipo de Discapacidad"
-                                    value={familiarModalData.tipoDiscapApo || '6'}
+                                    value={familiarModalData.tipoDiscapApo || ''}
                                     onChange={(e) => setFamiliarModalData({ ...familiarModalData, tipoDiscapApo: e.target.value })}
                                     options={parametros?.OPCIONES_DISCAPACIDAD_APO_2026 || [
                                         { value: '6', label: 'Ninguna' },
@@ -2868,7 +2881,7 @@ export const NnaCreatePage = () => {
                                 />
                                 <SelectField
                                     label="¿Certificado CONADIS?"
-                                    value={familiarModalData.certDiscapApo || '99'}
+                                    value={familiarModalData.certDiscapApo || ''}
                                     onChange={(e) => setFamiliarModalData({ ...familiarModalData, certDiscapApo: e.target.value })}
                                     options={parametros?.OPCIONES_CERT_DISCAP_APO_2026 || [
                                         { value: '99', label: 'No aplica' },
@@ -3004,22 +3017,33 @@ export const NnaCreatePage = () => {
 
             {/* DUPLICATE CHECKER DRAWER */}
             {showDuplicateDrawer && duplicateCheckResults && (
-                <div className="fixed inset-y-0 right-0 w-96 bg-white shadow-2xl z-40 overflow-y-auto animate-slideInRight">
-                    <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-                        <h2 className="font-bold text-gray-800">Verificación de Duplicados</h2>
+                <div className="fixed inset-y-0 right-0 w-96 bg-white shadow-2xl z-40 overflow-y-auto animate-slideInRight border-l border-gray-200">
+                    <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
+                        <h2 className="font-bold text-gray-800 text-sm">Verificación Nacional de Duplicados</h2>
                         <button onClick={() => setShowDuplicateDrawer(false)} className="text-gray-500 hover:text-gray-700">
                             <X size={20} />
                         </button>
                     </div>
                     <div className="p-4 space-y-4">
-                        <div className={`p-3 rounded-lg ${duplicateCheckResults.status === 'duplicate' ? 'bg-red-50 border border-red-200' : 'bg-yellow-50 border border-yellow-200'}`}>
-                            <p className="text-sm font-bold text-gray-800">{duplicateCheckResults.message}</p>
+                        <div className={`p-3 rounded-lg ${duplicateCheckResults.status === 'duplicate' ? 'bg-red-50 border border-red-200 text-red-800' : 'bg-yellow-50 border border-yellow-200 text-yellow-800'}`}>
+                            <p className="text-xs font-black uppercase tracking-wider mb-1">
+                                {duplicateCheckResults.status === 'duplicate' ? '¡Duplicado Crítico!' : 'Alerta de Homónimo'}
+                            </p>
+                            <p className="text-sm font-semibold">{duplicateCheckResults.message}</p>
                         </div>
-                        {duplicateCheckResults.matches && duplicateCheckResults.matches.map((match, i) => (
-                            <div key={i} className="border border-gray-200 rounded-lg p-3 bg-gray-50">
-                                <p className="font-bold text-gray-800">{match.nombres} {match.apellidoPaterno} {match.apellidoMaterno}</p>
-                                <p className="text-xs text-gray-600">DNI: {match.numeroDoc}</p>
-                                {match.tipoDiscapacidad && <p className="text-xs text-gray-600">Tipo: {match.tipoDiscapacidad}</p>}
+                        {duplicateCheckResults.matches && duplicateCheckResults.matches.map((match: any, i) => (
+                            <div key={i} className="border border-gray-200 rounded-xl p-4 bg-white shadow-sm flex flex-col gap-2 hover:border-blue-200 transition-all">
+                                <p className="font-bold text-sm text-gray-800 uppercase">{match.nombres} {match.apellidoPaterno} {match.apellidoMaterno}</p>
+                                <div className="grid grid-cols-2 gap-2 border-t pt-2 text-xs text-gray-500">
+                                    <div>
+                                        <span className="font-bold text-[9px] uppercase text-gray-400 block">DNI / Doc</span>
+                                        <span className="font-semibold text-gray-700">{match.numeroDoc || 'Sin Doc'}</span>
+                                    </div>
+                                    <div>
+                                        <span className="font-bold text-[9px] uppercase text-gray-400 block">Sede de Origen</span>
+                                        <span className="font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded inline-block mt-0.5">{match.sede || 'No especificada'}</span>
+                                    </div>
+                                </div>
                             </div>
                         ))}
                     </div>

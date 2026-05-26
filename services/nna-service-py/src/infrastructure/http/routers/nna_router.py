@@ -386,6 +386,107 @@ async def get_next_code(user: dict = Depends(get_current_user)):
     return {"code": code}
 
 
+@router.get("/buscar-duplicados")
+async def buscar_duplicados(
+    nombres: Optional[str] = None,
+    apellido_paterno: Optional[str] = None,
+    apellido_materno: Optional[str] = None,
+    numero_doc: Optional[str] = None,
+    user: dict = Depends(get_current_user)
+):
+    """Busca coincidencias exactas por DNI u homónimos por apellidos y nombres en todo el país (cruzando sedes)."""
+    from src.infrastructure.db.connection import get_pool
+    pool = get_pool()
+    matches = []
+    
+    # Normalizar valores para la búsqueda
+    n_doc = (numero_doc or "").strip()
+    ap_pat = (apellido_paterno or "").strip().upper()
+    ap_mat = (apellido_materno or "").strip().upper()
+    nom = (nombres or "").strip().upper()
+
+    if not n_doc and not ap_pat:
+        return {"status": "unique", "matches": []}
+
+    try:
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                # 1. Búsqueda exacta por número de documento si se proporciona
+                if n_doc:
+                    query = """
+                        SELECT n.ID, n.NOMBRES, n.APELLIDO_PATERNO, n.APELLIDO_MATERNO, n.TIPO_DOC, n.NUMERO_DOC, n.SEXO, s.NOMBRE AS SEDE
+                        FROM NNA n
+                        LEFT JOIN NNA_CASO c ON c.NNA_ID = n.ID AND c.ESTADO <> 'CERRADO'
+                        LEFT JOIN SEC_SEDE s ON s.ID = c.SEDE_ID
+                        WHERE n.NUMERO_DOC = :doc
+                    """
+                    await cur.execute(query, {"doc": n_doc})
+                    rows = await cur.fetchall()
+                    for r in rows:
+                        matches.append({
+                            "id": r[0],
+                            "nombres": r[1],
+                            "apellidoPaterno": r[2],
+                            "apellidoMaterno": r[3],
+                            "tipoDoc": r[4],
+                            "numeroDoc": r[5],
+                            "sexo": r[6],
+                            "sede": r[7] or "Sin Sede Activa"
+                        })
+                    
+                    if matches:
+                        return {
+                            "status": "duplicate",
+                            "message": f"CRÍTICO: Se encontró un NNA registrado con el mismo número de documento en la sede: {matches[0]['sede']}",
+                            "matches": matches
+                        }
+
+                # 2. Búsqueda de homónimos por nombres y apellidos
+                if ap_pat and nom:
+                    # Encontrar coincidencias similares en la BD
+                    query = """
+                        SELECT n.ID, n.NOMBRES, n.APELLIDO_PATERNO, n.APELLIDO_MATERNO, n.TIPO_DOC, n.NUMERO_DOC, n.SEXO, s.NOMBRE AS SEDE
+                        FROM NNA n
+                        LEFT JOIN NNA_CASO c ON c.NNA_ID = n.ID AND c.ESTADO <> 'CERRADO'
+                        LEFT JOIN SEC_SEDE s ON s.ID = c.SEDE_ID
+                        WHERE UPPER(n.APELLIDO_PATERNO) = :ap_pat
+                          AND (:ap_mat IS NULL OR UPPER(n.APELLIDO_MATERNO) = :ap_mat)
+                          AND UPPER(n.NOMBRES) LIKE :nom
+                    """
+                    await cur.execute(query, {
+                        "ap_pat": ap_pat,
+                        "ap_mat": ap_mat if ap_mat else None,
+                        "nom": f"%{nom}%"
+                    })
+                    rows = await cur.fetchall()
+                    for r in rows:
+                        # Evitar duplicar si ya se agregó por DNI
+                        if not any(m["id"] == r[0] for m in matches):
+                            matches.append({
+                                "id": r[0],
+                                "nombres": r[1],
+                                "apellidoPaterno": r[2],
+                                "apellidoMaterno": r[3],
+                                "tipoDoc": r[4],
+                                "numeroDoc": r[5],
+                                "sexo": r[6],
+                                "sede": r[7] or "Sin Sede Activa"
+                            })
+
+                    if matches:
+                        return {
+                            "status": "homonym",
+                            "message": f"ADVERTENCIA: Se encontraron {len(matches)} posible(s) homónimo(s) en el sistema nacional.",
+                            "matches": matches
+                        }
+
+    except Exception as e:
+        logger.error(f"Error al verificar duplicados: {e}")
+        raise HTTPException(status_code=500, detail="Error en la verificación de duplicados")
+
+    return {"status": "unique", "message": "NNA Único: No se encontraron coincidencias.", "matches": []}
+
+
 @router.get("/debug-loaded/show")
 async def debug_loaded():
     import sys

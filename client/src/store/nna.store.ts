@@ -116,6 +116,7 @@ interface NnaState {
     getNextCarpetaCode: () => Promise<string>;
     createDerivacion: (data: any) => Promise<void>;
     saveFamiliares: (carpetaId: number, familiares: any[]) => Promise<void>;
+    checkNnaDuplicates: (params: { nombres?: string, apellidoPaterno?: string, apellidoMaterno?: string, numeroDoc?: string }) => Promise<any>;
 
     // Expediente Digital
     documents: any[];
@@ -158,6 +159,26 @@ export const useNnaStore = create<NnaState>((set, get) => ({
             set({ nnas: data, isLoading: false });
         } catch (err: any) {
             set({ error: err.message, isLoading: false });
+        }
+    },
+
+    checkNnaDuplicates: async (params) => {
+        try {
+            const token = useAuthStore.getState().token;
+            const queryParams = new URLSearchParams();
+            if (params.nombres) queryParams.append('nombres', params.nombres);
+            if (params.apellidoPaterno) queryParams.append('apellido_paterno', params.apellidoPaterno);
+            if (params.apellidoMaterno) queryParams.append('apellido_materno', params.apellidoMaterno);
+            if (params.numeroDoc) queryParams.append('numero_doc', params.numeroDoc);
+
+            const response = await fetch(`${NNA_API_URL}/nna/buscar-duplicados?${queryParams.toString()}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!response.ok) throw new Error('Error al verificar duplicados');
+            return await response.json();
+        } catch (err: any) {
+            console.error('Error en checkNnaDuplicates:', err);
+            return { status: 'unique', message: 'Error de conexión', matches: [] };
         }
     },
 
