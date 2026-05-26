@@ -103,6 +103,7 @@ interface NnaFormData {
     lugarPernocte: string;
     detalleLugarPernocte: string;
     nombreTutor: string;
+    actividadesCalle?: any[];
 }
 
 interface DuplicateCheckResult {
@@ -533,7 +534,8 @@ export const NnaCreatePage = () => {
             situacionCalle: '',
             perfil: '',
             condicion: '',
-            diasTrabajo: ''
+            diasTrabajo: '',
+            actividadesCalle: []
         }
     });
 
@@ -595,6 +597,28 @@ export const NnaCreatePage = () => {
                         const parsed = JSON.parse(parts[0].slice(5));
                         if (parsed?.actividadesTiempoLibreLista && Array.isArray(parsed.actividadesTiempoLibreLista)) {
                             return parsed.actividadesTiempoLibreLista;
+                        }
+                    } catch {}
+                }
+                return [];
+            };
+
+            const parseActividadesCalle = (nna: any): any[] => {
+                if (nna.datosF03) {
+                    try {
+                        const parsed = typeof nna.datosF03 === 'string' ? JSON.parse(nna.datosF03) : nna.datosF03;
+                        if (parsed?.actividadesCalle && Array.isArray(parsed.actividadesCalle)) {
+                            return parsed.actividadesCalle;
+                        }
+                    } catch {}
+                }
+                const saved = nna.actividadesTiempoLibre || '';
+                if (saved.startsWith('JSON:')) {
+                    try {
+                        const parts = saved.split(' | ');
+                        const parsed = JSON.parse(parts[0].slice(5));
+                        if (parsed?.actividadesCalle && Array.isArray(parsed.actividadesCalle)) {
+                            return parsed.actividadesCalle;
                         }
                     } catch {}
                 }
@@ -670,6 +694,7 @@ export const NnaCreatePage = () => {
                 detalleLugarPernocte: mainNna.detalleLugarPernocte || '',
                 nombreTutor: mainNna.nombreTutor || '',
 
+                actividadesCalle: parseActividadesCalle(mainNna),
                 nnas: mappedNnas
             });
         }
@@ -726,6 +751,7 @@ export const NnaCreatePage = () => {
             const datosF03 = {
                 usoTiempo: nna.usoTiempo || {},
                 actividadesTiempoLibreLista: actList,
+                actividadesCalle: data.actividadesCalle || [], // BACKUP STREET ACTIVITIES
                 diagnostico: riesgo
             };
 
@@ -825,7 +851,9 @@ export const NnaCreatePage = () => {
             zona_intervencion: data.zonaIntervencion || null,
             distrito_intervencion: data.distritoDom || null,
             situacion_calle: data.situacionCalle || null,
-            actividad_realizada: data.actividadRealizada || null,
+            actividad_realizada: data.actividadesCalle && data.actividadesCalle.length > 0
+                ? data.actividadesCalle.map((a: any) => a.actividad === 'OTROS' ? a.actividadEspecifique : a.actividad?.replace(/_/g, ' ')).join(', ')
+                : data.actividadRealizada || null,
             tiempo_en_calle: data.tiempoEnCalle || null,
             condicion: data.condicion || null,
             fecha_abordaje: parseDate(data.fechaAbordaje),
