@@ -748,24 +748,42 @@ const normalizeLugarPernocte = (value: unknown): string => {
     return '';
 };
 
+const normalizeEstudiaActualmente = (value: unknown): string => {
+    if (value === null || value === undefined) return 'NO';
+    const str = String(value).toUpperCase().trim();
+    if (str === '1' || str === 'SI' || str === 'TRUE') return 'SI';
+    if (str === '0' || str === 'NO' || str === 'FALSE') return 'NO';
+    if (str === '3' || str === 'PROCESO') return 'PROCESO';
+    if (str === '99' || str === 'NO_APLICA' || str === 'NO APLICA') return 'NO_APLICA';
+    return str; // Dejar pasar cualquier otro valor guardado como código directo
+};
+
 const normalizeNivelEducativo = (value: unknown): string => {
     const normalized = normalizeCatalogText(value);
     if (!normalized) return '';
-    if (normalized.includes('INICIAL')) return 'INICIAL';
-    if (normalized.includes('PRIMARIA')) return 'PRIMARIA';
-    if (normalized.includes('SECUNDARIA')) return 'SECUNDARIA';
-    if (normalized.includes('NO ESCOLAR') || normalized.includes('SIN ESCOLAR')) return 'NO_ESCOLARIZADO';
-    return '';
+    // Dejar pasar códigos numéricos directos (1-11)
+    if (['1','2','3','4','5','6','7','8','9','10','11'].includes(normalized)) return normalized;
+    // Mapeos legacy de compatibilidad
+    if (normalized.includes('INICIAL')) return '2';
+    if (normalized.includes('PRIMARIA INCOMPLETA')) return '3';
+    if (normalized.includes('PRIMARIA COMPLETA') || normalized === 'PRIMARIA') return '4';
+    if (normalized.includes('SECUNDARIA INCOMPLETA')) return '5';
+    if (normalized.includes('SECUNDARIA COMPLETA') || normalized === 'SECUNDARIA') return '6';
+    if (normalized.includes('SIN NIVEL') || normalized.includes('NO ESCOLAR')) return '1';
+    return normalized;
 };
 
 const normalizeModalidadEstudio = (value: unknown): string => {
     const normalized = normalizeCatalogText(value);
     if (!normalized) return '';
-    if (normalized.includes('EBR') || normalized.includes('BASICA / REGULAR') || normalized.includes('BASICA REGULAR') || normalized === 'REGULAR') return 'EBR';
-    if (normalized.includes('EBA') || normalized.includes('ALTERNAT')) return 'EBA';
-    if (normalized.includes('EBE') || normalized.includes('ESPECIAL')) return 'EBE';
-    if (normalized.includes('CETPRO')) return 'CETPRO';
-    return '';
+    // Dejar pasar códigos numéricos directos (1-6)
+    if (['1','2','3','4','5','6'].includes(normalized)) return normalized;
+    // Mapeos legacy de compatibilidad
+    if (normalized.includes('EBR') || normalized.includes('REGULAR')) return '1';
+    if (normalized.includes('EBA') || normalized.includes('ALTERNAT')) return '2';
+    if (normalized.includes('EBE') || normalized.includes('ESPECIAL')) return '3';
+    if (normalized.includes('CETPRO')) return '6';
+    return normalized;
 };
 
 const normalizeTipoDoc = (value: unknown): string => {
@@ -1336,7 +1354,7 @@ export const NnaCreatePage = () => {
                 provinciaNac: nna.provinciaNac || '',
                 distritoNac: nna.distritoNac || '',
 
-                estudiaActualmente: toBoolean(nna.estudiaActualmente),
+                estudiaActualmente: normalizeEstudiaActualmente(nna.estudiaActualmente),
                 nivelEducativo: normalizeNivelEducativo(nna.nivelEducativo),
                 gradoEstudio: nna.gradoEstudio || '',
                 institucionEducativa: nna.institucionEducativa || '',
@@ -1555,7 +1573,14 @@ export const NnaCreatePage = () => {
         const mappedNnas: NnaPayloadItem[] = nnasWithBackup.map((nna) => {
             const tienePartida = nna.tienePartidaNacimiento === "true";
             const tieneDiscapacidad = nna.tieneDiscapacidad === true;
-            const estudiaActualmente = nna.estudiaActualmente === true;
+            
+            // Mapeo correcto de las opciones de matrícula a código número para la base de datos
+            let estudiaActualmenteVal = 0;
+            if (nna.estudiaActualmente === 'SI' || nna.estudiaActualmente === 'true') estudiaActualmenteVal = 1;
+            else if (nna.estudiaActualmente === 'NO' || nna.estudiaActualmente === 'false') estudiaActualmenteVal = 0;
+            else if (nna.estudiaActualmente === 'PROCESO') estudiaActualmenteVal = 3;
+            else if (nna.estudiaActualmente === 'NO_APLICA') estudiaActualmenteVal = 99;
+
             const tieneAntecedenteAlbergue = nna.tieneAntecedenteAlbergue === true;
             const sufreEnfermedad = nna.sufreEnfermedad === "SI" || nna.sufreEnfermedad === "true";
 
@@ -1604,7 +1629,7 @@ export const NnaCreatePage = () => {
                 tipo_discapacidad: nna.tipoDiscapacidad || null,
                 detalle_discapacidad: nna.detalleDiscapacidad || null,
 
-                estudia_actualmente: estudiaActualmente,
+                estudia_actualmente: estudiaActualmenteVal,
                 nivel_educativo: nna.nivelEducativo || null,
                 grado_estudio: nna.gradoEstudio || null,
                 institucion_educativa: nna.institucionEducativa || null,
