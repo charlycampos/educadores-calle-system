@@ -564,12 +564,15 @@ export const NnaCreatePage = () => {
                     try {
                         const parsed = typeof nna.datosF03 === 'string' ? JSON.parse(nna.datosF03) : nna.datosF03;
                         if (parsed?.usoTiempo) return parsed.usoTiempo;
+                        if (parsed?.grid) return parsed.grid;
                     } catch {}
                 }
                 const saved = nna.actividadesTiempoLibre || '';
                 if (saved.startsWith('JSON:')) {
                     try {
-                        const parsed = JSON.parse(saved.slice(5));
+                        const parts = saved.split(' | ');
+                        const parsed = JSON.parse(parts[0].slice(5));
+                        if (parsed?.usoTiempo) return parsed.usoTiempo;
                         if (parsed?.grid) return parsed.grid;
                     } catch {}
                 }
@@ -580,6 +583,16 @@ export const NnaCreatePage = () => {
                 if (nna.datosF03) {
                     try {
                         const parsed = typeof nna.datosF03 === 'string' ? JSON.parse(nna.datosF03) : nna.datosF03;
+                        if (parsed?.actividadesTiempoLibreLista && Array.isArray(parsed.actividadesTiempoLibreLista)) {
+                            return parsed.actividadesTiempoLibreLista;
+                        }
+                    } catch {}
+                }
+                const saved = nna.actividadesTiempoLibre || '';
+                if (saved.startsWith('JSON:')) {
+                    try {
+                        const parts = saved.split(' | ');
+                        const parsed = JSON.parse(parts[0].slice(5));
                         if (parsed?.actividadesTiempoLibreLista && Array.isArray(parsed.actividadesTiempoLibreLista)) {
                             return parsed.actividadesTiempoLibreLista;
                         }
