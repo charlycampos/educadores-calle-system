@@ -14,6 +14,7 @@ from src.infrastructure.db.repositories.oracle_nna_repository import (
 )
 from src.infrastructure.db.repositories.oracle_caso_repository import OracleCasoRepository, OracleHistorialRepository
 from src.infrastructure.db.repositories.oracle_familiar_repository import OracleFamiliarRepository
+from src.infrastructure.db.repositories.oracle_parametro_repository import OracleParametroRepository
 from src.infrastructure.http.middleware.jwt_middleware import get_current_user
 
 router = APIRouter(prefix="/nna", tags=["nna"])
@@ -137,6 +138,14 @@ class RegistrarNnaRequest(BaseModel):
     tiempo_en_calle: Optional[str] = None
     condicion: Optional[str] = None
     fecha_abordaje: Optional[datetime] = None
+    fecha_ingreso: Optional[datetime] = None
+    fecha_reingreso: Optional[datetime] = None
+    fecha_cambio_perfil: Optional[datetime] = None
+    horario_inicio: Optional[str] = None
+    horario_fin: Optional[str] = None
+    horario_inicio2: Optional[str] = None
+    horario_fin2: Optional[str] = None
+    dias_trabajo: Optional[str] = None
     crear_nueva_carpeta: Optional[bool] = True
     familiares: Optional[list[FamiliarItem]] = None
 
@@ -210,7 +219,7 @@ async def registrar_nna(body: RegistrarNnaRequest, user: dict = Depends(get_curr
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acceso denegado")
     if rol == "MONITOR":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No tienes permisos de escritura")
-    logger.info(f"Registrando {len(body.nnas)} NNA(s) en nueva carpeta")
+    logger.info(f"[registrar_nna] Registrando {len(body.nnas)} NNA(s) | perfil={body.perfil!r} | user={user.get('userId')}")
     use_case = RegistrarNnaUseCase(
         OracleNnaRepository(),
         OracleCasoRepository(),
@@ -309,7 +318,14 @@ async def registrar_nna(body: RegistrarNnaRequest, user: dict = Depends(get_curr
             tiempo_en_calle=body.tiempo_en_calle,
             condicion=body.condicion,
             fecha_abordaje=body.fecha_abordaje,
-            fecha_ingreso=datetime.now(),
+            fecha_ingreso=body.fecha_ingreso or datetime.now(),
+            fecha_reingreso=body.fecha_reingreso,
+            fecha_cambio_perfil=body.fecha_cambio_perfil,
+            horario_inicio=body.horario_inicio,
+            horario_fin=body.horario_fin,
+            horario_inicio2=body.horario_inicio2,
+            horario_fin2=body.horario_fin2,
+            dias_trabajo=body.dias_trabajo,
         )
 
         resultado = await use_case.execute(
@@ -335,6 +351,50 @@ async def registrar_nna(body: RegistrarNnaRequest, user: dict = Depends(get_curr
     except Exception as e:
         logger.error(f"Error en registro: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/parametros")
+async def get_parametros(user: dict = Depends(get_current_user)):
+    rol = user.get("rol", "")
+    if rol == "ESTADISTICO":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acceso denegado")
+    repo = OracleParametroRepository()
+    try:
+        parametros = await repo.list_active_parametros()
+        result = {}
+        for p in parametros:
+            grupo = p.grupo
+            if grupo not in result:
+                result[grupo] = []
+            result[grupo].append({
+                "value": p.codigo,
+                "label": p.descripcion
+            })
+        return result
+    except Exception as e:
+        logger.error(f"Error al obtener parametros: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/next-code")
+async def get_next_code(user: dict = Depends(get_current_user)):
+    rol = user.get("rol", "")
+    if rol == "ESTADISTICO":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acceso denegado")
+    repo = OracleNnaRepository()
+    code = await repo.get_next_codigo_ficha03()
+    return {"code": code}
+
+
+@router.get("/debug-loaded/show")
+async def debug_loaded():
+    import sys
+    import inspect
+    return {
+        "sys_path": sys.path,
+        "nna_router_file": __file__,
+        "_nna_to_dict_source": inspect.getsource(_nna_to_dict)
+    }
 
 
 @router.put("/{carpeta_id}")
@@ -369,27 +429,6 @@ async def actualizar_expediente(carpeta_id: int, body: dict, user: dict = Depend
         await fam_repo.save_bulk(carpeta_id, body["familiares"])
 
     return {"ok": True}
-
-
-@router.get("/next-code")
-async def get_next_code(user: dict = Depends(get_current_user)):
-    rol = user.get("rol", "")
-    if rol == "ESTADISTICO":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acceso denegado")
-    repo = OracleNnaRepository()
-    code = await repo.get_next_codigo_ficha03()
-    return {"code": code}
-
-
-@router.get("/debug-loaded/show")
-async def debug_loaded():
-    import sys
-    import inspect
-    return {
-        "sys_path": sys.path,
-        "nna_router_file": __file__,
-        "_nna_to_dict_source": inspect.getsource(_nna_to_dict)
-    }
 
 
 @router.get("/{nna_id}/expediente")

@@ -145,6 +145,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Handler para loguear errores de validación (422)
+from fastapi.exceptions import RequestValidationError
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    errors = exc.errors()
+    logger.error(f"[422 VALIDATION ERROR] {request.method} {request.url.path}")
+    for e in errors:
+        logger.error(f"  Campo: {'.'.join(str(x) for x in e.get('loc', []))} | Error: {e.get('msg')} | Input: {str(e.get('input', ''))[:200]}")
+    return JSONResponse(
+        status_code=422,
+        content={"detail": errors, "message": " | ".join(f"{'.'.join(str(x) for x in e.get('loc', []))}: {e.get('msg')}" for e in errors)}
+    )
+
 @app.get("/health")
 async def health():
     return {

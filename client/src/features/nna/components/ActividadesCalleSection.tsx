@@ -43,8 +43,15 @@ export const ActividadesCalleSection: React.FC<ActividadesCalleSectionProps> = (
         name: 'actividadesCalle'
     });
 
+    // Usar useWatch para re-renderizar cuando los datos cambian,
+    // pero siempre usar fields como fuente de datos para el renderizado
+    // para evitar desincronización con el estado interno del useFieldArray
     const watchedFields = useWatch({ control, name: 'actividadesCalle' });
-    const actividades = (watchedFields || fields) as unknown as ActividadPerfil[];
+    // Merge: fields tiene los IDs internos de RHF, watchedFields tiene los datos actuales
+    const actividades = fields.map((field, index) => ({
+        ...field,
+        ...(watchedFields?.[index] || {})
+    })) as unknown as ActividadPerfil[];
 
     const [modalState, setModalState] = useState<{ isOpen: boolean; editIndex: number | null }>({
         isOpen: false,
@@ -127,7 +134,7 @@ export const ActividadesCalleSection: React.FC<ActividadesCalleSectionProps> = (
                                 </div>
  
                                  {actividades.map((act, index) => (
-                                     <div key={(fields[index] as any).id} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center group relative border-b border-slate-100 py-5 last:border-0 last:pb-0">
+                                     <div key={(act as any).id || index} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center group relative border-b border-slate-100 py-5 last:border-0 last:pb-0">
                                          
                                          <div className="md:col-span-4 flex items-center gap-3">
                                              <div className="w-2.5 h-2.5 rounded-full bg-blue-600 shrink-0" />

@@ -106,11 +106,13 @@ interface NnaState {
     error: string | null;
 
     selectedExpediente: Nna[] | null; // Full family list
+    parametros: Record<string, { value: string, label: string }[]> | null;
     fetchAllNnas: () => Promise<void>;
     createNna: (data: any) => Promise<any>; // Changed to any to accept specific backend payload
     updateExpediente: (data: any) => Promise<void>;
     getNnaById: (id: number) => Promise<void>;
     fetchExpediente: (nnaId: number) => Promise<void>;
+    fetchParametros: () => Promise<void>;
     getNextCarpetaCode: () => Promise<string>;
     createDerivacion: (data: any) => Promise<void>;
     saveFamiliares: (carpetaId: number, familiares: any[]) => Promise<void>;
@@ -128,6 +130,21 @@ export const useNnaStore = create<NnaState>((set, get) => ({
     error: null,
 
     selectedExpediente: null,
+    parametros: null,
+
+    fetchParametros: async () => {
+        try {
+            const token = useAuthStore.getState().token;
+            const response = await fetch(`${NNA_API_URL}/nna/parametros`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!response.ok) throw new Error('Error al cargar parámetros');
+            const data = await response.json();
+            set({ parametros: data });
+        } catch (err: any) {
+            console.error('Error loading parametros:', err);
+        }
+    },
 
     fetchAllNnas: async () => {
         set({ isLoading: true, error: null });
@@ -159,7 +176,15 @@ export const useNnaStore = create<NnaState>((set, get) => ({
 
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.message || 'Error al crear NNA');
+                console.error('[createNna] Error response:', JSON.stringify(errorData, null, 2));
+                // Pydantic 422 errors come in errorData.detail as an array
+                let msg = errorData.message || errorData.detail;
+                if (Array.isArray(msg)) {
+                    msg = msg.map((e: any) => `${e.loc?.join('.')}: ${e.msg}`).join(' | ');
+                } else if (typeof msg === 'object') {
+                    msg = JSON.stringify(msg);
+                }
+                throw new Error(msg || 'Error al crear NNA');
             }
 
             const result = await response.json();
