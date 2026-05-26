@@ -35,3 +35,5 @@ class Folio:
     hash_documento: Optional[str]
     creado_por_id: int
     fecha_creacion: Optional[datetime]
+    usuario_responsable: Optional[str] = None
+

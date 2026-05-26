@@ -1,4 +1,4 @@
-import { NNA_API_URL, DERIVACION_API_URL } from '../config/api';
+import { NNA_API_URL, DERIVACION_API_URL, EXPEDIENTE_API_URL } from '../config/api';
 import { create } from 'zustand';
 import { useAuthStore } from './auth.store';
 
@@ -120,8 +120,10 @@ interface NnaState {
 
     // Expediente Digital
     documents: any[];
-    loadDocuments: (nnaId: number, nnaData: any) => void;
+    loadDocuments: (nnaId: number, nnaData: any) => Promise<void>;
     registerDocument: (doc: any) => void;
+    uploadPhysicalDocument: (nnaId: number, file: File, docType: string) => Promise<any>;
+    fetchNnaPdfBlob: (nnaId: number) => Promise<Blob>;
 }
 
 export const useNnaStore = create<NnaState>((set, get) => ({
@@ -357,32 +359,83 @@ export const useNnaStore = create<NnaState>((set, get) => ({
     documents: [],
 
     // Cargar documentos iniciales (mezcla mock + localStorage)
-    loadDocuments: (nnaId: number, nnaData: any) => {
+    loadDocuments: async (nnaId: number, nnaData: any) => {
         const storedDocs = JSON.parse(localStorage.getItem(`expediente_docs_${nnaId}`) || '[]');
 
         const baseDocs = [];
 
         // 1. Ficha de Inscripción (F3): Es el único doc base que existe REALMENTE al existir el NNA
         if (nnaData) {
+            let realPages = 1; // Fallback seguro
+            try {
+                const token = useAuthStore.getState().token;
+                const response = await fetch(`${NNA_API_URL}/nna/${nnaId}/pdf/pages`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    realPages = data.pages || 1;
+                }
+            } catch (err) {
+                console.error("Error fetching F03 pdf page count:", err);
+            }
+
             baseDocs.push({
                 id: `f3-${nnaId}`,
                 nnaId,
                 type: 'FICHA DE INSCRIPCIÓN (FORMATO 3)',
-                // Usar ID real y Año real del registro
-                code: `REG-${nnaData.createdAt ? new Date(nnaData.createdAt).getFullYear() : new Date().getFullYear()}-${String(nnaData.id).padStart(4, '0')}`,
+                // Usar ID real y Año real del registro (priorizar codigoFicha03)
+                code: nnaData.codigoFicha03 || nnaData.codigo_ficha03 || `REG-${nnaData.createdAt ? new Date(nnaData.createdAt).getFullYear() : new Date().getFullYear()}-${String(nnaData.id).padStart(4, '0')}`,
                 // Usar Fecha exacta de creación del registro en base de datos
                 date: nnaData.createdAt || new Date().toISOString(),
-                pages: 4,
+                pages: realPages,
                 // Intentar obtener el responsable real del caso si está cargado
                 user: nnaData.casos?.[0]?.responsable?.nombreCompleto || 'Registro Inicial',
                 status: 'APROBADO'
             });
         }
 
-        // NOTA: El Acta de Compromiso y RENIEC se agregarán dinámicamente cuando el usuario
-        // genere el PDF o suba el archivo, no antes.
+        // 2. Cargar documentos físicos/subidos reales desde el microservicio expediente-service
+        let backendDocs = [];
+        const activeCase = nnaData?.casos?.find((c: any) => c.estado !== 'CERRADO') || nnaData?.casos?.[0];
+        if (activeCase) {
+            try {
+                const token = useAuthStore.getState().token;
+                const response = await fetch(`${EXPEDIENTE_API_URL}/expediente/caso/${activeCase.id}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (response.ok) {
+                    const folios = await response.json();
+                    backendDocs = folios.map((f: any) => {
+                        // Intentar deducir páginas o usar 1 por defecto (a menos que se guarde)
+                        return {
+                            id: f.id,
+                            nnaId,
+                            type: f.tipo_documento || 'DOCUMENTO SUBIDO',
+                            code: f.hash_documento ? f.hash_documento.toUpperCase() : `FOLIO-${f.numero_folio}`,
+                            date: f.fecha_creacion || new Date().toISOString(),
+                            pages: 1, // Por defecto 1 o estimar
+                            user: f.usuarioResponsable || 'Usuario Autenticado',
+                            usuarioResponsable: f.usuarioResponsable,
+                            filename: f.archivo_url.split('/').pop(),
+                            status: 'APROBADO'
+                        };
+                    });
+                }
+            } catch (err) {
+                console.error("Error fetching backend folios:", err);
+            }
+        }
 
-        set({ documents: [...baseDocs, ...storedDocs] });
+        // Combinar con localStorage (evitando duplicar archivos si se subieron en esta sesión antes de refrescar)
+        const combined = [...baseDocs, ...backendDocs];
+        storedDocs.forEach((localDoc: any) => {
+            if (!combined.some((d: any) => d.filename === localDoc.filename)) {
+                combined.push(localDoc);
+            }
+        });
+
+        set({ documents: combined });
     },
 
     registerDocument: (doc: any) => {
@@ -401,5 +454,79 @@ export const useNnaStore = create<NnaState>((set, get) => ({
         // Persistir solo los nuevos agregados dinámicamente
         const storedDocs = JSON.parse(localStorage.getItem(`expediente_docs_${nnaId}`) || '[]');
         localStorage.setItem(`expediente_docs_${nnaId}`, JSON.stringify([...storedDocs, newDoc]));
+    },
+
+    uploadPhysicalDocument: async (nnaId: number, file: File, docType: string) => {
+        const token = useAuthStore.getState().token;
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await fetch(`${EXPEDIENTE_API_URL}/expediente/upload`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            },
+            body: formData
+        });
+
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.detail || 'Error al subir el archivo físico.');
+        }
+
+        const metadata = await response.json(); // {filename, original_name, pages, path}
+
+        // Registrar el Folio en la base de datos si hay un caso activo
+        const selectedNna = get().selectedNna;
+        const activeCase = selectedNna?.casos?.find((c: any) => c.estado !== 'CERRADO') || selectedNna?.casos?.[0];
+        
+        if (activeCase) {
+            try {
+                const folioResponse = await fetch(`${EXPEDIENTE_API_URL}/expediente/caso/${activeCase.id}/folio`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        tipo_documento: docType.substring(0, 10).toUpperCase(),
+                        titulo: file.name,
+                        archivo_url: `${EXPEDIENTE_API_URL}/expediente/documento/${metadata.filename}`,
+                        contenido_hash: metadata.filename.substring(0, 20)
+                    })
+                });
+                if (folioResponse.ok) {
+                    const savedFolio = await folioResponse.json();
+                    console.log("Folio successfully persisted in DB:", savedFolio);
+                }
+            } catch (err) {
+                console.error("Error persisting folio in DB:", err);
+            }
+        }
+
+        // Registrar el documento recién creado en el store local para mantener persistencia visual inmediata
+        const userPayload = useAuthStore.getState().user;
+        const newDoc = {
+            nnaId,
+            type: docType,
+            code: file.name.substring(0, 20).toUpperCase(),
+            pages: metadata.pages,
+            user: userPayload?.nombreCompleto || 'Usuario Autenticado',
+            usuarioResponsable: userPayload?.nombreCompleto,
+            filename: metadata.filename,
+            status: 'APROBADO'
+        };
+
+        get().registerDocument(newDoc);
+        return metadata;
+    },
+
+    fetchNnaPdfBlob: async (nnaId) => {
+        const token = useAuthStore.getState().token;
+        const response = await fetch(`${NNA_API_URL}/nna/${nnaId}/pdf`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!response.ok) throw new Error('Error al generar o descargar el PDF');
+        return await response.blob();
     }
 }));

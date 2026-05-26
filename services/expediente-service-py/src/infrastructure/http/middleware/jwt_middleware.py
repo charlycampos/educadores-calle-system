@@ -3,9 +3,10 @@ Utilidades JWT: generar y verificar tokens.
 El payload incluye sedeId, sedeCodigo y regionId para multi-tenancy.
 """
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, Optional
 from jose import jwt, JWTError
 from fastapi import HTTPException, status, Depends
+
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from src.config import settings
@@ -21,6 +22,7 @@ def generar_token(payload: dict[str, Any]) -> str:
     return jwt.encode(data, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
+
 def verificar_token(token: str) -> dict[str, Any]:
     try:
         return jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
@@ -31,10 +33,33 @@ def verificar_token(token: str) -> dict[str, Any]:
         )
 
 
+from fastapi import Request
+
+bearer_scheme = HTTPBearer(auto_error=False)
+
+
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
-) -> dict[str, Any]:
-    return verificar_token(credentials.credentials)
+
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
+) -> Optional[dict[str, Any]]:
+    if credentials:
+        return verificar_token(credentials.credentials)
+    # También verificar si hay un header normal o query param
+    auth_header = request.headers.get("authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        try:
+            return verificar_token(auth_header.split(" ")[1])
+        except Exception:
+            pass
+    token_param = request.query_params.get("token")
+    if token_param:
+        try:
+            return verificar_token(token_param)
+        except Exception:
+            pass
+    return None
+
 
 
 def require_roles(*roles: str):

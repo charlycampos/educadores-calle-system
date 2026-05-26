@@ -1793,19 +1793,13 @@ export const NnaCreatePage = () => {
                                 {`${(selectedExpediente[0] as any).nombres || ''} ${(selectedExpediente[0] as any).apellidoPaterno || ''}`}
                             </p>
                         </div>
-                        <div className="grid grid-cols-2 gap-2">
-                            <div>
-                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Nº Ficha</p>
-                                <p className="text-xs font-bold text-gray-700 truncate">
-                                    {(selectedExpediente[0] as any).codigoFicha03 || 'Sin Código'}
-                                </p>
-                            </div>
-                            <div>
-                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Expediente</p>
-                                <p className="text-xs font-bold text-gray-700">
-                                    {((selectedExpediente[0] as any).casos?.find((c: any) => c.estado !== 'CERRADO') || (selectedExpediente[0] as any).casos?.[0])?.codigoCaso || `ID: ${id}`}
-                                </p>
-                            </div>
+                        <div className="mt-1 space-y-1">
+                            <p className="text-xs text-gray-600">
+                                <span className="font-bold text-gray-800">Nº Ficha:</span> {(selectedExpediente[0] as any).codigoFicha03 || 'Sin Código'}
+                            </p>
+                            <p className="text-xs text-gray-600">
+                                <span className="font-bold text-gray-800">Expediente:</span> {((selectedExpediente[0] as any).casos?.find((c: any) => c.estado !== 'CERRADO') || (selectedExpediente[0] as any).casos?.[0])?.codigoCaso || `ID: ${id}`}
+                            </p>
                         </div>
                     </div>
                 )}

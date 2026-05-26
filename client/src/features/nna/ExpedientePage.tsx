@@ -44,6 +44,7 @@ import { InformeEgresoList } from './components/InformeEgresoList';
 // Formato 12: Seguimiento Familiar (Fase 3)
 import { SeguimientoFamiliarList } from './components/SeguimientoFamiliarList';
 import { ResumenCaso } from './components/ResumenCaso';
+import { PdfViewerModal } from './components/PdfViewerModal';
 
 export const ExpedientePage = () => {
     const { id } = useParams();
@@ -224,7 +225,7 @@ export const ExpedientePage = () => {
                                 <span className={`w-1.5 h-1.5 rounded-full ${activeCase?.estado === 'CERRADO' ? 'bg-fg-muted' : 'bg-success'}`}></span>
                                 {activeCase?.estado || 'ACTIVO'}
                             </span>
-                            <span className="text-[11px] text-fg-muted font-mono font-medium">EXP: {carpetaCode}</span>
+                            <span className="text-[11px] text-fg-muted font-mono font-medium">EXP: {mainNna.carpeta?.codigo || activeCase?.codigoCaso || '---'}</span>
                         </div>
                     </div>
 
@@ -416,31 +417,35 @@ const NavButton = ({ active, onClick, icon: Icon, label, subLabel }: any) => (
 
 const ExpedienteDigitalDocs = ({ nna, caso }: any) => {
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
-    const { documents, registerDocument } = useNnaStore();
+    const { documents, uploadPhysicalDocument } = useNnaStore();
+    const [isPdfOpen, setIsPdfOpen] = useState(false);
+    const [selectedPdfNna, setSelectedPdfNna] = useState<{ id: number, name: string, filename?: string, title?: string } | null>(null);
 
     // documents viene del store ahora
 
-    const handleUploadDocument = (newDocData: any) => {
-        registerDocument({
-            nnaId: nna.id,
-            type: newDocData.type,
-            code: `DOC-${String(documents.length + 1).padStart(3, '0')}`,
-            pages: Number(newDocData.pages),
-            user: 'Usuario Actual',
-            status: 'CARGADO',
-            file: newDocData.file
-        });
+    const handleUploadDocument = async (newDocData: any) => {
+        try {
+            await uploadPhysicalDocument(nna.id, newDocData.file, newDocData.type);
+        } catch (error: any) {
+            alert(`Error al subir documento: ${error.message}`);
+        }
         setIsUploadModalOpen(false);
     };
 
-    // Dynamic Folio Calculation
+    // 1. Ordenar documentos cronológicamente de forma ascendente (el más antiguo primero) para realizar el foliado
+    const sortedAsc = [...documents].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    // 2. Cálculo dinámico de folios secuenciales
     let currentFolio = 1;
-    const documentsFoliated = documents.map((doc: any) => {
+    const documentsFoliatedAsc = sortedAsc.map((doc: any) => {
         const start = currentFolio;
         const end = currentFolio + doc.pages - 1;
         currentFolio = end + 1;
         return { ...doc, folioStart: start, folioEnd: end };
     });
+
+    // 3. Invertir la lista foliada para mostrarla en orden estrictamente descendente (el más reciente arriba)
+    const documentsFoliated = [...documentsFoliatedAsc].reverse();
 
     return (
         <div className="space-y-6 relative">
@@ -510,7 +515,7 @@ const ExpedienteDigitalDocs = ({ nna, caso }: any) => {
                                     <div className="flex items-center gap-3">
                                         <div className={`p-1.5 rounded flex-shrink-0
                                             ${doc.type.includes('FICHA') ? 'bg-info-soft text-info border border-info/20' :
-                                                doc.type.includes('RENIEC') ? 'bg-primary-soft text-primary border border-primary/20' :
+                                                doc.type.includes('DNI') ? 'bg-primary-soft text-primary border border-primary/20' :
                                                     'bg-danger-soft text-danger border border-danger/20'
                                             }`}
                                         >
@@ -539,25 +544,47 @@ const ExpedienteDigitalDocs = ({ nna, caso }: any) => {
                                 <td className="px-4 py-2.5">
                                     <div className="flex items-center gap-1.5 bg-surface-muted px-2 py-1 rounded w-fit border border-border">
                                         <User size={12} className="text-fg-muted" />
-                                        <span className="text-[12px] text-fg-2 truncate max-w-[150px]" title={doc.user}>
-                                            {doc.user}
+                                        <span className="text-[12px] text-fg-2 truncate max-w-[150px]" title={doc.usuarioResponsable || doc.user}>
+                                            {doc.usuarioResponsable || doc.user}
                                         </span>
                                     </div>
                                 </td>
                                 <td className="px-4 py-2.5">
                                     <div className="flex flex-col items-center justify-center">
                                         <div className="bg-primary text-primary-fg text-[9px] font-bold px-2 py-0.5 rounded-t-[3px] w-16 text-center uppercase tracking-wider">
-                                            Exp.
+                                            Folios
                                         </div>
                                         <div className="bg-primary-soft text-primary border border-t-0 border-primary/20 rounded-b-[3px] w-16 py-0.5 flex flex-col items-center">
-                                            <span className="text-[11px] font-bold">{doc.pages} págs</span>
+                                            <span className="text-[11px] font-bold">{String(doc.folioStart).padStart(3, '0')}-{String(doc.folioEnd).padStart(3, '0')}</span>
                                         </div>
                                     </div>
                                 </td>
                                 <td className="px-4 py-2.5 text-center">
-                                    <button className="text-fg-muted hover:text-primary p-1.5 rounded transition-all" title="Ver Documento">
-                                        <Eye size={16} />
-                                    </button>
+                                    {(doc.type.includes('FICHA') || doc.filename) ? (
+                                        <button
+                                            onClick={() => {
+                                                setSelectedPdfNna({
+                                                    id: nna.id,
+                                                    name: `${nna.nombres} ${nna.apellidoPaterno} ${nna.apellidoMaterno}`,
+                                                    filename: doc.filename,
+                                                    title: doc.type
+                                                });
+                                                setIsPdfOpen(true);
+                                            }}
+                                            className="text-fg-muted hover:text-primary p-1.5 rounded transition-all"
+                                            title="Ver Documento PDF"
+                                        >
+                                            <Eye size={16} />
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={() => alert('La visualización directa en este momento solo está habilitada para las Fichas de Inscripción F03 en formato PDF y archivos PDF cargados.')}
+                                            className="text-fg-muted/40 p-1.5 rounded cursor-not-allowed"
+                                            title="Vista previa no disponible"
+                                        >
+                                            <Eye size={16} />
+                                        </button>
+                                    )}
                                 </td>
                             </tr>
                         ))}
@@ -572,19 +599,34 @@ const ExpedienteDigitalDocs = ({ nna, caso }: any) => {
                     onUpload={handleUploadDocument}
                 />
             )}
+
+            {/* Visor de PDF Integrado */}
+            {selectedPdfNna && (
+                <PdfViewerModal
+                    isOpen={isPdfOpen}
+                    onClose={() => {
+                        setIsPdfOpen(false);
+                        setSelectedPdfNna(null);
+                    }}
+                    nnaId={selectedPdfNna.id}
+                    nnaName={selectedPdfNna.name}
+                    documentFilename={selectedPdfNna.filename}
+                    title={selectedPdfNna.title}
+                />
+            )}
         </div>
     );
 };
 
 const StatusCard = ({ title, status, icon: Icon, details }: any) => {
-    const colors = {
+    const colors: Record<string, string> = {
         success: 'bg-success-soft text-success border-success/30',
         warning: 'bg-warning-soft text-warning border-warning/30',
         danger: 'bg-danger-soft text-danger border-danger/30',
     };
 
     return (
-        <div className={`p-[14px] rounded-[7px] border ${colors[status]} flex flex-col gap-1.5`}>
+        <div className={`p-[14px] rounded-[7px] border ${colors[status] || colors.warning} flex flex-col gap-1.5`}>
             <div className="flex items-center justify-between">
                 <span className="text-[11px] font-semibold uppercase opacity-80">{title}</span>
                 <Icon size={15} />

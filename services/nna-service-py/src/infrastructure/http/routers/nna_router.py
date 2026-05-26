@@ -1,7 +1,7 @@
 import logging
 from typing import Optional
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends, BackgroundTasks, Request
 from pydantic import BaseModel
 
 logger = logging.getLogger("nna_router")
@@ -213,7 +213,7 @@ async def guardar_familiares(
 
 @router.post("")
 @router.post("/")
-async def registrar_nna(body: RegistrarNnaRequest, user: dict = Depends(get_current_user)):
+async def registrar_nna(body: RegistrarNnaRequest, background_tasks: BackgroundTasks, user: dict = Depends(get_current_user)):
     rol = user.get("rol", "")
     if rol == "ESTADISTICO":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acceso denegado")
@@ -340,6 +340,12 @@ async def registrar_nna(body: RegistrarNnaRequest, user: dict = Depends(get_curr
             if hasattr(body, 'familiares') and body.familiares:
                 fam_repo = OracleFamiliarRepository()
                 await fam_repo.save_bulk(carpeta_id, [f.model_dump() for f in body.familiares])
+
+        # Encolar generación de PDF en segundo plano
+        for r in resultado:
+            nna_obj = r.get("nna")
+            if nna_obj and getattr(nna_obj, "id", None):
+                background_tasks.add_task(trigger_pdf_generation, nna_obj.id)
 
         return [{
             "nna": _nna_to_dict(r["nna"]),
@@ -499,7 +505,7 @@ async def debug_loaded():
 
 
 @router.put("/{carpeta_id}")
-async def actualizar_expediente(carpeta_id: int, body: dict, user: dict = Depends(get_current_user)):
+async def actualizar_expediente(carpeta_id: int, body: dict, background_tasks: BackgroundTasks, user: dict = Depends(get_current_user)):
     """Actualiza todos los NNA y familiares de una carpeta."""
     rol = user.get("rol", "")
     if rol == "ESTADISTICO":
@@ -528,6 +534,13 @@ async def actualizar_expediente(carpeta_id: int, body: dict, user: dict = Depend
     # 3. Actualizar familiares
     if "familiares" in body:
         await fam_repo.save_bulk(carpeta_id, body["familiares"])
+
+    # 4. Encolar regeneración del PDF para cada NNA actualizado
+    if "nnas" in body:
+        for n_data in body["nnas"]:
+            nna_id = n_data.get("id")
+            if nna_id:
+                background_tasks.add_task(trigger_pdf_generation, nna_id)
 
     return {"ok": True}
 
@@ -763,3 +776,177 @@ def _caso_to_dict(caso) -> dict:
         "responsableNombre": caso.responsable_nombre,
         "fechaApertura": iso(caso.fecha_apertura),
     }
+
+
+@router.get("/{nna_id}/pdf")
+async def get_nna_pdf(nna_id: int, request: Request, token: Optional[str] = None):
+    from fastapi.responses import FileResponse
+    from src.infrastructure.services.pdf_generator import generate_f03_pdf
+    from src.infrastructure.http.middleware.jwt_middleware import verificar_token
+    import os
+
+    # Extraer token del header o query param
+    actual_token = None
+    auth_header = request.headers.get("authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        actual_token = auth_header.split(" ")[1]
+    elif token:
+        actual_token = token
+
+    if not actual_token:
+        raise HTTPException(status_code=401, detail="No autorizado: Token faltante")
+
+    try:
+        user = verificar_token(actual_token)
+    except Exception:
+        raise HTTPException(status_code=401, detail="No autorizado: Token inválido")
+
+    nna_repo = OracleNnaRepository()
+    nna = await nna_repo.find_by_id(nna_id)
+    if not nna:
+        raise HTTPException(status_code=404, detail="Beneficiario NNA no encontrado")
+
+    # Obtener código de la ficha (o en su defecto expediente/carpeta) para el nombre único del archivo
+    carpeta_repo = OracleCarpetaRepository()
+    carpeta = await carpeta_repo.find_by_id(nna.carpeta_id) if nna.carpeta_id else None
+    codigo_archivo = nna.codigo_ficha03 if nna.codigo_ficha03 else (carpeta.codigo if carpeta else f"ID_{nna_id}")
+    # Sanitizar nombre del archivo
+    codigo_archivo = "".join(c for c in codigo_archivo if c.isalnum() or c in ("-", "_", ".")).strip()
+
+    # Ruta del repositorio físico local
+    repositorio_dir = os.getenv("REPOSITORIO_PDFS", "./repositorio_archivos/fichas_f03")
+    filename = f"{codigo_archivo}.pdf"
+    filepath = os.path.join(repositorio_dir, filename)
+
+    # Si no existe el PDF físicamente en disco, lo generamos en caliente
+    if not os.path.exists(filepath):
+        caso_repo = OracleCasoRepository()
+        fam_repo = OracleFamiliarRepository()
+
+        casos = await caso_repo.find_by_nna_id(nna.id)
+        familiares = await fam_repo.list_by_carpeta(nna.carpeta_id) if nna.carpeta_id else []
+
+        nna_dict = _nna_to_dict(nna)
+        nna_dict["casos"] = [_caso_to_dict(c) for c in casos]
+        nna_dict["familiares"] = [_familiar_to_dict(f) for f in familiares]
+
+        try:
+            generate_f03_pdf(nna_dict, filepath)
+        except Exception as e:
+            logger.error(f"Error generando PDF para NNA {nna_id}: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Error generando PDF: {str(e)}")
+
+    return FileResponse(
+        filepath,
+        media_type="application/pdf",
+        filename=filename,
+        headers={"Content-Disposition": f"inline; filename={filename}"}
+    )
+
+
+@router.get("/{nna_id}/pdf/pages")
+async def get_nna_pdf_pages_count(nna_id: int, request: Request, token: Optional[str] = None):
+    """Genera la ficha F03 si no existe, cuenta las páginas exactas con pypdf, y las devuelve."""
+    from src.infrastructure.services.pdf_generator import generate_f03_pdf
+    from src.infrastructure.http.middleware.jwt_middleware import verificar_token
+    from pypdf import PdfReader
+    import os
+
+    actual_token = None
+    auth_header = request.headers.get("authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        actual_token = auth_header.split(" ")[1]
+    elif token:
+        actual_token = token
+
+    if not actual_token:
+        raise HTTPException(status_code=401, detail="No autorizado: Token faltante")
+
+    try:
+        user = verificar_token(actual_token)
+    except Exception:
+        raise HTTPException(status_code=401, detail="No autorizado: Token inválido")
+
+    nna_repo = OracleNnaRepository()
+    nna = await nna_repo.find_by_id(nna_id)
+    if not nna:
+        raise HTTPException(status_code=404, detail="Beneficiario NNA no encontrado")
+
+    carpeta_repo = OracleCarpetaRepository()
+    carpeta = await carpeta_repo.find_by_id(nna.carpeta_id) if nna.carpeta_id else None
+    codigo_archivo = nna.codigo_ficha03 if nna.codigo_ficha03 else (carpeta.codigo if carpeta else f"ID_{nna_id}")
+    codigo_archivo = "".join(c for c in codigo_archivo if c.isalnum() or c in ("-", "_", ".")).strip()
+
+    repositorio_dir = os.getenv("REPOSITORIO_PDFS", "./repositorio_archivos/fichas_f03")
+    filename = f"{codigo_archivo}.pdf"
+    filepath = os.path.join(repositorio_dir, filename)
+
+    if not os.path.exists(filepath):
+        caso_repo = OracleCasoRepository()
+        fam_repo = OracleFamiliarRepository()
+        casos = await caso_repo.find_by_nna_id(nna.id)
+        familiares = await fam_repo.list_by_carpeta(nna.carpeta_id) if nna.carpeta_id else []
+        nna_dict = _nna_to_dict(nna)
+        nna_dict["casos"] = [_caso_to_dict(c) for c in casos]
+        nna_dict["familiares"] = [_familiar_to_dict(f) for f in familiares]
+        try:
+            generate_f03_pdf(nna_dict, filepath)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error generando PDF: {str(e)}")
+
+    try:
+        reader = PdfReader(filepath)
+        page_count = len(reader.pages)
+    except Exception:
+        page_count = 1
+
+    return {"pages": page_count}
+
+
+
+def trigger_pdf_generation(nna_id: int):
+    import asyncio
+    from src.infrastructure.db.repositories.oracle_nna_repository import OracleNnaRepository
+    from src.infrastructure.db.repositories.oracle_caso_repository import OracleCasoRepository
+    from src.infrastructure.db.repositories.oracle_familiar_repository import OracleFamiliarRepository
+    from src.infrastructure.services.pdf_generator import generate_f03_pdf
+    import os
+
+    async def _run():
+        nna_repo = OracleNnaRepository()
+        nna = await nna_repo.find_by_id(nna_id)
+        if not nna:
+            return
+        
+        carpeta_repo = OracleCarpetaRepository()
+        carpeta = await carpeta_repo.find_by_id(nna.carpeta_id) if nna.carpeta_id else None
+        codigo_archivo = nna.codigo_ficha03 if nna.codigo_ficha03 else (carpeta.codigo if carpeta else f"ID_{nna_id}")
+        codigo_archivo = "".join(c for c in codigo_archivo if c.isalnum() or c in ("-", "_", ".")).strip()
+
+        repositorio_dir = os.getenv("REPOSITORIO_PDFS", "./repositorio_archivos/fichas_f03")
+        filepath = os.path.join(repositorio_dir, f"{codigo_archivo}.pdf")
+
+        # Regenerar siempre para tener la versión más fresca
+        caso_repo = OracleCasoRepository()
+        fam_repo = OracleFamiliarRepository()
+
+        casos = await caso_repo.find_by_nna_id(nna.id)
+        familiares = await fam_repo.list_by_carpeta(nna.carpeta_id) if nna.carpeta_id else []
+
+        nna_dict = _nna_to_dict(nna)
+        nna_dict["casos"] = [_caso_to_dict(c) for c in casos]
+        nna_dict["familiares"] = [_familiar_to_dict(f) for f in familiares]
+
+        try:
+            generate_f03_pdf(nna_dict, filepath)
+        except Exception:
+            pass
+
+    try:
+        # Si ya hay un event loop corriendo, lo disparamos como tarea
+        loop = asyncio.get_running_loop()
+        loop.create_task(_run())
+    except RuntimeError:
+        asyncio.run(_run())
+
+

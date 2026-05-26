@@ -3,9 +3,11 @@ from src.domain.entities.folio import Folio
 from src.infrastructure.db.connection import get_pool
 
 _SELECT = """
-    SELECT ID, CASO_ID, SEDE_ID, NUMERO_FOLIO, TIPO_DOCUMENTO,
-           TITULO, ARCHIVO_URL, HASH_DOCUMENTO, CREADO_POR_ID, FECHA_CREACION
-    FROM EXP_FOLIO
+    SELECT f.ID, f.CASO_ID, f.SEDE_ID, f.NUMERO_FOLIO, f.TIPO_DOCUMENTO,
+           f.TITULO, f.ARCHIVO_URL, f.HASH_DOCUMENTO, f.CREADO_POR_ID, f.FECHA_CREACION,
+           u.nombre_completo
+    FROM EXP_FOLIO f
+    LEFT JOIN SEC_USUARIO u ON f.CREADO_POR_ID = u.id
 """
 
 
@@ -14,6 +16,7 @@ def _row_to_folio(row) -> Folio:
         id=row[0], caso_id=row[1], sede_id=row[2], numero_folio=row[3],
         tipo_documento=row[4], titulo=row[5], archivo_url=row[6],
         hash_documento=row[7], creado_por_id=row[8], fecha_creacion=row[9],
+        usuario_responsable=row[10] if len(row) > 10 else None,
     )
 
 
@@ -24,7 +27,7 @@ class OracleFolioRepository:
         async with pool.acquire() as conn:
             async with conn.cursor() as cur:
                 await cur.execute(
-                    f"{_SELECT} WHERE CASO_ID = :caso ORDER BY NUMERO_FOLIO",
+                    f"{_SELECT} WHERE f.CASO_ID = :caso ORDER BY f.NUMERO_FOLIO",
                     {"caso": caso_id},
                 )
                 return [_row_to_folio(r) for r in await cur.fetchall()]
@@ -64,5 +67,5 @@ class OracleFolioRepository:
         pool = get_pool()
         async with pool.acquire() as conn:
             async with conn.cursor() as cur:
-                await cur.execute(f"{_SELECT} WHERE ID = :id", {"id": new_id})
+                await cur.execute(f"{_SELECT} WHERE f.ID = :id", {"id": new_id})
                 return _row_to_folio(await cur.fetchone())

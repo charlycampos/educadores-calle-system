@@ -7,6 +7,7 @@ import { Plus, Search, FileDown, MoreHorizontal, ArrowRightCircle, Briefcase, Fi
 import { Link } from 'react-router-dom';
 import { DerivacionModal } from './components/DerivacionModal';
 import { Button } from '../../components/ui/Button';
+import { PdfViewerModal } from './components/PdfViewerModal';
 
 const calculateAge = (dobString: string | Date | null) => {
     if (!dobString) return '-';
@@ -32,6 +33,8 @@ export const NnaListPage = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [isDerivacionOpen, setIsDerivacionOpen] = useState(false);
     const [selectedCase, setSelectedCase] = useState<{ nnaId: number, casoId: number, nnaName: string } | null>(null);
+    const [isPdfOpen, setIsPdfOpen] = useState(false);
+    const [selectedPdfNna, setSelectedPdfNna] = useState<{ id: number, name: string, codigoFicha03?: string | null } | null>(null);
 
     const isNacional = user && [ROLES.ADMIN_NACIONAL, ROLES.MONITOR, ROLES.ESTADISTICO].includes(user.rol);
     const [selectedSede, setSelectedSede] = useState('TODAS');
@@ -188,10 +191,9 @@ export const NnaListPage = () => {
                     <table className="w-full text-left text-[13px]">
                         <thead className="bg-surface-muted border-b border-border">
                             <tr>
-                                <th className="px-4 py-3 font-semibold text-fg-secondary w-48">Expediente</th>
+                                <th className="px-4 py-3 font-semibold text-fg-secondary w-56 whitespace-nowrap">Expediente</th>
                                 <th className="px-4 py-3 font-semibold text-fg-secondary">Beneficiario</th>
                                 <th className="px-4 py-3 font-semibold text-fg-secondary">Ficha 03</th>
-                                <th className="px-4 py-3 font-semibold text-fg-secondary">Documento</th>
                                 <th className="px-4 py-3 font-semibold text-fg-secondary">Edad / Sexo</th>
                                 <th className="px-4 py-3 font-semibold text-fg-secondary">Fecha Reg.</th>
                                 <th className="px-4 py-3 font-semibold text-fg-secondary">Casos Activos</th>
@@ -201,13 +203,13 @@ export const NnaListPage = () => {
                         <tbody className="divide-y divide-border">
                             {isLoading ? (
                                 <tr>
-                                    <td colSpan={8} className="px-4 py-12 text-center text-fg-muted">
+                                    <td colSpan={7} className="px-4 py-12 text-center text-fg-muted">
                                         Cargando datos...
                                     </td>
                                 </tr>
                             ) : filteredNnas.length === 0 ? (
                                 <tr>
-                                    <td colSpan={8} className="px-4 py-12 text-center text-fg-muted">
+                                    <td colSpan={7} className="px-4 py-12 text-center text-fg-muted">
                                         {searchTerm ? 'No se encontraron resultados.' : 'No hay beneficiarios registrados.'}
                                     </td>
                                 </tr>
@@ -223,7 +225,7 @@ export const NnaListPage = () => {
                                         {/* Spacer Row between groups (except first) */}
                                         {groupIndex > 0 && (
                                             <tr>
-                                                <td colSpan={8} className="h-3 bg-bg border-none"></td>
+                                                <td colSpan={7} className="h-3 bg-bg border-none"></td>
                                             </tr>
                                         )}
 
@@ -238,7 +240,7 @@ export const NnaListPage = () => {
                                                                     <Briefcase size={16} />
                                                                 </div>
                                                                 <div>
-                                                                    <span className="font-mono text-[13px] font-semibold text-fg block">
+                                                                    <span className="font-mono text-[13px] font-semibold text-fg block whitespace-nowrap">
                                                                         {nna.carpeta?.codigo || '---'}
                                                                     </span>
                                                                 </div>
@@ -277,14 +279,10 @@ export const NnaListPage = () => {
                                                     </span>
                                                 </td>
                                                 <td className={clsx("px-4 py-3 border-r border-border", idx > 0 ? "border-t border-border" : "")}>
-                                                    <div className="flex flex-col">
-                                                        <span className="text-[10px] font-semibold text-fg-muted uppercase">{nna.tipoDoc}</span>
-                                                        <span className="font-mono text-[13px] text-fg">{nna.numeroDoc || '---'}</span>
-                                                    </div>
-                                                </td>
-                                                <td className={clsx("px-4 py-3 border-r border-border", idx > 0 ? "border-t border-border" : "")}>
                                                     <p className="text-fg font-medium text-[13px]">{calculateAge(nna.fechaNacimiento)} años</p>
-                                                    <p className="text-[11px] text-fg-muted capitalize">{nna.sexo === 'M' ? 'Masculino' : nna.sexo === 'F' ? 'Femenino' : '-'}</p>
+                                                    <p className="text-[11px] text-fg-muted capitalize">
+                                                        {['1', 'M'].includes(String(nna.sexo).trim().toUpperCase()) ? 'Hombre' : ['2', 'F'].includes(String(nna.sexo).trim().toUpperCase()) ? 'Mujer' : '-'}
+                                                    </p>
                                                 </td>
                                                 <td className={clsx("px-4 py-3 border-r border-border", idx > 0 ? "border-t border-border" : "")}>
                                                     <p className="text-[13px] text-fg font-mono">
@@ -316,13 +314,20 @@ export const NnaListPage = () => {
                                                             >
                                                                 <FolderOpen size={15} />
                                                             </Link>
-                                                            <Link
-                                                                to={`/nna/ficha/${nna.id}`}
-                                                                title="Ver Ficha"
+                                                            <button
+                                                                onClick={() => {
+                                                                    setSelectedPdfNna({
+                                                                        id: nna.id,
+                                                                        name: `${nna.nombres} ${nna.apellidoPaterno} ${nna.apellidoMaterno}`,
+                                                                        codigoFicha03: nna.codigoFicha03
+                                                                    });
+                                                                    setIsPdfOpen(true);
+                                                                }}
+                                                                title="Ver Ficha PDF"
                                                                 className="p-1.5 bg-surface text-fg-muted border border-border rounded-md hover:text-primary hover:border-primary/30 hover:bg-primary-soft transition-colors"
                                                             >
                                                                 <FileText size={15} />
-                                                            </Link>
+                                                            </button>
                                                             {canEdit && (
                                                                 <Link
                                                                     to={`/nna/editar/${nna.id}`}
@@ -364,6 +369,18 @@ export const NnaListPage = () => {
                     nnaId={selectedCase.nnaId}
                     casoId={selectedCase.casoId}
                     nnaName={selectedCase.nnaName}
+                />
+            )}
+
+            {selectedPdfNna && (
+                <PdfViewerModal
+                    isOpen={isPdfOpen}
+                    onClose={() => {
+                        setIsPdfOpen(false);
+                        setSelectedPdfNna(null);
+                    }}
+                    nnaId={selectedPdfNna.id}
+                    nnaName={selectedPdfNna.name}
                 />
             )}
         </div>

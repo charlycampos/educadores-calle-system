@@ -27,11 +27,8 @@ class AgregarFolioUseCase:
         self._repo = folio_repo
 
     async def execute(self, input: AgregarFolioInput):
-        from src.domain.entities.folio import TIPOS_DOCUMENTO
-        if input.tipo_documento not in TIPOS_DOCUMENTO:
-            raise TipoDocumentoInvalidoError(
-                f"Tipo '{input.tipo_documento}' no válido. Válidos: {TIPOS_DOCUMENTO}"
-            )
+        # Permitir cualquier tipo de documento para flexibilidad de DNI, Actas, etc.
+        pass
 
         # Siguiente número de folio para este caso
         siguiente = await self._repo.get_next_numero_folio(input.caso_id)
