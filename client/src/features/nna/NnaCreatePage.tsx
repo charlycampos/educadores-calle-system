@@ -748,6 +748,14 @@ const normalizeLugarPernocte = (value: unknown): string => {
     return '';
 };
 
+const SEGUROS_PREDEFINIDOS = [
+    "EsSalud",
+    "Seguro Privado / EPS",
+    "Seguro de FF.AA. o Policiales",
+    "Seguro Escolar Privado",
+    "Seguro Universitario"
+];
+
 const normalizeEstudiaActualmente = (value: unknown): string => {
     if (value === null || value === undefined) return 'NO';
     const str = String(value).toUpperCase().trim();
@@ -1759,6 +1767,36 @@ export const NnaCreatePage = () => {
                     <p className="text-blue-200 text-[11px] mt-0.5">Formato F03 · Registro Oficial</p>
                 </div>
 
+                {isEditMode && selectedExpediente && selectedExpediente.length > 0 && (
+                    <div className="px-4 py-3 border-b border-gray-100 bg-blue-50/50 flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                            <span className="text-[9px] font-bold uppercase tracking-wider text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
+                                Edición Activa
+                            </span>
+                        </div>
+                        <div>
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Beneficiario (NNA)</p>
+                            <p className="text-xs font-bold text-gray-800 truncate" title={`${(selectedExpediente[0] as any).nombres || ''} ${(selectedExpediente[0] as any).apellidoPaterno || ''}`}>
+                                {`${(selectedExpediente[0] as any).nombres || ''} ${(selectedExpediente[0] as any).apellidoPaterno || ''}`}
+                            </p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                            <div>
+                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Nº Ficha</p>
+                                <p className="text-xs font-bold text-gray-700 truncate">
+                                    {(selectedExpediente[0] as any).codigoFicha03 || 'Sin Código'}
+                                </p>
+                            </div>
+                            <div>
+                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Expediente</p>
+                                <p className="text-xs font-bold text-gray-700">
+                                    {((selectedExpediente[0] as any).casos?.find((c: any) => c.estado !== 'CERRADO') || (selectedExpediente[0] as any).casos?.[0])?.codigoCaso || `ID: ${id}`}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
                     {sections.map((section, idx) => {
                         const isActive = activeSection === section.id;
@@ -2067,46 +2105,6 @@ export const NnaCreatePage = () => {
                                     </div>
                                 ))}
 
-                                <button type="button" onClick={() => {
-                                    const primerNna = watch('nnas.0');
-                                    append({
-                                        nombres: '',
-                                        apellidoPaterno: primerNna?.apellidoPaterno || '',
-                                        apellidoMaterno: primerNna?.apellidoMaterno || '',
-                                        tipoDoc: '1',
-                                        departamentoNac: primerNna?.departamentoNac || '',
-                                        provinciaNac: primerNna?.provinciaNac || '',
-                                        distritoNac: primerNna?.distritoNac || '',
-                                        institucionEducativa: primerNna?.institucionEducativa || '',
-                                        estudiaActualmente: true,
-                                        tienePartidaNacimiento: "true",
-                                        tieneDiscapacidad: false,
-                                        sexo: '',
-                                        fechaNacimiento: '',
-                                        numeroDoc: '',
-                                        detalleSinDoc: '',
-                                        detalleNoEstudia: '',
-                                        modalidadEstudio: '',
-                                        nivelEducativo: '',
-                                        gradoEstudio: '',
-                                        tipoDiscapacidad: '',
-                                        afiliadoSIS: '',
-                                        afiliadoOtroSeguro: '',
-                                        detalleOtroSeguro: '',
-                                        sufreEnfermedad: '',
-                                        detalleEnfermedad: '',
-                                        observacionesSalud: '',
-                                        actividadesTiempoLibre: '',
-                                        caracteristicas: '',
-                                        tieneAntecedenteAlbergue: false,
-                                        detalleAntecedenteAlbergue: '',
-                                        nacionalidad: primerNna?.nacionalidad || 'PERUANA',
-                                        usoTiempo: {} as Record<string, UsoTiempoDia>,
-                                        actividadesTiempoLibreLista: []
-                                    });
-                                }} className="w-full py-3 border-2 border-dashed border-gray-300 rounded-xl hover:border-blue-400 hover:bg-blue-50 text-gray-500 hover:text-blue-600 font-bold transition-all flex items-center justify-center gap-2">
-                                    <Plus size={20} /> Agregar Hermano (Copiar apellidos)
-                                </button>
                             </div>
                         )}
 
@@ -2222,7 +2220,20 @@ export const NnaCreatePage = () => {
                                                     <div className="p-3 text-sm font-bold text-gray-700">¿Estás afiliado al Seguro Universal de Salud (SIS)?</div>
                                                     {['SI', 'NO', 'NO_SABE'].map((opt) => (
                                                         <label key={opt} className={`p-3 flex items-center justify-center cursor-pointer hover:bg-blue-50 transition-colors h-full ${watch(`nnas.${index}.afiliadoSIS` as const) === opt ? 'bg-blue-100 text-blue-900 font-bold' : ''}`}>
-                                                            <input type="radio" value={opt} {...register(`nnas.${index}.afiliadoSIS` as const)} className="mr-2" />
+                                                            <input
+                                                                type="radio"
+                                                                value={opt}
+                                                                {...register(`nnas.${index}.afiliadoSIS` as const)}
+                                                                onChange={(e) => {
+                                                                    const val = e.target.value;
+                                                                    setValue(`nnas.${index}.afiliadoSIS`, val);
+                                                                    if (val === 'SI') {
+                                                                        setValue(`nnas.${index}.afiliadoOtroSeguro`, 'NO');
+                                                                        setValue(`nnas.${index}.detalleOtroSeguro`, '');
+                                                                    }
+                                                                }}
+                                                                className="mr-2"
+                                                            />
                                                             <span className="text-xs font-bold">{opt.replace('_', ' ')}</span>
                                                         </label>
                                                     ))}
@@ -2231,14 +2242,60 @@ export const NnaCreatePage = () => {
                                                     <div className="p-3 text-sm font-bold text-gray-700">¿Estás afiliado a algún otro tipo de seguro de salud?</div>
                                                     {['SI', 'NO', 'NO_SABE'].map((opt) => (
                                                         <label key={opt} className={`p-3 flex items-center justify-center cursor-pointer hover:bg-blue-50 transition-colors h-full ${watch(`nnas.${index}.afiliadoOtroSeguro` as const) === opt ? 'bg-blue-100 text-blue-900 font-bold' : ''}`}>
-                                                            <input type="radio" value={opt} {...register(`nnas.${index}.afiliadoOtroSeguro` as const)} className="mr-2" />
+                                                            <input
+                                                                type="radio"
+                                                                value={opt}
+                                                                {...register(`nnas.${index}.afiliadoOtroSeguro` as const)}
+                                                                onChange={(e) => {
+                                                                    const val = e.target.value;
+                                                                    setValue(`nnas.${index}.afiliadoOtroSeguro`, val);
+                                                                    if (val === 'SI') {
+                                                                        setValue(`nnas.${index}.afiliadoSIS`, 'NO');
+                                                                    } else {
+                                                                        setValue(`nnas.${index}.detalleOtroSeguro`, '');
+                                                                    }
+                                                                }}
+                                                                className="mr-2"
+                                                            />
                                                             <span className="text-xs font-bold">{opt.replace('_', ' ')}</span>
                                                         </label>
                                                     ))}
                                                 </div>
                                                 {watch(`nnas.${index}.afiliadoOtroSeguro` as const) === 'SI' && (
-                                                    <div className="p-3 bg-blue-50 animate-slideDown border-t">
-                                                        <InputField label="De ser afirmativo especificar: ¿Cuál?" register={register(`nnas.${index}.detalleOtroSeguro` as const)} placeholder="Especifique el seguro..." />
+                                                    <div className="p-4 bg-blue-50 animate-slideDown border-t space-y-4">
+                                                        <SelectField
+                                                            label="Seleccione el seguro de salud"
+                                                            value={
+                                                                SEGUROS_PREDEFINIDOS.includes(watch(`nnas.${index}.detalleOtroSeguro` as const) || '')
+                                                                    ? watch(`nnas.${index}.detalleOtroSeguro` as const)
+                                                                    : (watch(`nnas.${index}.detalleOtroSeguro` as const) ? 'OTRO' : '')
+                                                            }
+                                                            onChange={(e) => {
+                                                                const val = e.target.value;
+                                                                if (val === 'OTRO') {
+                                                                    setValue(`nnas.${index}.detalleOtroSeguro`, '');
+                                                                } else {
+                                                                    setValue(`nnas.${index}.detalleOtroSeguro`, val);
+                                                                }
+                                                            }}
+                                                            options={[
+                                                                { value: '', label: 'Seleccione un seguro...' },
+                                                                ...SEGUROS_PREDEFINIDOS.map(s => ({ value: s, label: s })),
+                                                                { value: 'OTRO', label: 'Otro (Especificar)' }
+                                                            ]}
+                                                        />
+
+                                                        {(!SEGUROS_PREDEFINIDOS.includes(watch(`nnas.${index}.detalleOtroSeguro` as const) || '') || 
+                                                         watch(`nnas.${index}.detalleOtroSeguro` as const) === '') && 
+                                                         (watch(`nnas.${index}.detalleOtroSeguro` as const) !== undefined) && (
+                                                            <div className="animate-slideDown">
+                                                                <InputField
+                                                                    label="Especifique el seguro de salud alternativo"
+                                                                    register={register(`nnas.${index}.detalleOtroSeguro` as const)}
+                                                                    placeholder="Ej: Mapfre, Seguro universitario particular..."
+                                                                />
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 )}
                                             </div>
@@ -2381,40 +2438,7 @@ export const NnaCreatePage = () => {
                                             </div>
                                         )}
 
-                                         {/* Ocultar el input simple de nombreTutor si se registra el Tutor Detallado SEC 2026 */}
-                                         {!(watch('tieneTutorApo') === 'true' || watch('tieneTutorApo') === true) && (
-                                             <div className="animate-fadeIn">
-                                                 <InputField label="Nombre del Tutor / Responsable" register={register('nombreTutor')} placeholder="Si aplica" />
-                                             </div>
-                                         )}
 
-                                         {/* Hermanos (SEC 2026) */}
-                                         <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mt-4 space-y-4">
-                                             <label className="text-[10px] font-bold text-gray-500 uppercase block mb-1">Hermanos del NNA (SEC 2026)</label>
-                                             <div className="flex gap-4 items-center">
-                                                 <label className="text-sm font-bold text-gray-700">¿Tiene hermanos?</label>
-                                                 <div className="flex gap-4">
-                                                     <label className="flex items-center gap-2 cursor-pointer">
-                                                         <input type="radio" value="true" {...register('tieneHermanos')} className="text-blue-600" />
-                                                         <span className="text-sm font-bold">Sí</span>
-                                                     </label>
-                                                     <label className="flex items-center gap-2 cursor-pointer">
-                                                         <input type="radio" value="false" {...register('tieneHermanos')} className="text-blue-600" />
-                                                         <span className="text-sm font-bold">No</span>
-                                                     </label>
-                                                 </div>
-                                             </div>
-                                             {(watch('tieneHermanos') === 'true' || watch('tieneHermanos') === true) && (
-                                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-slideDown border-t pt-3">
-                                                     <div className="md:col-span-1">
-                                                         <InputField type="number" label="Cantidad de hermanos" register={register('cantHermanos')} placeholder="Ej. 2" />
-                                                     </div>
-                                                     <div className="md:col-span-2">
-                                                         <InputField label="Detalles de los hermanos" register={register('detallesHermanos')} placeholder="Nombres, edades, etc." />
-                                                     </div>
-                                                 </div>
-                                             )}
-                                          </div>
 
                                           {/* Familiar / Adulto Responsable (SEC 2026) */}
                                           <div className="border border-purple-100 rounded-xl bg-purple-50/30 p-5 mt-6 group hover:border-purple-200 transition-all">
