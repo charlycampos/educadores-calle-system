@@ -1,0 +1,958 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SEC · Paso 1 — Fundamentos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+:root {
+  /* ───── Color tokens (oklch) ────────────────────────────────── */
+  --primary:        oklch(0.43 0.14 254);
+  --primary-hover:  oklch(0.38 0.14 254);
+  --primary-soft:   oklch(0.95 0.025 254);
+  --primary-fg:     #ffffff;
+
+  --bg:             oklch(0.985 0.003 250);
+  --surface:        #ffffff;
+  --surface-muted:  oklch(0.975 0.004 250);
+
+  --border:         oklch(0.92 0.005 250);
+  --border-strong:  oklch(0.85 0.008 250);
+
+  --fg:             oklch(0.22 0.018 257);
+  --fg-secondary:   oklch(0.42 0.015 257);
+  --fg-muted:       oklch(0.55 0.012 257);
+
+  --success:        oklch(0.58 0.13 155);
+  --success-soft:   oklch(0.95 0.04 155);
+  --warning:        oklch(0.68 0.15 70);
+  --warning-soft:   oklch(0.96 0.05 80);
+  --danger:         oklch(0.55 0.20 25);
+  --danger-soft:    oklch(0.96 0.04 25);
+  --info:           oklch(0.58 0.12 230);
+  --info-soft:      oklch(0.95 0.03 230);
+
+  /* ───── Type ────────────────────────────────────────────────── */
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+
+  /* ───── Radius ──────────────────────────────────────────────── */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  /* ───── Shadows ─────────────────────────────────────────────── */
+  --shadow-1: 0 1px 2px rgba(15, 23, 42, 0.04), 0 0 0 1px rgba(15, 23, 42, 0.04);
+  --shadow-2: 0 2px 8px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-3: 0 12px 32px rgba(15, 23, 42, 0.10), 0 2px 4px rgba(15, 23, 42, 0.04);
+}
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Layout ----------------------------------------------------- */
+.page {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 48px 32px 96px;
+}
+.section { margin-top: 64px; }
+.section-head { margin-bottom: 24px; display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.section h2 { font-size: 18px; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
+.section .label-num { font-size: 11px; font-weight: 600; color: var(--primary); text-transform: uppercase; letter-spacing: 0.08em; }
+.section .desc { color: var(--fg-secondary); font-size: 13px; max-width: 620px; }
+.divider { height: 1px; background: var(--border); margin-top: 12px; }
+
+/* Hero ------------------------------------------------------- */
+.hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
+  padding-bottom: 32px;
+  border-bottom: 1px solid var(--border);
+}
+.hero h1 {
+  font-size: 28px;
+  font-weight: 700;
+  margin: 0 0 8px;
+  letter-spacing: -0.025em;
+}
+.hero p {
+  color: var(--fg-secondary);
+  margin: 0;
+  font-size: 14px;
+}
+.hero .meta {
+  display: flex;
+  gap: 24px;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.hero .meta strong { color: var(--fg); font-weight: 600; }
+
+/* Logo ------------------------------------------------------- */
+.logo-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.logo-mark {
+  width: 36px; height: 36px;
+  border-radius: 8px;
+  background: var(--primary);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.logo-mark svg { display: block; }
+.logo-wordmark { display: flex; flex-direction: column; line-height: 1.15; }
+.logo-wordmark .t1 { font-size: 14px; font-weight: 700; color: var(--fg); letter-spacing: -0.01em; }
+.logo-wordmark .t2 { font-size: 11px; color: var(--fg-muted); }
+
+/* Palette ---------------------------------------------------- */
+.palette-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+.swatch {
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  background: var(--surface);
+}
+.swatch-color {
+  height: 72px;
+  display: flex;
+  align-items: flex-end;
+  padding: 10px;
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.swatch-meta {
+  padding: 10px 12px;
+  font-size: 11px;
+  border-top: 1px solid var(--border);
+}
+.swatch-meta .name { font-weight: 600; color: var(--fg); }
+.swatch-meta .val { color: var(--fg-muted); font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 10.5px; margin-top: 2px; display: block; }
+
+/* Type ------------------------------------------------------- */
+.type-table { width: 100%; border-collapse: collapse; }
+.type-table td { padding: 16px 0; border-bottom: 1px solid var(--border); vertical-align: baseline; }
+.type-table td:first-child { width: 200px; }
+.type-table .name { font-weight: 600; font-size: 13px; color: var(--fg); }
+.type-table .meta { color: var(--fg-muted); font-size: 11px; font-family: ui-monospace, "SF Mono", Menlo, monospace; margin-top: 2px; }
+.t-display { font-size: 32px; font-weight: 700; letter-spacing: -0.025em; line-height: 1.1; }
+.t-h1 { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.2; }
+.t-h2 { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.3; }
+.t-body { font-size: 14px; font-weight: 400; line-height: 1.5; }
+.t-caption { font-size: 12px; font-weight: 500; color: var(--fg-secondary); line-height: 1.4; }
+.t-micro { font-size: 11px; font-weight: 600; color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.08em; }
+
+/* Radii + shadow --------------------------------------------- */
+.tile-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+.tile {
+  height: 96px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  display: grid;
+  place-items: center;
+  position: relative;
+  font-size: 11px;
+  color: var(--fg-muted);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+.tile.r-sm { border-radius: 6px; }
+.tile.r-md { border-radius: 8px; }
+.tile.r-lg { border-radius: 12px; }
+.tile.s-1 { box-shadow: var(--shadow-1); border-color: transparent; }
+.tile.s-2 { box-shadow: var(--shadow-2); border-color: transparent; }
+.tile.s-3 { box-shadow: var(--shadow-3); border-color: transparent; }
+
+/* Components ------------------------------------------------- */
+.component-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+.component-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+}
+.component-card h3 {
+  font-size: 12px; font-weight: 600; color: var(--fg-muted);
+  text-transform: uppercase; letter-spacing: 0.08em;
+  margin: 0 0 16px;
+}
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.row + .row { margin-top: 12px; }
+
+/* Button */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+  line-height: 1.2;
+}
+.btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.btn-primary { background: var(--primary); color: var(--primary-fg); }
+.btn-primary:hover { background: var(--primary-hover); }
+.btn-secondary { background: var(--surface); color: var(--fg); border-color: var(--border-strong); }
+.btn-secondary:hover { background: var(--surface-muted); }
+.btn-ghost { background: transparent; color: var(--fg-secondary); }
+.btn-ghost:hover { background: var(--surface-muted); color: var(--fg); }
+.btn-danger { background: var(--danger); color: white; }
+.btn-sm { font-size: 12px; padding: 6px 10px; }
+
+/* Badge */
+.badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  letter-spacing: 0.01em;
+}
+.badge-dot { width: 6px; height: 6px; border-radius: 999px; }
+.badge-success { background: var(--success-soft); color: var(--success); }
+.badge-warning { background: var(--warning-soft); color: var(--warning); }
+.badge-danger { background: var(--danger-soft); color: var(--danger); }
+.badge-info { background: var(--info-soft); color: var(--info); }
+.badge-neutral { background: var(--surface-muted); color: var(--fg-secondary); border: 1px solid var(--border); }
+.badge-success .badge-dot { background: var(--success); }
+.badge-warning .badge-dot { background: var(--warning); }
+.badge-danger  .badge-dot { background: var(--danger); }
+
+/* Input */
+.input-group { display: flex; flex-direction: column; gap: 4px; }
+.input-label { font-size: 12px; font-weight: 500; color: var(--fg-secondary); }
+.input {
+  font-family: inherit;
+  font-size: 14px;
+  padding: 9px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--fg);
+  width: 100%;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.input::placeholder { color: var(--fg-muted); }
+.input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in oklch, var(--primary) 18%, transparent); }
+
+/* StatCard */
+.stat {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.stat-label { font-size: 12px; font-weight: 500; color: var(--fg-secondary); display: flex; align-items: center; gap: 6px; }
+.stat-value { font-size: 28px; font-weight: 700; color: var(--fg); letter-spacing: -0.02em; line-height: 1; }
+.stat-delta { font-size: 12px; color: var(--success); display: flex; align-items: center; gap: 4px; }
+.stat-delta.down { color: var(--danger); }
+.stat-delta .arrow { font-size: 10px; }
+
+/* Empty State */
+.empty {
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: 36px 24px;
+  text-align: center;
+  background: var(--surface-muted);
+}
+.empty .icon {
+  width: 40px; height: 40px;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  display: grid; place-items: center;
+  margin: 0 auto 12px;
+  color: var(--fg-muted);
+}
+.empty .title { font-size: 14px; font-weight: 600; color: var(--fg); }
+.empty .desc { font-size: 12px; color: var(--fg-secondary); margin: 4px 0 14px; }
+
+/* ───── Login redesign frame ───── */
+.login-frame {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 64px 24px;
+  min-height: 560px;
+  display: grid;
+  place-items: center;
+  position: relative;
+  overflow: hidden;
+}
+.login-frame::before {
+  /* very subtle topographic pattern hint */
+  content: "";
+  position: absolute; inset: 0;
+  background-image:
+    radial-gradient(circle at 20% 30%, color-mix(in oklch, var(--primary) 4%, transparent) 0, transparent 40%),
+    radial-gradient(circle at 80% 70%, color-mix(in oklch, var(--primary) 3%, transparent) 0, transparent 45%);
+  pointer-events: none;
+}
+.login-card {
+  width: 100%; max-width: 380px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 32px;
+  box-shadow: var(--shadow-2);
+  position: relative;
+  z-index: 1;
+}
+.login-brand {
+  display: flex; flex-direction: column; align-items: flex-start;
+  gap: 20px;
+  margin-bottom: 28px;
+}
+.login-brand .meta {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.login-title {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  margin: 0 0 4px;
+  color: var(--fg);
+}
+.login-subtitle {
+  font-size: 13px;
+  color: var(--fg-secondary);
+  margin: 0 0 24px;
+}
+.field { margin-bottom: 14px; }
+.field-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--fg-secondary);
+  display: block;
+  margin-bottom: 6px;
+}
+.field .input { font-size: 14px; }
+.login-pass-wrapper { position: relative; }
+.login-pass-wrapper .toggle {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  background: transparent; border: 0; color: var(--fg-muted);
+  cursor: pointer; padding: 6px;
+  border-radius: var(--radius-sm);
+}
+.login-pass-wrapper .toggle:hover { color: var(--fg); background: var(--surface-muted); }
+.login-row {
+  display: flex; align-items: center; justify-content: space-between;
+  margin: 4px 0 20px;
+}
+.login-checkbox {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; color: var(--fg-secondary);
+  cursor: pointer;
+}
+.login-checkbox input { accent-color: var(--primary); width: 14px; height: 14px; }
+.login-link {
+  font-size: 12px; color: var(--primary);
+  text-decoration: none; font-weight: 500;
+}
+.login-link:hover { text-decoration: underline; }
+.btn-block { width: 100%; justify-content: center; padding: 10px 14px; font-size: 14px; }
+.login-foot {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 6px;
+}
+.login-foot .needs-help {
+  font-size: 12px; color: var(--fg-muted);
+}
+.login-frame .legal {
+  position: absolute;
+  bottom: 16px; left: 0; right: 0;
+  text-align: center;
+  font-size: 11px;
+  color: var(--fg-muted);
+  z-index: 1;
+}
+.error-bar {
+  display: flex; align-items: flex-start; gap: 8px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  font-size: 12px;
+  margin-bottom: 14px;
+  border: 1px solid color-mix(in oklch, var(--danger) 20%, transparent);
+}
+
+/* Before / After cols ----------------------------------------- */
+.ba {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: stretch;
+}
+@media (max-width: 800px) {
+  .ba { grid-template-columns: 1fr; }
+  .component-grid { grid-template-columns: 1fr; }
+}
+.ba-col { display: flex; flex-direction: column; gap: 10px; }
+.ba-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  display: flex; align-items: center; gap: 6px;
+}
+.ba-label .pill {
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+/* Before frame — replicates current style with emoji + gradient banner */
+.before-frame {
+  background: linear-gradient(135deg, #f1f5f9 0%, #eff6ff 100%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 64px 24px;
+  min-height: 560px;
+  display: grid;
+  place-items: center;
+  position: relative;
+  overflow: hidden;
+}
+.before-card {
+  width: 100%; max-width: 380px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+  overflow: hidden;
+}
+.before-banner {
+  background: linear-gradient(90deg, #1e40af 0%, #2563eb 100%);
+  padding: 22px 28px;
+  text-align: center;
+  color: white;
+}
+.before-banner .row { justify-content: center; gap: 10px; align-items: center; }
+.before-banner .emoji {
+  width: 42px; height: 42px;
+  background: rgba(255,255,255,0.18);
+  border-radius: 999px;
+  display: grid; place-items: center;
+  font-size: 18px;
+}
+.before-banner .b-meta { text-align: left; }
+.before-banner .b-meta strong { font-size: 12.5px; display: block; }
+.before-banner .b-meta span { font-size: 11px; color: #bfdbfe; }
+.before-banner h2 { font-size: 16px; font-weight: 700; margin: 10px 0 2px; }
+.before-banner p { font-size: 11px; color: #bfdbfe; margin: 0; }
+.before-avatar {
+  width: 60px; height: 60px;
+  background: #f3f4f6; border-radius: 999px;
+  border: 4px solid white;
+  margin: -30px auto 0;
+  display: grid; place-items: center;
+  color: #9ca3af;
+}
+.before-body { padding: 8px 28px 28px; }
+.before-body .sub { text-align: center; font-size: 13px; color: #6b7280; font-weight: 500; padding: 8px 0 14px; }
+.before-input { width: 100%; padding: 12px 16px; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 13px; margin-bottom: 12px; }
+.before-btn { width: 100%; padding: 12px; background: #2563eb; color: white; border: 0; border-radius: 8px; font-weight: 600; font-size: 13px; cursor: pointer; }
+
+/* Inline SVG icons (small) */
+.i { display: inline-block; width: 14px; height: 14px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ─────────── HERO ─────────── -->
+  <header class="hero">
+    <div>
+      <div class="logo-row" style="margin-bottom: 18px;">
+        <div class="logo-mark">
+          <!-- Path mark: two anchor dots connected by an arc — "guided path" -->
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <path d="M5 18 Q 12 10, 19 6" stroke="white" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+            <circle cx="5" cy="18" r="2.2" fill="white"/>
+            <circle cx="19" cy="6" r="2.2" fill="white"/>
+          </svg>
+        </div>
+        <div class="logo-wordmark">
+          <span class="t1">Sistema de Educadores de Calle</span>
+          <span class="t2">INABIF · DGNNA · MIMP</span>
+        </div>
+      </div>
+      <h1>Paso 1 — Fundamentos del sistema</h1>
+      <p>Paleta, tipografía, radios, sombras, componentes base y rediseño del Login.</p>
+    </div>
+    <div class="meta">
+      <div><strong>5</strong><br/>Pasos del plan</div>
+      <div><strong>1 / 5</strong><br/>Avance</div>
+    </div>
+  </header>
+
+  <!-- ─────────── 1. IDENTIDAD ─────────── -->
+  <section class="section">
+    <div class="section-head">
+      <div>
+        <div class="label-num">01 · Identidad</div>
+        <h2>Marca institucional</h2>
+        <p class="desc">Reemplazamos el emoji 🏛️ por un monograma vectorial: dos puntos conectados por un arco — representa la <em>ruta de acompañamiento</em> entre el educador y el NNA. Funciona en sidebar, login, header, y se ve igual en cualquier sistema operativo.</p>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+
+      <!-- Lockup formal -->
+      <div class="component-card">
+        <h3>Lockup formal · Login y documentos</h3>
+        <div style="display: flex; align-items: center; gap: 14px;">
+          <div class="logo-mark" style="width: 48px; height: 48px;">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
+              <path d="M5 18 Q 12 10, 19 6" stroke="white" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+              <circle cx="5" cy="18" r="2.2" fill="white"/>
+              <circle cx="19" cy="6" r="2.2" fill="white"/>
+            </svg>
+          </div>
+          <div class="logo-wordmark">
+            <span class="t1" style="font-size: 16px;">Sistema de Educadores de Calle</span>
+            <span class="t2" style="font-size: 12px;">INABIF · DGNNA · Ministerio de la Mujer</span>
+          </div>
+        </div>
+
+        <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 12px;">
+          <div class="logo-mark" style="width: 28px; height: 28px; border-radius: 6px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M5 18 Q 12 10, 19 6" stroke="white" stroke-width="2.4" stroke-linecap="round" fill="none"/>
+              <circle cx="5" cy="18" r="2.4" fill="white"/>
+              <circle cx="19" cy="6" r="2.4" fill="white"/>
+            </svg>
+          </div>
+          <div class="logo-wordmark">
+            <span class="t1" style="font-size: 13px;">SEC</span>
+            <span class="t2">Versión compacta · Sidebar</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- En contextos -->
+      <div class="component-card">
+        <h3>En contexto</h3>
+        <!-- Mini sidebar -->
+        <div style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px 14px; display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+          <div class="logo-mark" style="width: 28px; height: 28px; border-radius: 6px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M5 18 Q 12 10, 19 6" stroke="white" stroke-width="2.4" stroke-linecap="round" fill="none"/>
+              <circle cx="5" cy="18" r="2.4" fill="white"/>
+              <circle cx="19" cy="6" r="2.4" fill="white"/>
+            </svg>
+          </div>
+          <div style="line-height: 1.2;">
+            <div style="font-size: 12px; font-weight: 600;">SEC</div>
+            <div style="font-size: 10.5px; color: var(--fg-muted);">Educadores de Calle</div>
+          </div>
+        </div>
+        <!-- Sobre fondo oscuro -->
+        <div style="background: var(--primary); border-radius: var(--radius-md); padding: 16px; display: flex; align-items: center; gap: 10px;">
+          <div style="width: 32px; height: 32px; border-radius: 6px; background: rgba(255,255,255,0.15); display: grid; place-items: center;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M5 18 Q 12 10, 19 6" stroke="white" stroke-width="2.4" stroke-linecap="round" fill="none"/>
+              <circle cx="5" cy="18" r="2.4" fill="white"/>
+              <circle cx="19" cy="6" r="2.4" fill="white"/>
+            </svg>
+          </div>
+          <div style="line-height: 1.2;">
+            <div style="font-size: 13px; font-weight: 600; color: white;">SEC</div>
+            <div style="font-size: 11px; color: rgba(255,255,255,0.75);">Sistema Operativo</div>
+          </div>
+        </div>
+        <p style="font-size: 11.5px; color: var(--fg-muted); margin: 12px 0 0;">El monograma usa relleno blanco sobre primario, y relleno blanco semi-transparente sobre cualquier fondo de color sólido.</p>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ─────────── 2. PALETA ─────────── -->
+  <section class="section">
+    <div class="section-head">
+      <div>
+        <div class="label-num">02 · Color</div>
+        <h2>Paleta institucional</h2>
+        <p class="desc">Un solo azul primario. Grises con tinte cool unificado. Cuatro colores semánticos (éxito, advertencia, peligro, info). <strong>Se acaba el indigo, el emerald, el rose, el amber.</strong> Todo se reduce a estos tokens.</p>
+      </div>
+    </div>
+
+    <div class="palette-grid">
+      <div class="swatch"><div class="swatch-color" style="background: var(--primary);">primary</div><div class="swatch-meta"><span class="name">--primary</span><span class="val">oklch(0.43 0.14 254)</span></div></div>
+      <div class="swatch"><div class="swatch-color" style="background: var(--primary-hover);">primary-hover</div><div class="swatch-meta"><span class="name">--primary-hover</span><span class="val">oklch(0.38 0.14 254)</span></div></div>
+      <div class="swatch"><div class="swatch-color" style="background: var(--primary-soft); color: var(--primary);">primary-soft</div><div class="swatch-meta"><span class="name">--primary-soft</span><span class="val">oklch(0.95 0.025 254)</span></div></div>
+
+      <div class="swatch"><div class="swatch-color" style="background: var(--fg);">fg</div><div class="swatch-meta"><span class="name">--fg</span><span class="val">oklch(0.22 0.018 257)</span></div></div>
+      <div class="swatch"><div class="swatch-color" style="background: var(--fg-secondary);">fg-secondary</div><div class="swatch-meta"><span class="name">--fg-secondary</span><span class="val">oklch(0.42 0.015 257)</span></div></div>
+      <div class="swatch"><div class="swatch-color" style="background: var(--fg-muted);">fg-muted</div><div class="swatch-meta"><span class="name">--fg-muted</span><span class="val">oklch(0.55 0.012 257)</span></div></div>
+
+      <div class="swatch"><div class="swatch-color" style="background: var(--surface); color: var(--fg);">surface</div><div class="swatch-meta"><span class="name">--surface</span><span class="val">#ffffff</span></div></div>
+      <div class="swatch"><div class="swatch-color" style="background: var(--bg); color: var(--fg);">bg</div><div class="swatch-meta"><span class="name">--bg</span><span class="val">oklch(0.985 0.003 250)</span></div></div>
+      <div class="swatch"><div class="swatch-color" style="background: var(--border); color: var(--fg);">border</div><div class="swatch-meta"><span class="name">--border</span><span class="val">oklch(0.92 0.005 250)</span></div></div>
+
+      <div class="swatch"><div class="swatch-color" style="background: var(--success);">success</div><div class="swatch-meta"><span class="name">--success</span><span class="val">oklch(0.58 0.13 155)</span></div></div>
+      <div class="swatch"><div class="swatch-color" style="background: var(--warning);">warning</div><div class="swatch-meta"><span class="name">--warning</span><span class="val">oklch(0.68 0.15 70)</span></div></div>
+      <div class="swatch"><div class="swatch-color" style="background: var(--danger);">danger</div><div class="swatch-meta"><span class="name">--danger</span><span class="val">oklch(0.55 0.20 25)</span></div></div>
+      <div class="swatch"><div class="swatch-color" style="background: var(--info);">info</div><div class="swatch-meta"><span class="name">--info</span><span class="val">oklch(0.58 0.12 230)</span></div></div>
+    </div>
+  </section>
+
+  <!-- ─────────── 3. TIPOGRAFÍA ─────────── -->
+  <section class="section">
+    <div class="section-head">
+      <div>
+        <div class="label-num">03 · Tipografía</div>
+        <h2>Escala</h2>
+        <p class="desc">Inter en 4 pesos (400 / 500 / 600 / 700). Solo 6 estilos nombrados. <strong>Prohibido <code>text-[10px]</code></strong> — el mínimo para texto operativo es 11px y solo para etiquetas en mayúsculas.</p>
+      </div>
+    </div>
+
+    <table class="type-table">
+      <tr>
+        <td>
+          <div class="name">Display</div>
+          <div class="meta">32px · 700 · −2.5% tracking</div>
+        </td>
+        <td><div class="t-display">Bienvenido, Ana</div></td>
+      </tr>
+      <tr>
+        <td>
+          <div class="name">Heading 1</div>
+          <div class="meta">24px · 600 · −2% tracking</div>
+        </td>
+        <td><div class="t-h1">Beneficiarios (NNA)</div></td>
+      </tr>
+      <tr>
+        <td>
+          <div class="name">Heading 2</div>
+          <div class="meta">18px · 600 · −1% tracking</div>
+        </td>
+        <td><div class="t-h2">Resumen de mis casos</div></td>
+      </tr>
+      <tr>
+        <td>
+          <div class="name">Body</div>
+          <div class="meta">14px · 400 · 1.5 line</div>
+        </td>
+        <td><div class="t-body">Registro y seguimiento del padrón de Niños, Niñas y Adolescentes atendidos por el equipo de Educadores de Calle.</div></td>
+      </tr>
+      <tr>
+        <td>
+          <div class="name">Caption</div>
+          <div class="meta">12px · 500</div>
+        </td>
+        <td><div class="t-caption">Última actualización hace 3 minutos</div></td>
+      </tr>
+      <tr>
+        <td>
+          <div class="name">Micro / Eyebrow</div>
+          <div class="meta">11px · 600 · UPPERCASE</div>
+        </td>
+        <td><div class="t-micro">Expediente Familiar</div></td>
+      </tr>
+    </table>
+  </section>
+
+  <!-- ─────────── 4. RADIOS Y SOMBRAS ─────────── -->
+  <section class="section">
+    <div class="section-head">
+      <div>
+        <div class="label-num">04 · Forma</div>
+        <h2>Radios y elevación</h2>
+        <p class="desc">3 radios (inputs, botones, cards) y 3 sombras (sutiles, sin colores teñidos). Eliminamos los <code>shadow-lg shadow-blue-200</code> que se ven a 2021.</p>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+      <div>
+        <div class="t-micro" style="margin-bottom: 10px; color: var(--fg-muted);">Radios</div>
+        <div class="tile-grid">
+          <div class="tile r-sm">6px · inputs, badges</div>
+          <div class="tile r-md">8px · botones, cards pequeñas</div>
+          <div class="tile r-lg">12px · cards, modales</div>
+        </div>
+      </div>
+      <div>
+        <div class="t-micro" style="margin-bottom: 10px; color: var(--fg-muted);">Sombras</div>
+        <div class="tile-grid">
+          <div class="tile r-md s-1">shadow-1 · línea</div>
+          <div class="tile r-md s-2">shadow-2 · cards</div>
+          <div class="tile r-md s-3">shadow-3 · modales</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────── 5. COMPONENTES ─────────── -->
+  <section class="section">
+    <div class="section-head">
+      <div>
+        <div class="label-num">05 · Componentes base</div>
+        <h2>Núcleo del sistema</h2>
+        <p class="desc">Los 6 ladrillos que reemplazan los <code>StatCard</code>, <code>Button</code>, <code>Badge</code> repetidos en cada pantalla. Una sola fuente de verdad en <code>components/ui/</code>.</p>
+      </div>
+    </div>
+
+    <div class="component-grid">
+
+      <!-- Buttons -->
+      <div class="component-card">
+        <h3>Button</h3>
+        <div class="row">
+          <button class="btn btn-primary">
+            <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>
+            Nuevo registro
+          </button>
+          <button class="btn btn-secondary">Cancelar</button>
+          <button class="btn btn-ghost">Filtrar</button>
+          <button class="btn btn-danger">Eliminar</button>
+        </div>
+        <div class="row">
+          <button class="btn btn-primary btn-sm">Acción pequeña</button>
+          <button class="btn btn-secondary btn-sm">Cancelar</button>
+        </div>
+      </div>
+
+      <!-- Badges -->
+      <div class="component-card">
+        <h3>Badge / Estado</h3>
+        <div class="row">
+          <span class="badge badge-success"><span class="badge-dot"></span> Activo</span>
+          <span class="badge badge-info"><span class="badge-dot" style="background:var(--info)"></span> En diagnóstico</span>
+          <span class="badge badge-warning"><span class="badge-dot"></span> Pendiente</span>
+          <span class="badge badge-danger"><span class="badge-dot"></span> Crítico</span>
+          <span class="badge badge-neutral">Cerrado</span>
+        </div>
+        <div class="row" style="margin-top: 16px;">
+          <span class="badge badge-info">Fase 1</span>
+          <span class="badge badge-success">Fase 2</span>
+          <span class="badge badge-neutral">Fase 3</span>
+        </div>
+      </div>
+
+      <!-- Inputs -->
+      <div class="component-card">
+        <h3>Input</h3>
+        <div class="input-group">
+          <label class="input-label">Nombres del NNA</label>
+          <input class="input" placeholder="Ej. Juan Carlos" />
+        </div>
+        <div class="input-group" style="margin-top: 12px;">
+          <label class="input-label">Documento</label>
+          <input class="input" value="71820394" />
+        </div>
+      </div>
+
+      <!-- StatCard -->
+      <div class="component-card">
+        <h3>StatCard</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div class="stat">
+            <div class="stat-label">Mis casos activos</div>
+            <div class="stat-value">23</div>
+            <div class="stat-delta"><span class="arrow">↑</span> 3 esta semana</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Pendientes hoy</div>
+            <div class="stat-value">5</div>
+            <div class="stat-delta down"><span class="arrow">↓</span> 2 vs. ayer</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Empty State -->
+      <div class="component-card" style="grid-column: 1 / -1;">
+        <h3>Empty State · reemplaza "Cargando..." y "Sin datos"</h3>
+        <div class="empty">
+          <div class="icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 4v16"/></svg>
+          </div>
+          <div class="title">Aún no hay beneficiarios registrados</div>
+          <div class="desc">Comienza creando la primera ficha 03 para abrir un expediente familiar.</div>
+          <button class="btn btn-primary btn-sm">
+            <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>
+            Crear primer registro
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ─────────── 6. LOGIN ANTES / DESPUÉS ─────────── -->
+  <section class="section">
+    <div class="section-head">
+      <div>
+        <div class="label-num">06 · Aplicado</div>
+        <h2>Login · antes / después</h2>
+        <p class="desc">Mismo formulario, mismas validaciones. Cambios: monograma real en lugar de emoji, fondo sereno (no gradiente), labels visibles, "recordarme", jerarquía tipográfica clara.</p>
+      </div>
+    </div>
+
+    <div class="ba">
+
+      <!-- BEFORE -->
+      <div class="ba-col">
+        <div class="ba-label">Antes <span class="pill">actual</span></div>
+        <div class="before-frame">
+          <div class="before-card">
+            <div class="before-banner">
+              <div class="row">
+                <div class="emoji">🏛️</div>
+                <div class="b-meta">
+                  <strong>INABIF / DGNNA</strong>
+                  <span>Ministerio de la Mujer y Poblaciones Vulnerables</span>
+                </div>
+              </div>
+              <h2>Sistema de Educadores de Calle</h2>
+              <p>Dirección General de Niñas, Niños y Adolescentes</p>
+            </div>
+            <div class="before-avatar">
+              <svg viewBox="0 0 24 24" width="34" height="34" fill="currentColor"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>
+            </div>
+            <div class="before-body">
+              <div class="sub">Inicia sesión para continuar</div>
+              <input class="before-input" placeholder="Correo electrónico" />
+              <input class="before-input" type="password" placeholder="Contraseña" />
+              <button class="before-btn">→ Iniciar sesión</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AFTER -->
+      <div class="ba-col">
+        <div class="ba-label" style="color: var(--primary);">Después <span class="pill" style="background: var(--primary-soft); border-color: color-mix(in oklch, var(--primary) 20%, transparent); color: var(--primary);">rediseño</span></div>
+        <div class="login-frame">
+          <div class="login-card">
+
+            <div class="login-brand">
+              <div class="logo-row">
+                <div class="logo-mark">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                    <path d="M5 18 Q 12 10, 19 6" stroke="white" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+                    <circle cx="5" cy="18" r="2.2" fill="white"/>
+                    <circle cx="19" cy="6" r="2.2" fill="white"/>
+                  </svg>
+                </div>
+                <div class="logo-wordmark">
+                  <span class="t1">SEC · Educadores de Calle</span>
+                  <span class="t2">INABIF · DGNNA · MIMP</span>
+                </div>
+              </div>
+            </div>
+
+            <h1 class="login-title">Inicia sesión</h1>
+            <p class="login-subtitle">Acceso al sistema de gestión de casos</p>
+
+            <form onsubmit="event.preventDefault();">
+
+              <div class="field">
+                <label class="field-label" for="email">Correo institucional</label>
+                <input class="input" id="email" type="email" placeholder="ana.lopez@inabif.gob.pe" autocomplete="email" />
+              </div>
+
+              <div class="field">
+                <label class="field-label" for="password">Contraseña</label>
+                <div class="login-pass-wrapper">
+                  <input class="input" id="password" type="password" placeholder="••••••••" autocomplete="current-password" style="padding-right: 40px;" />
+                  <button type="button" class="toggle" aria-label="Mostrar contraseña" onclick="
+                    const i = this.previousElementSibling;
+                    i.type = i.type === 'password' ? 'text' : 'password';
+                  ">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                  </button>
+                </div>
+              </div>
+
+              <div class="login-row">
+                <label class="login-checkbox">
+                  <input type="checkbox" /> Mantener sesión iniciada
+                </label>
+                <a href="#" class="login-link">¿Olvidaste tu contraseña?</a>
+              </div>
+
+              <button type="submit" class="btn btn-primary btn-block">
+                Ingresar
+                <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+
+            </form>
+
+            <div class="login-foot">
+              <div class="needs-help">
+                ¿Problemas para acceder? Contacta a tu Coordinador de Sede o a soporte:
+                <a href="/cdn-cgi/l/email-protection#2a59455a45585e4f04594f496a43444b48434c044d4548045a4f" class="login-link"><span class="__cf_email__" data-cfemail="8ffce0ffe0fdfbeaa1fceaeccfe6e1eeede6e9a1e8e0eda1ffea">[email&#160;protected]</span></a>
+              </div>
+            </div>
+
+          </div>
+          <div class="legal">© 2026 MIMP · INABIF · DGNNA · Uso exclusivo interno</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────── 7. NOTAS DE MIGRACIÓN ─────────── -->
+  <section class="section">
+    <div class="section-head">
+      <div>
+        <div class="label-num">07 · Próximo</div>
+        <h2>Cómo se aplica a tu codebase</h2>
+        <p class="desc">Te dejé en la carpeta <code>codigo/</code> los archivos drop-in (TypeScript + Tailwind v4):</p>
+      </div>
+    </div>
+
+    <div class="component-card">
+      <ul style="margin: 0; padding-left: 18px; line-height: 1.9; font-size: 13px;">
+        <li><code>codigo/index.css</code> &nbsp;→&nbsp; reemplaza <code>client/src/index.css</code></li>
+        <li><code>codigo/components/SecLogo.tsx</code> &nbsp;→&nbsp; nuevo, importar donde aparece el emoji</li>
+        <li><code>codigo/components/ui/Button.tsx</code>, <code>Badge.tsx</code>, <code>Card.tsx</code>, <code>Input.tsx</code>, <code>StatCard.tsx</code>, <code>EmptyState.tsx</code> &nbsp;→&nbsp; nuevos en <code>client/src/components/ui/</code></li>
+        <li><code>codigo/features/auth/LoginPage.tsx</code> &nbsp;→&nbsp; reemplaza el existente</li>
+      </ul>
+      <p style="margin: 16px 0 0; font-size: 12px; color: var(--fg-muted);">En el <strong>Paso 2</strong> rediseñamos el <code>MainLayout</code> (sidebar) y el <code>MainMenu</code> usando estos mismos cimientos.</p>
+    </div>
+  </section>
+
+</div>
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script></body>
+</html>

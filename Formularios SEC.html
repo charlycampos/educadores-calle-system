@@ -1,0 +1,861 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>SEC · 8 Formularios Completos</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --primary:oklch(0.43 0.14 254);--primary-h:oklch(0.38 0.14 254);--primary-soft:oklch(0.95 0.025 254);--primary-fg:#fff;
+  --bg:oklch(0.985 0.003 250);--surface:#fff;--surface-muted:oklch(0.975 0.004 250);
+  --border:oklch(0.92 0.005 250);--border-strong:oklch(0.85 0.008 250);
+  --fg:oklch(0.22 0.018 257);--fg-2:oklch(0.42 0.015 257);--fg-muted:oklch(0.55 0.012 257);
+  --success:oklch(0.58 0.13 155);--success-soft:oklch(0.95 0.04 155);
+  --warning:oklch(0.68 0.15 70);--warning-soft:oklch(0.96 0.05 80);
+  --danger:oklch(0.55 0.20 25);--danger-soft:oklch(0.96 0.04 25);
+  --info:oklch(0.58 0.12 230);--info-soft:oklch(0.95 0.03 230);
+  --sh1:0 1px 2px rgba(15,23,42,.04),0 0 0 1px rgba(15,23,42,.04);
+  --sh2:0 2px 8px rgba(15,23,42,.06),0 1px 2px rgba(15,23,42,.04);
+  --sh3:0 12px 32px rgba(15,23,42,.10),0 2px 4px rgba(15,23,42,.04);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{font-family:"Inter",system-ui,sans-serif;font-size:14px;line-height:1.5;height:100%;-webkit-font-smoothing:antialiased;background:var(--bg);color:var(--fg)}
+*{scrollbar-width:thin;scrollbar-color:var(--border-strong) transparent}
+*:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:4px}
+
+/* Layout */
+.app{display:flex;height:100vh;overflow:hidden}
+.nav{width:230px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column}
+.nav-hd{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.nav-logo{width:30px;height:30px;border-radius:7px;background:var(--primary);display:grid;place-items:center;flex-shrink:0}
+.nav-scroll{flex:1;overflow-y:auto;padding:10px 8px}
+.nav-sec{padding:3px 8px 2px;margin:8px 0 2px}
+.ns-badge{display:inline-flex;align-items:center;gap:3px;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700;margin-bottom:2px}
+.ns-title{font-size:12px;font-weight:600;color:var(--fg)}
+.ni{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:6px;margin-bottom:1px;cursor:pointer;border:1px solid transparent;transition:all .12s;font-size:12px;font-weight:500;color:var(--fg-2)}
+.ni:hover{background:var(--surface-muted);color:var(--fg)}
+.ni.active{background:var(--primary-soft);color:var(--primary);border-color:color-mix(in oklch,var(--primary) 20%,transparent)}
+.ni .bn{margin-left:auto;font-size:10px;color:var(--fg-muted)}
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{height:44px;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;background:var(--surface);gap:12px;flex-shrink:0}
+
+/* Form views */
+.fv{display:none;flex:1;flex-direction:column;overflow:hidden}
+.fv.active{display:flex}
+.fshell{display:flex;flex:1;overflow:hidden}
+.fsb{width:196px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column}
+.fsb-hd{padding:12px 14px;background:var(--primary)}
+.fsb-steps{flex:1;overflow-y:auto;padding:8px}
+.fstep{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:6px;margin-bottom:2px;cursor:pointer;transition:all .12s}
+.fstep.active{background:var(--primary-soft)}
+.fstep:not(.active):hover{background:var(--surface-muted)}
+.snum{width:20px;height:20px;border-radius:999px;display:grid;place-items:center;font-size:10px;font-weight:700;flex-shrink:0}
+.snum.a{background:var(--primary);color:#fff}
+.snum.d{background:var(--success-soft);color:var(--success)}
+.snum.p{background:var(--surface-muted);color:var(--fg-muted);border:1px solid var(--border)}
+.fsb-ft{padding:10px 14px;border-top:1px solid var(--border);background:var(--surface-muted)}
+.fcontent{flex:1;overflow-y:auto;padding:28px 32px;background:var(--surface)}
+.ffoot{padding:12px 20px;border-top:1px solid var(--border);background:var(--surface);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+
+/* Tabs */
+.tabs{display:flex;border-bottom:1px solid var(--border);overflow-x:auto;background:var(--surface);flex-shrink:0}
+.tab{display:flex;align-items:center;gap:5px;padding:11px 14px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--fg-muted);border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap;margin-bottom:-1px;transition:color .12s}
+.tab:hover{color:var(--fg)}
+.tab.active{color:var(--primary);border-bottom-color:var(--primary)}
+
+/* Section header */
+.sh{padding-bottom:12px;border-bottom:1px solid var(--border);margin-bottom:20px}
+.sh h2{font-size:18px;font-weight:600;letter-spacing:-.01em}
+.sh p{font-size:12px;color:var(--fg-2);margin-top:3px}
+
+/* Fields */
+.field{margin-bottom:16px}
+.fl{font-size:12px;font-weight:500;color:var(--fg-2);display:block;margin-bottom:5px}
+.req{color:var(--danger)}
+.inp,.sel,.ta{font-family:inherit;font-size:13px;padding:8px 12px;border-radius:6px;border:1px solid var(--border-strong);background:var(--surface);color:var(--fg);width:100%;outline:none;transition:border-color .12s,box-shadow .12s}
+.inp:focus,.sel:focus,.ta:focus{border-color:var(--primary);box-shadow:0 0 0 3px color-mix(in oklch,var(--primary) 18%,transparent)}
+.sel{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 20 20' fill='%23888'%3E%3Cpath d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:32px}
+.ta{resize:vertical;min-height:68px}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:6px;font-family:inherit;font-size:13px;font-weight:500;padding:8px 14px;border-radius:6px;border:0;cursor:pointer;transition:background .12s,opacity .12s}
+.btn-p{background:var(--primary);color:#fff}.btn-p:hover{background:var(--primary-h)}
+.btn-s{background:var(--surface);color:var(--fg);border:1px solid var(--border-strong)}.btn-s:hover{background:var(--surface-muted)}
+.btn-sm{font-size:12px;padding:6px 11px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+/* Badges */
+.badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px}
+.bs{background:var(--success-soft);color:var(--success)}
+.bw{background:var(--warning-soft);color:var(--warning)}
+.bd{background:var(--danger-soft);color:var(--danger)}
+.bp{background:var(--primary-soft);color:var(--primary)}
+.bi{background:var(--info-soft);color:var(--info)}
+.bn2{background:var(--surface-muted);border:1px solid var(--border);color:var(--fg-2)}
+
+/* Grid */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+
+/* Card */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:var(--sh1)}
+
+/* Check pills */
+.cp{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border:1px solid var(--border-strong);border-radius:5px;cursor:pointer;font-size:12px;font-weight:500;color:var(--fg-2);transition:all .12s;user-select:none}
+.cp:hover{border-color:var(--primary);color:var(--fg)}
+.cp.on{border-color:var(--primary);background:var(--primary-soft);color:var(--primary)}
+
+/* Status buttons (F05) */
+.sbtns{display:flex;gap:4px}
+.sbtn{padding:4px 10px;border-radius:4px;font-size:11px;font-weight:700;border:1px solid;cursor:pointer;transition:all .1s}
+.sbtn.si{background:var(--success-soft);color:var(--success);border-color:color-mix(in oklch,var(--success) 30%,transparent)}
+.sbtn.no{background:var(--danger-soft);color:var(--danger);border-color:color-mix(in oklch,var(--danger) 30%,transparent)}
+.sbtn.pr{background:var(--warning-soft);color:var(--warning);border-color:color-mix(in oklch,var(--warning) 30%,transparent)}
+.sbtn.off{background:var(--surface);color:var(--fg-muted);border-color:var(--border)}
+
+/* Table */
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--fg-muted);padding:8px 12px;text-align:left;background:var(--surface-muted);border-bottom:1px solid var(--border)}
+.tbl td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+.tbl tr:last-child td{border-bottom:0}
+.tbl tr:hover td{background:var(--surface-muted)}
+
+/* Doc page (Informe Situacional) */
+.doc{background:white;max-width:680px;margin:0 auto;padding:48px 56px;font-family:"Times New Roman",Times,serif;font-size:13px;line-height:1.7;border:1px solid var(--border);border-radius:4px;box-shadow:var(--sh2)}
+.doc-inp{font-family:inherit;font-size:13px;border:none;border-bottom:1px solid #ccc;outline:none;width:100%;padding:2px 4px;background:transparent;line-height:1.7}
+.doc-ta{font-family:inherit;font-size:13px;border:1px dotted #bbb;border-radius:2px;outline:none;width:100%;padding:8px;background:transparent;resize:vertical;min-height:68px;line-height:1.5}
+
+/* PTI */
+.objcard{border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:14px}
+.objhd{background:var(--surface-muted);border-bottom:1px solid var(--border);padding:11px 16px;display:flex;align-items:center;gap:8px}
+.objbd{padding:16px}
+.actrow{display:grid;grid-template-columns:1fr 110px 105px 105px 32px;gap:8px;align-items:center;padding:7px 8px;border-radius:5px;margin-bottom:3px}
+.actrow:hover{background:var(--surface-muted)}
+.actinp{font-family:inherit;font-size:12px;border:none;border-bottom:1px solid var(--border);outline:none;background:transparent;padding:3px 0;width:100%;color:var(--fg)}
+.actinp:focus{border-bottom-color:var(--primary)}
+
+/* Egreso */
+.esec{border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:10px}
+.esec-hd{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--surface-muted);cursor:pointer;user-select:none}
+.esec-hd:hover{background:var(--bg)}
+.esec-bd{padding:16px}
+.rcard{border:1px solid var(--border);border-radius:6px;padding:11px 14px;cursor:pointer;margin-bottom:5px;transition:all .12s}
+.rcard:hover{border-color:var(--primary)}
+.rcard.on{border-color:var(--primary);background:var(--primary-soft)}
+
+/* Readonly display */
+.fdisplay{font-size:13px;font-weight:600;color:var(--fg);padding:8px 12px;background:var(--surface-muted);border:1px solid var(--border);border-radius:6px}
+
+/* Toast */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--fg);color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;font-weight:500;box-shadow:var(--sh3);z-index:9999;display:flex;align-items:center;gap:8px;transform:translateY(80px);opacity:0;transition:transform .2s,opacity .2s}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.ok{background:var(--success)}
+.toast.err{background:var(--danger)}
+
+/* Modal */
+.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center;padding:16px}
+.modal.open{display:flex}
+.modal-box{background:var(--surface);border-radius:10px;width:100%;max-width:560px;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:var(--sh3)}
+.modal-hd{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-bd{overflow-y:auto;padding:18px;flex:1}
+.modal-ft{padding:12px 18px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px}
+
+/* Utilities */
+.flex{display:flex}.ic{align-items:center}.jb{justify-content:space-between}.g2{gap:8px}.g3{gap:12px}
+.mt1{margin-top:4px}.mt2{margin-top:8px}.mt3{margin-top:12px}.mt4{margin-top:16px}.mt6{margin-top:24px}
+.mb2{margin-bottom:8px}.mb3{margin-bottom:12px}.mb4{margin-bottom:16px}
+.fw6{font-weight:600}.fw7{font-weight:700}.fs11{font-size:11px}.fs12{font-size:12px}.fs13{font-size:13px}
+.cm{color:var(--fg-muted)}.c2{color:var(--fg-2)}.cp2{color:var(--primary)}
+.divider{border:none;border-top:1px solid var(--border);margin:14px 0}
+.infobox{background:var(--primary-soft);border:1px solid color-mix(in oklch,var(--primary) 20%,transparent);border-radius:6px;padding:10px 14px;font-size:12px;color:var(--primary);display:flex;align-items:flex-start;gap:8px}
+.warnbox{background:var(--warning-soft);border:1px solid color-mix(in oklch,var(--warning) 30%,transparent);border-radius:6px;padding:10px 14px;font-size:12px;color:var(--warning);display:flex;gap:8px}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- ══ NAV ══ -->
+<nav class="nav">
+  <div class="nav-hd">
+    <div class="nav-logo">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M5 18Q12 10 19 6" stroke="white" stroke-width="2.2" stroke-linecap="round"/><circle cx="5" cy="18" r="2.2" fill="white"/><circle cx="19" cy="6" r="2.2" fill="white"/></svg>
+    </div>
+    <div style="line-height:1.2">
+      <p style="font-size:13px;font-weight:600">Educadores de Calle</p>
+      <p style="font-size:11px;color:var(--fg-muted)">INABIF · DGNNA · MIMP</p>
+    </div>
+  </div>
+  <div class="nav-scroll">
+    <div class="nav-sec"><span class="ns-badge" style="background:var(--primary-soft);color:var(--primary)">Fase 1</span><p class="ns-title">Contacto e Integración</p></div>
+    <div class="ni active" onclick="goTo('f03')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Ficha de Inscripción<span class="bn">F03</span></div>
+    <div class="ni" onclick="goTo('f04')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>Diagnóstico Social<span class="bn">F04</span></div>
+    <div class="ni" onclick="goTo('f05')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Ficha de Logros<span class="bn">F05</span></div>
+    <div class="ni" onclick="goTo('inf')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>Informe Situacional<span class="bn">IS</span></div>
+    <div class="nav-sec"><span class="ns-badge" style="background:var(--info-soft);color:var(--info)">Fase 2</span><p class="ns-title">Desarrollo e Intervención</p></div>
+    <div class="ni" onclick="goTo('pti')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Plan de Intervención<span class="bn">PTI</span></div>
+    <div class="ni" onclick="goTo('f07')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Talleres<span class="bn">F07</span></div>
+    <div class="nav-sec"><span class="ns-badge" style="background:var(--success-soft);color:var(--success)">Fase 3</span><p class="ns-title">Seguimiento y Egreso</p></div>
+    <div class="ni" onclick="goTo('f12')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Seguimiento Familiar<span class="bn">F12</span></div>
+    <div class="ni" onclick="goTo('f13')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>Ficha de Egreso<span class="bn">F13</span></div>
+  </div>
+</nav>
+
+<main class="main">
+  <!-- Top bar NNA -->
+  <div class="topbar">
+    <span style="font-size:13px;font-weight:600">JUAN CARLOS GARCÍA LÓPEZ</span>
+    <span style="font-size:11px;color:var(--fg-muted);margin-left:4px">DNI: 72394810 · 14 años · EXP: SEC-2024-001</span>
+    <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
+      <span class="badge bp" style="display:flex;align-items:center;gap:4px"><span style="width:6px;height:6px;border-radius:999px;background:var(--primary);display:inline-block"></span>F2 Activa</span>
+      <span class="badge bs">SIS</span>
+    </div>
+  </div>
+
+  <!-- ── F03 FICHA DE INSCRIPCIÓN ── -->
+  <div class="fv active" id="v-f03">
+    <div class="fshell">
+      <div class="fsb">
+        <div class="fsb-hd">
+          <p style="color:#fff;font-weight:600;font-size:13px;line-height:1.2">Ficha de Inscripción</p>
+          <p style="color:rgba(255,255,255,.7);font-size:11px;margin-top:2px">Formato F03 · Registro Oficial</p>
+        </div>
+        <div class="fsb-steps" id="f03-steps"></div>
+        <div class="fsb-ft">
+          <div class="flex ic jb mb2"><span style="font-size:10px;color:var(--fg-muted);font-weight:500">Progreso</span><span id="f03-pt" style="font-size:10px;color:var(--primary);font-weight:600">1/6</span></div>
+          <div style="background:var(--border);border-radius:999px;height:4px;overflow:hidden"><div id="f03-pb" style="width:16.7%;height:100%;background:var(--primary);border-radius:999px;transition:width .3s"></div></div>
+        </div>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+        <div class="fcontent" id="f03-ct"></div>
+        <div class="ffoot">
+          <button class="btn btn-s btn-sm" id="f03-prev" onclick="f03Nav(-1)">← Atrás</button>
+          <button class="btn btn-p btn-sm" id="f03-next" onclick="f03Nav(1)">Siguiente →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── F04 DIAGNÓSTICO SOCIAL ── -->
+  <div class="fv" id="v-f04">
+    <div class="tabs" id="f04-tabs"></div>
+    <div class="fcontent" id="f04-ct" style="background:var(--bg)"></div>
+    <div class="ffoot">
+      <div></div>
+      <div class="flex" style="gap:8px">
+        <button class="btn btn-s btn-sm" onclick="window.print()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Imprimir</button>
+        <button class="btn btn-p btn-sm" onclick="toast_('Diagnóstico Social guardado correctamente')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg>Guardar Diagnóstico</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── F05 LOGROS ── -->
+  <div class="fv" id="v-f05">
+    <div class="tabs" id="f05-tabs"></div>
+    <div class="fcontent" id="f05-ct"></div>
+    <div class="ffoot">
+      <div></div>
+      <div class="flex" style="gap:8px">
+        <button class="btn btn-s btn-sm" onclick="window.print()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Imprimir F05</button>
+        <button class="btn btn-p btn-sm" onclick="toast_('Ficha de Logros guardada correctamente')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg>Guardar Avance</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── INFORME SITUACIONAL ── -->
+  <div class="fv" id="v-inf">
+    <div class="fcontent" style="background:var(--bg)">
+      <div class="doc">
+        <div style="text-align:center;border-bottom:2px solid #333;padding-bottom:16px;margin-bottom:24px">
+          <h2 style="font-size:15px;font-weight:700;text-transform:uppercase;letter-spacing:.02em">Programa Integral Nacional para el Bienestar Familiar</h2>
+          <h3 style="font-size:13px;color:#555;text-transform:uppercase;margin-top:4px">Servicio de Educadores de Calle</h3>
+          <div style="margin-top:12px;display:inline-block;border:1px solid #333;padding:3px 16px;font-size:12px;font-weight:700;text-transform:uppercase">Informe Situacional</div>
+        </div>
+        <div style="margin-bottom:20px;line-height:2.1">
+          <div style="display:flex;gap:8px;margin-bottom:6px"><b style="width:68px;flex-shrink:0">A:</b><input class="doc-inp" value="COORDINACIÓN DEL SERVICIO DE EDUCADORES DE CALLE"/></div>
+          <div style="display:flex;gap:8px;margin-bottom:6px"><b style="width:68px;flex-shrink:0">DE:</b><span style="text-transform:uppercase">Equipo Técnico — Educadores de Calle</span></div>
+          <div style="display:flex;gap:8px;margin-bottom:6px"><b style="width:68px;flex-shrink:0">ASUNTO:</b><input class="doc-inp" value="INFORME SITUACIONAL DEL NNA JUAN CARLOS GARCÍA LÓPEZ"/></div>
+          <div style="display:flex;gap:8px"><b style="width:68px;flex-shrink:0">FECHA:</b><input class="doc-inp" type="date" value="2024-03-15" style="width:auto"/></div>
+        </div>
+        <hr style="border:none;border-top:1px solid #333;margin-bottom:20px"/>
+        <section style="margin-bottom:18px">
+          <h4 style="font-weight:700;text-transform:uppercase;text-decoration:underline;margin-bottom:8px;font-size:13px">I. Datos de Identificación</h4>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 24px;margin-left:16px;font-size:13px">
+            <div><b>Nombres y Apellidos:</b> Juan Carlos García López</div><div><b>Documento:</b> DNI 72394810</div>
+            <div><b>Edad:</b> 14 años</div><div><b>Sexo:</b> Masculino</div>
+          </div>
+        </section>
+        <section style="margin-bottom:18px">
+          <h4 style="font-weight:700;text-transform:uppercase;text-decoration:underline;margin-bottom:8px;font-size:13px">II. Antecedentes y Circunstancias del Hallazgo</h4>
+          <p style="font-size:11px;color:#999;font-style:italic;margin-bottom:6px;font-family:sans-serif">¿En qué circunstancias y condiciones se encontró al NNA? (Ubicación, horario, actividad, compañía, apariencia).</p>
+          <textarea class="doc-ta" rows="4" placeholder="Redacte aquí las circunstancias del contacto inicial..."></textarea>
+        </section>
+        <section style="margin-bottom:18px">
+          <h4 style="font-weight:700;text-transform:uppercase;text-decoration:underline;margin-bottom:8px;font-size:13px">III. Estrategias de Acercamiento</h4>
+          <p style="font-size:11px;color:#999;font-style:italic;margin-bottom:6px;font-family:sans-serif">¿Qué estrategias utilizó para establecer la relación de confianza?</p>
+          <textarea class="doc-ta" rows="3" placeholder="Técnicas de abordaje, ludopatía, observación participante..."></textarea>
+        </section>
+        <section style="margin-bottom:18px">
+          <h4 style="font-weight:700;text-transform:uppercase;text-decoration:underline;margin-bottom:8px;font-size:13px">IV. Análisis de la Situación</h4>
+          <div style="margin-left:16px">
+            <p style="font-weight:700;font-size:12px;margin-bottom:4px">4.1 Situación de Salud:</p><textarea class="doc-ta" rows="2" placeholder="Estado de salud, nutrición, higiene..."></textarea>
+            <p style="font-weight:700;font-size:12px;margin:10px 0 4px">4.2 Situación Educativa:</p><textarea class="doc-ta" rows="2" placeholder="Escolaridad, deserción, rezago..."></textarea>
+            <p style="font-weight:700;font-size:12px;margin:10px 0 4px">4.3 Situación Familiar y Social:</p><textarea class="doc-ta" rows="3" placeholder="Dinámica familiar, violencia, soporte..."></textarea>
+          </div>
+        </section>
+        <section style="margin-bottom:18px">
+          <h4 style="font-weight:700;text-transform:uppercase;text-decoration:underline;margin-bottom:8px;font-size:13px">V. Conclusiones y Recomendaciones</h4>
+          <textarea class="doc-ta" rows="3" placeholder="Conclusiones principales del caso..."></textarea>
+          <div style="background:#f9f9f9;padding:10px;margin-top:8px;border-radius:3px"><p style="font-weight:700;font-size:12px;margin-bottom:4px">Se recomienda:</p><textarea class="doc-ta" rows="2" style="background:transparent" placeholder="acciones inmediatas, derivaciones, ingreso a Fase II..."></textarea></div>
+        </section>
+        <div style="margin-top:56px;display:grid;grid-template-columns:1fr 1fr;gap:48px;text-align:center">
+          <div style="border-top:1px solid #333;padding-top:8px"><p style="font-weight:700;font-size:13px">Educador/a de Calle</p><p style="font-size:12px;color:#666">Responsable del Caso</p></div>
+          <div style="border-top:1px solid #333;padding-top:8px"><p style="font-weight:700;font-size:13px">Coordinador/a</p><p style="font-size:12px;color:#666">V° B°</p></div>
+        </div>
+      </div>
+    </div>
+    <div class="ffoot"><div></div>
+      <div class="flex" style="gap:8px">
+        <button class="btn btn-s btn-sm" onclick="window.print()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Imprimir / PDF</button>
+        <button class="btn btn-p btn-sm" onclick="toast_('Informe Situacional guardado correctamente')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg>Guardar Informe</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PTI ── -->
+  <div class="fv" id="v-pti">
+    <div class="fcontent" id="pti-ct" style="background:var(--bg)"></div>
+    <div class="ffoot"><div></div>
+      <div class="flex" style="gap:8px">
+        <button class="btn btn-s btn-sm" onclick="ptiAdd()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Nuevo Objetivo</button>
+        <button class="btn btn-p btn-sm" onclick="toast_('Plan de Intervención Individual guardado')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg>Guardar Plan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── F07 TALLERES ── -->
+  <div class="fv" id="v-f07">
+    <div class="fcontent" id="f07-ct" style="background:var(--bg)"></div>
+  </div>
+
+  <!-- ── F12 SEGUIMIENTO ── -->
+  <div class="fv" id="v-f12">
+    <div class="fcontent" id="f12-ct" style="background:var(--bg)"></div>
+    <div class="ffoot"><div></div>
+      <button class="btn btn-p btn-sm" onclick="openModal('m12')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Nueva Ficha (F12)</button>
+    </div>
+  </div>
+
+  <!-- ── F13 EGRESO ── -->
+  <div class="fv" id="v-f13">
+    <div class="fcontent" id="f13-ct" style="background:var(--bg)"></div>
+    <div class="ffoot"><div></div>
+      <div class="flex" style="gap:8px">
+        <button class="btn btn-s btn-sm" onclick="window.print()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Generar PDF</button>
+        <button class="btn btn-p btn-sm" onclick="toast_('Ficha de Egreso guardada correctamente')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg>Guardar Egreso</button>
+      </div>
+    </div>
+  </div>
+</main>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast_el"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg><span id="toast_msg"></span></div>
+
+<!-- Modal F12 -->
+<div class="modal" id="m12">
+  <div class="modal-box">
+    <div class="modal-hd"><div><h3 style="font-size:14px;font-weight:600">Nueva Ficha de Seguimiento Familiar</h3><p style="font-size:11px;color:var(--fg-muted);margin-top:2px">Formato F12</p></div><button onclick="closeModal('m12')" style="background:none;border:none;cursor:pointer;color:var(--fg-muted)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+    <div class="modal-bd">
+      <div class="g2 mb3"><div class="field"><label class="fl">Zona de Intervención</label><input class="inp" placeholder="Ej: Centro de Lima"/></div><div class="field"><label class="fl">Fecha</label><input class="inp" type="date"/></div></div>
+      <div class="g3 mb3"><div class="field"><label class="fl">Entrevistado/a</label><input class="inp" placeholder="Nombre completo"/></div><div class="field"><label class="fl">Parentesco</label><input class="inp" placeholder="Ej: Madre, Tío"/></div><div class="field"><label class="fl">Teléfono</label><input class="inp" placeholder="999 999 999"/></div></div>
+      <div class="field mb3"><label class="fl">Lugar de Seguimiento</label><div style="display:flex;gap:8px;flex-wrap:wrap"><span class="cp on" onclick="this.classList.toggle('on')">🏠 Domicilio</span><span class="cp" onclick="this.classList.toggle('on')">💼 Trabajo</span><span class="cp" onclick="this.classList.toggle('on')">🏢 Centro de Ref.</span><span class="cp" onclick="this.classList.toggle('on')">🚶 Calle</span></div></div>
+      <div class="g2 mb3"><div class="field"><label class="fl">Dirección</label><input class="inp"/></div><div class="field"><label class="fl">Hora</label><input class="inp" type="time" value="10:00"/></div></div>
+      <div class="field mb3"><label class="fl">Antecedentes / Motivo</label><textarea class="ta" rows="2" placeholder="Motivo de la visita..."></textarea></div>
+      <div class="field mb3"><label class="fl">Descripción de la Visita</label><textarea class="ta" rows="3" placeholder="Descripción detallada..."></textarea></div>
+      <div class="field mb3"><label class="fl">Resultados / Compromisos</label><textarea class="ta" rows="2" placeholder="Acuerdos alcanzados..."></textarea></div>
+      <div class="field"><label class="fl">Observaciones</label><textarea class="ta" rows="2"></textarea></div>
+    </div>
+    <div class="modal-ft"><button class="btn btn-s btn-sm" onclick="closeModal('m12')">Cancelar</button><button class="btn btn-p btn-sm" onclick="saveF12()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg>Guardar Ficha</button></div>
+  </div>
+</div>
+
+<!-- Modal F07 -->
+<div class="modal" id="m07">
+  <div class="modal-box">
+    <div class="modal-hd" style="background:var(--primary-soft)"><div><h3 style="font-size:14px;font-weight:700;color:var(--primary)">FORMATO 07: Planificación de Taller</h3><p style="font-size:11px;color:var(--primary);opacity:.8;margin-top:2px">Intervención Individualizada</p></div><button onclick="closeModal('m07')" style="background:none;border:none;cursor:pointer;color:var(--fg-muted)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+    <div class="modal-bd">
+      <div class="field"><label class="fl">Nombre del Taller <span class="req">*</span></label><input class="inp" id="f07-nm" placeholder="Ej: Taller de Habilidades Sociales"/></div>
+      <div class="g2"><div class="field"><label class="fl">Fecha <span class="req">*</span></label><input class="inp" type="date" id="f07-fe"/></div><div class="field"><label class="fl">Hora <span class="req">*</span></label><input class="inp" type="time" id="f07-hr" value="10:00"/></div></div>
+      <div class="field"><label class="fl">Lugar <span class="req">*</span></label><input class="inp" id="f07-lu" placeholder="Ej: Centro de Referencia, Parque..."/></div>
+      <div class="field"><label class="fl">Objetivo</label><textarea class="ta" id="f07-ob" rows="2" placeholder="Describa el objetivo pedagógico..."></textarea></div>
+      <hr class="divider"/>
+      <h4 style="font-size:12px;font-weight:700;border-left:3px solid var(--primary);padding-left:8px;margin-bottom:12px">Metodología del Taller</h4>
+      <div class="field"><label class="fl" style="color:var(--primary)">Inicio (Motivación)</label><textarea class="ta" rows="2" placeholder="Actividad de entrada..."></textarea></div>
+      <div class="field"><label class="fl" style="color:var(--primary)">Proceso (Desarrollo)</label><textarea class="ta" rows="3" placeholder="Actividad principal..."></textarea></div>
+      <div class="field"><label class="fl" style="color:var(--primary)">Cierre (Reflexión / Evaluación)</label><textarea class="ta" rows="2" placeholder="Actividad de cierre..."></textarea></div>
+    </div>
+    <div class="modal-ft"><button class="btn btn-s btn-sm" onclick="closeModal('m07')">Cancelar</button><button class="btn btn-p btn-sm" onclick="saveF07()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg>Guardar Planificación (F7)</button></div>
+  </div>
+</div>
+
+<script>
+// ── NAVIGATION ──
+function goTo(id){
+  document.querySelectorAll('.fv').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.ni').forEach(n=>n.classList.remove('active'));
+  document.getElementById('v-'+id).classList.add('active');
+  document.querySelectorAll('.ni').forEach(n=>{if((n.getAttribute('onclick')||'').includes("'"+id+"'"))n.classList.add('active')});
+}
+
+// ── TOAST ──
+function toast_(msg,type='ok'){
+  const t=document.getElementById('toast_el');
+  t.className='toast '+type;
+  document.getElementById('toast_msg').textContent=msg;
+  t.classList.add('show');
+  clearTimeout(t._t);
+  t._t=setTimeout(()=>t.classList.remove('show'),3200);
+}
+
+// ── MODALS ──
+function openModal(id){document.getElementById(id).classList.add('open')}
+function closeModal(id){document.getElementById(id).classList.remove('open')}
+
+// ── F03 FICHA DE INSCRIPCIÓN ──
+const f03Steps=[
+  {label:'Datos Generales',sub:'Intervención y fechas'},
+  {label:'Datos Personales',sub:'Identidad y domicilio'},
+  {label:'Datos Perfil',sub:'Actividad en calle'},
+  {label:'Educación',sub:'Situación educativa'},
+  {label:'Salud',sub:'Seguro y discapacidad'},
+  {label:'Familia / Otros',sub:'Vivienda y obs.'}
+];
+let f03c=0;
+
+const f03ct=[
+`<div class="sh"><h2>I. Datos Generales</h2><p>Ubicación de la intervención y marco temporal.</p></div>
+<div class="field"><label class="fl">Zona de Intervención <span class="req">*</span></label><input class="inp" value="Parque Kennedy, Miraflores" placeholder="Ej: Plaza de Armas, Jr. Comercio…"/></div>
+<div class="field">
+  <label class="fl">Perfil del NNA</label>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+    <label style="cursor:pointer;border:1px solid var(--primary);border-radius:7px;padding:10px 8px;background:var(--primary-soft);display:flex;flex-direction:column;align-items:center;gap:6px"><span style="font-size:10px;font-weight:700;color:var(--primary);text-align:center;text-transform:uppercase">Trabajo en Calle</span><div style="width:12px;height:12px;border-radius:999px;border:2px solid var(--primary);display:grid;place-items:center"><div style="width:6px;height:6px;background:var(--primary);border-radius:999px"></div></div></label>
+    <label style="cursor:pointer;border:1px solid var(--border);border-radius:7px;padding:10px 8px;display:flex;flex-direction:column;align-items:center;gap:6px"><span style="font-size:10px;font-weight:600;color:var(--fg-2);text-align:center;text-transform:uppercase">Mendicidad</span><div style="width:12px;height:12px;border-radius:999px;border:2px solid var(--border-strong)"></div></label>
+    <label style="cursor:pointer;border:1px solid var(--border);border-radius:7px;padding:10px 8px;display:flex;flex-direction:column;align-items:center;gap:6px"><span style="font-size:10px;font-weight:600;color:var(--fg-2);text-align:center;text-transform:uppercase">Vida en Calle</span><div style="width:12px;height:12px;border-radius:999px;border:2px solid var(--border-strong)"></div></label>
+    <label style="cursor:pointer;border:1px solid var(--border);border-radius:7px;padding:10px 8px;display:flex;flex-direction:column;align-items:center;gap:6px"><span style="font-size:10px;font-weight:600;color:var(--fg-2);text-align:center;text-transform:uppercase">Explotación Sexual</span><div style="width:12px;height:12px;border-radius:999px;border:2px solid var(--border-strong)"></div></label>
+  </div>
+</div>
+<div class="field"><label class="fl">Modalidad de Permanencia</label>
+  <div style="display:flex;gap:8px">
+    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:8px 12px;border:1px solid var(--primary);border-radius:6px;background:var(--primary-soft);font-size:13px;font-weight:500;color:var(--primary)"><input type="radio" name="sit" checked style="accent-color:var(--primary)"/> Tránsito en Calle</label>
+    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-weight:500;color:var(--fg-2)"><input type="radio" name="sit" style="accent-color:var(--primary)"/> Convivencia en Calle</label>
+  </div>
+</div>
+<div class="g4"><div class="field"><label class="fl">Fecha de Abordaje</label><input class="inp" type="date" value="2024-03-10"/></div><div class="field"><label class="fl">Fecha de Ingreso</label><input class="inp" type="date" value="2024-03-12"/></div><div class="field"><label class="fl">Fecha Reingreso</label><input class="inp" type="date"/></div><div class="field"><label class="fl">Cambio de Perfil</label><input class="inp" type="date"/></div></div>`,
+
+`<div class="sh"><h2>II. Datos Personales del NNA</h2><p>Información de identidad y ubicación.</p></div>
+<div style="background:var(--primary-soft);border:1px solid color-mix(in oklch,var(--primary) 20%,transparent);border-radius:8px;padding:16px;margin-bottom:20px">
+  <h3 style="font-size:12px;font-weight:700;color:var(--primary);text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:6px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Domicilio Actual y Contacto</h3>
+  <div class="g2 mb3"><div class="field" style="margin-bottom:0"><label class="fl">Domicilio Actual</label><input class="inp" value="Jr. Lampa 123, Cercado de Lima"/></div><div class="field" style="margin-bottom:0"><label class="fl">Referencia</label><input class="inp" placeholder="Referencia de ubicación"/></div></div>
+  <div class="g3 mt3"><div><label class="fl">Departamento</label><select class="sel"><option>Lima</option></select></div><div><label class="fl">Provincia</label><select class="sel"><option>Lima</option></select></div><div><label class="fl">Distrito</label><select class="sel"><option>Cercado de Lima</option></select></div></div>
+</div>
+<div style="background:var(--surface-muted);border:1px solid var(--border);border-radius:8px;padding:16px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><h3 style="font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px"><span style="background:var(--fg);color:#fff;width:22px;height:22px;border-radius:999px;display:grid;place-items:center;font-size:11px">1</span>Datos del NNA</h3></div>
+  <div class="g3"><div class="field"><label class="fl">Apellido Paterno <span class="req">*</span></label><input class="inp" value="GARCÍA"/></div><div class="field"><label class="fl">Apellido Materno</label><input class="inp" value="LÓPEZ"/></div><div class="field"><label class="fl">Nombres <span class="req">*</span></label><input class="inp" value="JUAN CARLOS"/></div></div>
+  <div class="g3 mt2"><div class="field"><label class="fl">Sexo</label><select class="sel"><option>Masculino</option><option>Femenino</option></select></div><div class="field"><label class="fl">Fecha de Nacimiento</label><input class="inp" type="date" value="2010-04-15"/></div><div class="field"><label class="fl">Tipo Documento</label><select class="sel"><option>DNI</option><option>Sin Documento</option><option>Partida Nac.</option></select></div></div>
+  <div class="g2 mt2"><div class="field"><label class="fl">N° de Documento</label><input class="inp" value="72394810"/></div><div class="field"><label class="fl">¿Tiene Partida de Nacimiento?</label><div style="display:flex;gap:12px;margin-top:6px"><label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="partida" checked style="accent-color:var(--primary)"/> SÍ</label><label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="partida" style="accent-color:var(--primary)"/> NO</label></div></div></div>
+</div>`,
+
+`<div class="sh"><h2>III. Datos Según Perfil</h2><p>Características de la situación en calle.</p></div>
+<div class="card" style="padding:20px">
+  <div class="field"><label class="fl">¿Qué actividades realizas en calle?</label><textarea class="ta" rows="2">Venta de caramelos y golosinas en el parque Kennedy.</textarea></div>
+  <div class="field"><label class="fl">¿Hace cuánto tiempo realizas esta actividad?</label><input class="inp" value="Aproximadamente 8 meses"/></div>
+  <div class="field"><label class="fl">Horario en calle</label>
+    <div style="background:var(--surface-muted);border:1px solid var(--border);border-radius:6px;padding:12px">
+      <div class="g2 mb2"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;font-weight:600;width:26px">De:</span><input class="inp" type="time" value="09:00"/></div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;font-weight:600;width:26px">A:</span><input class="inp" type="time" value="13:00"/></div></div>
+      <div class="g2"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;font-weight:600;width:26px">De:</span><input class="inp" type="time" value="15:00"/></div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;font-weight:600;width:26px">A:</span><input class="inp" type="time" value="18:00"/></div></div>
+    </div>
+  </div>
+  <div class="field"><label class="fl">Días de actividad</label>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);border:1px solid var(--border);border-radius:6px;overflow:hidden">
+      ${['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'].map((d,i)=>`<label style="display:flex;flex-direction:column;align-items:center;padding:9px 4px;cursor:pointer;${i<6?'border-right:1px solid var(--border);':''}${i<5?'background:var(--primary-soft);':''}"><span style="font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:5px;color:${i<5?'var(--primary)':'var(--fg-muted)'}">${d}</span><input type="checkbox" ${i<5?'checked':''} style="accent-color:var(--primary);width:15px;height:15px"/></label>`).join('')}
+    </div>
+  </div>
+  <div class="field"><label class="fl">Acompañamiento en la actividad</label>
+    <div style="display:grid;grid-template-columns:1fr 3fr;border:1px solid var(--border);border-radius:6px;overflow:hidden">
+      <div style="background:var(--surface-muted);padding:12px 14px;display:flex;align-items:center;font-size:13px;font-weight:600;border-right:1px solid var(--border)">Realizas:</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr)">
+        <label style="display:flex;flex-direction:column;align-items:center;padding:10px;cursor:pointer;border-right:1px solid var(--border);background:var(--primary-soft)"><input type="radio" name="cond" checked style="accent-color:var(--primary)"/><span style="font-size:11px;font-weight:700;margin-top:4px;color:var(--primary);text-align:center">Solo</span></label>
+        <label style="display:flex;flex-direction:column;align-items:center;padding:10px;cursor:pointer;border-right:1px solid var(--border)"><input type="radio" name="cond" style="accent-color:var(--primary)"/><span style="font-size:11px;font-weight:700;margin-top:4px;color:var(--fg-2);text-align:center">Con Pares</span></label>
+        <label style="display:flex;flex-direction:column;align-items:center;padding:10px;cursor:pointer"><input type="radio" name="cond" style="accent-color:var(--primary)"/><span style="font-size:11px;font-weight:700;margin-top:4px;color:var(--fg-2);text-align:center">Con Familiar</span></label>
+      </div>
+    </div>
+  </div>
+</div>`,
+
+`<div class="sh"><h2>IV. Educación</h2><p>Situación educativa del NNA.</p></div>
+<div class="card" style="padding:20px">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;background:var(--primary-soft);border:1px solid color-mix(in oklch,var(--primary) 20%,transparent);border-radius:6px;padding:10px 14px"><input type="checkbox" checked style="accent-color:var(--primary);width:17px;height:17px"/><label style="font-size:13px;font-weight:600;color:var(--primary);cursor:pointer">¿Estudia Actualmente?</label></div>
+  <div class="g2 mb3"><div class="field"><label class="fl">Nivel Educativo</label><select class="sel"><option>Secundaria</option><option>Primaria</option><option>Inicial</option><option>No Escolarizado</option></select></div><div class="field"><label class="fl">Grado / Año</label><input class="inp" value="2do de Secundaria"/></div></div>
+  <div class="g2 mb3"><div class="field"><label class="fl">Institución Educativa</label><input class="inp" value="I.E. 1190 Felipe Huamán Poma de Ayala"/></div><div class="field"><label class="fl">Modalidad</label><select class="sel"><option>Regular</option><option>Alternativa</option><option>Especial</option></select></div></div>
+  <hr class="divider"/>
+  <h4 style="font-size:12px;font-weight:700;text-transform:uppercase;color:var(--fg-2);margin-bottom:12px">Dificultades Escolares</h4>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+    <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" style="accent-color:var(--primary)"/>Problemas de aprendizaje</label>
+    <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" checked style="accent-color:var(--danger)"/>Bullying / Victimización</label>
+    <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" style="accent-color:var(--primary)"/>Conducta disruptiva</label>
+    <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" style="accent-color:var(--primary)"/>Faltas / Tardanzas</label>
+    <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" style="accent-color:var(--primary)"/>Duerme en clase</label>
+    <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" style="accent-color:var(--primary)"/>Expulsado alguna vez</label>
+  </div>
+</div>`,
+
+`<div class="sh"><h2>V. Salud</h2><p>Aseguramiento y condición de salud.</p></div>
+<div class="card" style="padding:20px">
+  <div class="g3 mb3"><div class="field"><label class="fl">¿Afiliado al SIS?</label><select class="sel"><option>Sí</option><option>No</option><option>No sabe</option></select></div><div class="field"><label class="fl">¿Otro seguro?</label><select class="sel"><option>No</option><option>EsSalud</option><option>Otro</option></select></div><div class="field"><label class="fl">¿Enfermedad crónica?</label><div style="display:flex;gap:12px;margin-top:6px"><label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="ec" style="accent-color:var(--primary)"/>SÍ</label><label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="ec" checked style="accent-color:var(--primary)"/>NO</label></div></div></div>
+  <div class="g2 mb3"><div class="field"><label class="fl">¿Tiene discapacidad?</label><div style="display:flex;gap:12px;margin-top:6px"><label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="disc" style="accent-color:var(--primary)"/>SÍ</label><label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="disc" checked style="accent-color:var(--primary)"/>NO</label></div></div><div class="field"><label class="fl">¿Indicadores psicológicos?</label><div style="display:flex;gap:12px;margin-top:6px"><label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="psico" checked style="accent-color:var(--primary)"/>SÍ</label><label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="psico" style="accent-color:var(--primary)"/>NO</label></div></div></div>
+  <div class="field"><label class="fl">¿Consume sustancias?</label><div style="display:flex;gap:8px;flex-wrap:wrap"><span class="cp" onclick="this.classList.toggle('on')">Alcohol</span><span class="cp" onclick="this.classList.toggle('on')">PBC</span><span class="cp" onclick="this.classList.toggle('on')">Marihuana</span><span class="cp" onclick="this.classList.toggle('on')">Inhalantes</span><span class="cp on" onclick="this.classList.toggle('on')">Ninguno</span></div></div>
+  <div class="field mt3"><label class="fl">Observaciones de Salud</label><textarea class="ta" rows="2" placeholder="Condiciones médicas relevantes..."></textarea></div>
+</div>`,
+
+`<div class="sh"><h2>VI. Familia / Otros</h2><p>Vivienda, convivencia y observaciones finales.</p></div>
+<div class="g2 mb3">
+  <div class="card" style="padding:16px"><h4 style="font-size:12px;font-weight:700;text-transform:uppercase;color:var(--fg-2);margin-bottom:12px">Convivencia</h4>
+    <div class="field"><label class="fl">Vive con</label><select class="sel"><option>Padre y Madre</option><option>Solo Madre</option><option>Solo Padre</option><option>Abuelos</option><option>Solo</option><option>Otro</option></select></div>
+    <div class="field"><label class="fl">Nombre del Tutor/a</label><input class="inp" value="María López Quispe"/></div>
+    <div class="field"><label class="fl">Lugar de Pernocte</label><select class="sel"><option>Domicilio familiar</option><option>Calle</option><option>Albergue</option><option>Otro</option></select></div>
+  </div>
+  <div class="card" style="padding:16px"><h4 style="font-size:12px;font-weight:700;text-transform:uppercase;color:var(--fg-2);margin-bottom:12px">Vivienda</h4>
+    <div class="field"><label class="fl">Material de construcción</label><select class="sel"><option>Material Noble</option><option>Adobe</option><option>Madera</option><option>Esteras</option></select></div>
+    <div class="field"><label class="fl">Servicios básicos</label><div style="display:flex;gap:8px;flex-wrap:wrap"><span class="cp on" onclick="this.classList.toggle('on')">Agua</span><span class="cp on" onclick="this.classList.toggle('on')">Luz</span><span class="cp" onclick="this.classList.toggle('on')">Desagüe</span></div></div>
+    <div class="field"><label class="fl">N° de ambientes</label><input class="inp" type="number" value="2" style="width:80px"/></div>
+  </div>
+</div>
+<div class="field"><label class="fl">Antecedentes en Albergue</label><div style="display:flex;gap:12px;margin-bottom:8px"><label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="alb" style="accent-color:var(--primary)"/>SÍ</label><label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="alb" checked style="accent-color:var(--primary)"/>NO</label></div></div>
+<div class="field"><label class="fl">Observaciones Generales</label><textarea class="ta" rows="3" placeholder="Características, observaciones y cualquier dato adicional relevante..."></textarea></div>`
+];
+
+function f03render(){
+  const st=document.getElementById('f03-steps');
+  st.innerHTML=f03Steps.map((s,i)=>`<div class="fstep ${i===f03c?'active':''}" onclick="f03go(${i})"><div class="snum ${i===f03c?'a':i<f03c?'d':'p'}">${i<f03c?'✓':i+1}</div><div><p style="font-size:12px;font-weight:600;color:${i===f03c?'var(--primary)':'var(--fg-2)'}">${s.label}</p><p style="font-size:10px;color:var(--fg-muted)">${s.sub}</p></div></div>`).join('');
+  document.getElementById('f03-ct').innerHTML=f03ct[f03c];
+  document.getElementById('f03-pt').textContent=`${f03c+1}/${f03Steps.length}`;
+  document.getElementById('f03-pb').style.width=`${((f03c+1)/f03Steps.length)*100}%`;
+  document.getElementById('f03-prev').disabled=f03c===0;
+  const nb=document.getElementById('f03-next');
+  if(f03c===f03Steps.length-1){nb.textContent='Guardar Ficha';nb.onclick=()=>toast_('Ficha de Inscripción guardada correctamente');}
+  else{nb.innerHTML='Siguiente →';nb.onclick=()=>f03Nav(1);}
+}
+function f03Nav(d){f03c=Math.max(0,Math.min(f03Steps.length-1,f03c+d));f03render();}
+function f03go(i){f03c=i;f03render();}
+
+// ── F04 DIAGNÓSTICO SOCIAL ──
+const f04T=[{id:'gen',l:'I–III. General / Calle'},{id:'fam',l:'IV–V. Familia / Vivienda'},{id:'edu',l:'VI. Educación'},{id:'sal',l:'VII–VIII. Salud / Recreación'},{id:'nec',l:'IX. Necesidades'}];
+let f04a='gen';
+
+const f04ct={
+gen:`<div style="max-width:820px">
+<div class="card" style="padding:18px;margin-bottom:14px">
+  <h3 style="font-size:12px;font-weight:700;text-transform:uppercase;color:var(--fg-2);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border)">I. Datos Generales</h3>
+  <div class="g2 mb3"><div><label class="fl">Nombres y Apellidos</label><div class="fdisplay">JUAN CARLOS GARCÍA LÓPEZ</div></div><div><label class="fl">DNI</label><div class="fdisplay">72394810</div></div></div>
+  <div class="g3 mb3"><div><label class="fl">Fecha de Nacimiento</label><div class="fdisplay">15/04/2010</div></div><div class="field"><label class="fl">Sexo</label><select class="sel"><option>M</option><option>F</option></select></div><div class="field"><label class="fl">Seguro de Salud</label><div style="display:flex;gap:8px;flex-wrap:wrap"><span class="cp on" onclick="this.classList.toggle('on')">SIS</span><span class="cp" onclick="this.classList.toggle('on')">EsSalud</span><span class="cp" onclick="this.classList.toggle('on')">Otro</span></div></div></div>
+  <div class="g2"><div class="field"><label class="fl">Fecha Inicio Ficha</label><input class="inp" type="date" value="2024-03-12"/></div><div class="field"><label class="fl">Fecha Fin Ficha</label><input class="inp" type="date"/></div></div>
+</div>
+<div class="card" style="padding:18px">
+  <h3 style="font-size:12px;font-weight:700;text-transform:uppercase;color:var(--fg-2);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border)">II. Situación de Calle</h3>
+  <div class="field"><label class="fl">Perfil del Usuario/a</label><div style="display:flex;gap:8px;flex-wrap:wrap"><span class="cp on" onclick="this.classList.toggle('on')">Trabajo Infantil</span><span class="cp" onclick="this.classList.toggle('on')">Mendicidad</span><span class="cp" onclick="this.classList.toggle('on')">Vida en Calle</span></div></div>
+  <div class="g3 mt3">
+    <div class="field"><label class="fl">Tiempo en Calle</label><div style="display:flex;gap:6px"><input class="inp" placeholder="Cant." style="width:64px" value="8"/><select class="sel"><option>Meses</option><option>Semanas</option><option>Años</option></select></div></div>
+    <div class="field"><label class="fl">¿Víctima de Explotación Sexual?</label><div style="display:flex;gap:12px;margin-top:6px"><label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="exp2" style="accent-color:var(--danger)"/>SÍ</label><label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="exp2" checked style="accent-color:var(--primary)"/>NO</label></div></div>
+    <div class="field"><label class="fl">Ingreso Aprox. Semanal</label><div style="position:relative"><span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-weight:600;color:var(--fg-muted)">S/</span><input class="inp" style="padding-left:28px" value="35.00"/></div></div>
+  </div>
+  <div class="g2 mt2">
+    <div class="field"><label class="fl">Horarios</label><div style="display:flex;gap:8px;flex-wrap:wrap"><span class="cp on" onclick="this.classList.toggle('on')">Mañana</span><span class="cp on" onclick="this.classList.toggle('on')">Tarde</span><span class="cp" onclick="this.classList.toggle('on')">Noche</span></div></div>
+    <div class="field"><label class="fl">Frecuencia</label><div style="display:flex;gap:8px;flex-wrap:wrap"><span class="cp on" onclick="this.classList.toggle('on')">Diario</span><span class="cp" onclick="this.classList.toggle('on')">Interdiario</span><span class="cp" onclick="this.classList.toggle('on')">Fines de Semana</span></div></div>
+  </div>
+  <div class="field mt3"><label class="fl">Actividad que realiza</label><textarea class="ta" rows="2">Venta de caramelos y golosinas en el parque Kennedy.</textarea></div>
+  <div class="field"><label class="fl">¿Consume sustancias psicoactivas?</label><div style="display:flex;gap:12px;margin-top:6px"><label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="consm" style="accent-color:var(--danger)"/>SÍ</label><label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="consm" checked style="accent-color:var(--primary)"/>NO</label></div></div>
+</div></div>`,
+
+fam:`<div style="max-width:820px">
+<div class="card" style="padding:18px;margin-bottom:14px">
+  <h3 style="font-size:12px;font-weight:700;text-transform:uppercase;color:var(--fg-2);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border)">III. Tutor/a Responsable</h3>
+  <div class="g3 mb3"><div class="field"><label class="fl">Nombre completo</label><input class="inp" value="María López Quispe"/></div><div class="field"><label class="fl">DNI</label><input class="inp" value="29874561"/></div><div class="field"><label class="fl">Parentesco</label><select class="sel"><option selected>Madre</option><option>Padre</option><option>Abuelo/a</option><option>Tío/a</option></select></div></div>
+  <div class="g3"><div class="field"><label class="fl">Teléfono</label><input class="inp" value="987654321"/></div><div class="field"><label class="fl">Ocupación</label><input class="inp" value="Vendedora ambulante"/></div><div class="field"><label class="fl">Ingreso Mensual (S/)</label><input class="inp" value="650"/></div></div>
+</div>
+<div class="card" style="padding:18px;margin-bottom:14px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><h3 style="font-size:12px;font-weight:700;text-transform:uppercase;color:var(--fg-2)">IV. Composición Familiar</h3><button class="btn btn-p btn-sm"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Agregar Familiar</button></div>
+  <table class="tbl"><thead><tr><th>Apellidos y Nombres</th><th>Parentesco</th><th>Edad</th><th>Sexo</th><th>Ocupación</th></tr></thead><tbody>
+    <tr><td>López Quispe, María</td><td>Madre</td><td>34</td><td>F</td><td>Vendedora</td></tr>
+    <tr><td>García López, Pedro</td><td>Hermano</td><td>10</td><td>M</td><td>Estudiante</td></tr>
+    <tr><td>López Quispe, Ana</td><td>Abuela</td><td>60</td><td>F</td><td>Ama de casa</td></tr>
+  </tbody></table>
+</div>
+<div class="card" style="padding:18px">
+  <h3 style="font-size:12px;font-weight:700;text-transform:uppercase;color:var(--fg-2);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border)">V. Vivienda</h3>
+  <div class="g3 mb3"><div class="field"><label class="fl">Material de Paredes</label><select class="sel"><option>Material Noble</option><option>Adobe</option><option>Madera</option></select></div><div class="field"><label class="fl">N° de Ambientes</label><input class="inp" type="number" value="2"/></div><div class="field"><label class="fl">Propiedad</label><select class="sel"><option>Alquilada</option><option>Propia</option><option>Prestada</option></select></div></div>
+  <div class="field"><label class="fl">Servicios Básicos</label><div style="display:flex;gap:8px;flex-wrap:wrap"><span class="cp on" onclick="this.classList.toggle('on')">Agua</span><span class="cp on" onclick="this.classList.toggle('on')">Luz</span><span class="cp" onclick="this.classList.toggle('on')">Desagüe</span></div></div>
+</div></div>`,
+
+edu:`<div style="max-width:820px"><div class="card" style="padding:18px">
+  <h3 style="font-size:12px;font-weight:700;text-transform:uppercase;color:var(--fg-2);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border)">VI. Educación</h3>
+  <div class="g2 mb3"><div class="field"><label class="fl">¿Estudia actualmente?</label><div style="display:flex;gap:12px;margin-top:6px"><label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="est2" checked style="accent-color:var(--primary)"/>SÍ</label><label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="est2" style="accent-color:var(--primary)"/>NO</label></div></div><div class="field"><label class="fl">Nivel Educativo</label><select class="sel"><option>Secundaria</option><option>Primaria</option><option>Inicial</option></select></div></div>
+  <div class="g3 mb3"><div class="field"><label class="fl">Grado/Año</label><input class="inp" value="2do de Secundaria"/></div><div class="field"><label class="fl">Turno</label><select class="sel"><option>Mañana</option><option>Tarde</option></select></div><div class="field"><label class="fl">Modalidad</label><select class="sel"><option>Regular</option><option>Alternativa</option></select></div></div>
+  <div class="field mb3"><label class="fl">Institución Educativa</label><input class="inp" value="I.E. 1190 Felipe Huamán Poma de Ayala"/></div>
+  <hr class="divider"/>
+  <h4 style="font-size:12px;font-weight:700;text-transform:uppercase;color:var(--fg-2);margin-bottom:12px">Dificultades / Indicadores</h4>
+  <div class="g2"><div class="field"><label class="fl">Problemas de Aprendizaje</label><div style="display:flex;gap:12px;margin-top:6px"><label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="apr" style="accent-color:var(--danger)"/>SÍ</label><label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="apr" checked style="accent-color:var(--primary)"/>NO</label></div></div>
+  <div class="field"><label class="fl">¿Fue expulsado alguna vez?</label><div style="display:flex;gap:12px;margin-top:6px"><label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="exp3" style="accent-color:var(--danger)"/>SÍ</label><label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="exp3" checked style="accent-color:var(--primary)"/>NO</label></div></div>
+  <div class="field"><label class="fl">Bullying / Victimización</label><div style="display:flex;gap:12px;margin-top:6px"><label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="bul" checked style="accent-color:var(--danger)"/>SÍ</label><label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="bul" style="accent-color:var(--primary)"/>NO</label></div></div>
+  <div class="field"><label class="fl">Problemas Conductuales</label><div style="display:flex;gap:12px;margin-top:6px"><label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="con2" style="accent-color:var(--danger)"/>SÍ</label><label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="con2" checked style="accent-color:var(--primary)"/>NO</label></div></div></div>
+</div></div>`,
+
+sal:`<div style="max-width:820px">
+<div class="card" style="padding:18px;margin-bottom:14px">
+  <h3 style="font-size:12px;font-weight:700;text-transform:uppercase;color:var(--fg-2);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border)">VII. Salud, Alimentación e Higiene</h3>
+  <div class="g3 mb3"><div class="field"><label class="fl">Enfermedad Crónica</label><div style="display:flex;gap:12px;margin-top:6px"><label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="ec2" style="accent-color:var(--danger)"/>SÍ</label><label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="ec2" checked style="accent-color:var(--primary)"/>NO</label></div></div><div class="field"><label class="fl">¿Recibe tratamiento?</label><div style="display:flex;gap:12px;margin-top:6px"><label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="tr2" style="accent-color:var(--primary)"/>SÍ</label><label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="tr2" checked style="accent-color:var(--primary)"/>NO</label></div></div><div class="field"><label class="fl">Discapacidad</label><div style="display:flex;gap:12px;margin-top:6px"><label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="dis2" style="accent-color:var(--danger)"/>SÍ</label><label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="dis2" checked style="accent-color:var(--primary)"/>NO</label></div></div></div>
+  <hr class="divider"/>
+  <h4 style="font-size:12px;font-weight:700;text-transform:uppercase;color:var(--fg-2);margin-bottom:10px">Alimentación</h4>
+  <div class="g2 mb3"><div class="field"><label class="fl">¿Recibe 3 comidas/día?</label><div style="display:flex;gap:12px;margin-top:6px"><label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="al2" style="accent-color:var(--primary)"/>SÍ</label><label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="al2" checked style="accent-color:var(--danger)"/>NO</label></div></div><div class="field"><label class="fl">¿Está bien alimentado/a?</label><div style="display:flex;gap:12px;margin-top:6px"><label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="ba2" style="accent-color:var(--primary)"/>SÍ</label><label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="ba2" checked style="accent-color:var(--danger)"/>NO</label></div></div></div>
+  <hr class="divider"/>
+  <h4 style="font-size:12px;font-weight:700;text-transform:uppercase;color:var(--fg-2);margin-bottom:10px">Violencia Intrafamiliar</h4>
+  <div class="g2"><div class="field"><label class="fl">¿Hay violencia en el hogar?</label><div style="display:flex;gap:12px;margin-top:6px"><label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="vio" checked style="accent-color:var(--danger)"/>SÍ</label><label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="vio" style="accent-color:var(--primary)"/>NO</label></div></div><div class="field"><label class="fl">Tipo de Violencia</label><div style="display:flex;gap:8px;flex-wrap:wrap"><span class="cp on" onclick="this.classList.toggle('on')">Física</span><span class="cp on" onclick="this.classList.toggle('on')">Psicológica</span><span class="cp" onclick="this.classList.toggle('on')">Sexual</span></div></div></div>
+</div>
+<div class="card" style="padding:18px">
+  <h3 style="font-size:12px;font-weight:700;text-transform:uppercase;color:var(--fg-2);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border)">VIII. Recreación e Intereses</h3>
+  <div class="g2"><div class="field"><label class="fl">¿Tiempo para jugar?</label><div style="display:flex;gap:12px;margin-top:6px"><label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="jg" checked style="accent-color:var(--primary)"/>SÍ</label><label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="jg" style="accent-color:var(--primary)"/>NO</label></div></div><div class="field"><label class="fl">Lugar de Juego</label><select class="sel"><option>Calle / Parque</option><option>Casa</option><option>Institución</option></select></div></div>
+  <div class="field mt3"><label class="fl">Intereses</label><div style="display:flex;gap:8px;flex-wrap:wrap"><span class="cp on" onclick="this.classList.toggle('on')">Deporte</span><span class="cp" onclick="this.classList.toggle('on')">Arte</span><span class="cp" onclick="this.classList.toggle('on')">Música</span><span class="cp" onclick="this.classList.toggle('on')">Tecnología</span></div></div>
+</div></div>`,
+
+nec:`<div style="max-width:820px">
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><h3 style="font-size:15px;font-weight:600">Necesidades Identificadas</h3><button class="btn btn-p btn-sm"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Agregar Necesidad</button></div>
+<div class="card" style="overflow:hidden">
+<table class="tbl"><thead><tr><th>Categoría</th><th>Descripción</th><th>Fase I</th><th>Fase II</th><th>Fase III</th><th style="width:36px"></th></tr></thead><tbody>
+  <tr><td><span class="badge bd">Identidad</span></td><td>Tramitar DNI urgente ante RENIEC</td><td><span class="badge bw">Proceso</span></td><td>—</td><td>—</td><td><button style="background:none;border:none;cursor:pointer;color:var(--fg-muted)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button></td></tr>
+  <tr><td><span class="badge bi">Salud</span></td><td>Afiliación al SIS y control nutricional</td><td><span class="badge bs">Logrado</span></td><td>—</td><td>—</td><td><button style="background:none;border:none;cursor:pointer;color:var(--fg-muted)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button></td></tr>
+  <tr><td><span class="badge bp">Educación</span></td><td>Reincorporación escolar y seguimiento</td><td><span class="badge bn2">Pendiente</span></td><td>—</td><td>—</td><td><button style="background:none;border:none;cursor:pointer;color:var(--fg-muted)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button></td></tr>
+</tbody></table></div></div>`
+};
+
+function f04render(){
+  const tc=document.getElementById('f04-tabs');
+  tc.innerHTML=f04T.map(t=>`<div class="tab ${t.id===f04a?'active':''}" onclick="f04go('${t.id}')">${t.l}</div>`).join('');
+  document.getElementById('f04-ct').innerHTML=f04ct[f04a];
+}
+function f04go(id){f04a=id;f04render();}
+
+// ── F05 LOGROS ──
+const f05fases=[{id:1,l:'Fase I — Inicial',c:'warning'},{id:2,l:'Fase II — Proceso',c:'primary'},{id:3,l:'Fase III — Logro',c:'success'}];
+let f05a=1;
+const f05st={};
+const f05items={
+  1:["El/la NNA se integra y colabora con otras/os NNA.","El/la NNA participa regularmente de las actividades del servicio de educadores de calle.","El adulto responsable muestra interés en cubrir necesidades básicas urgentes (identidad, salud y educación).","El/la NNA y adulto responsable muestran interés en cubrir sus necesidades básicas urgentes.","Muestra interés en acercarse a la comunidad a través de actores sociales próximos."],
+  2:["El NNA tiene cubierto y ejerce su derecho a la educación.","El NNA tiene cubierto y ejerce su derecho a la salud.","El NNA tiene cubierto y ejerce su derecho a la identidad.","El NNA tiene cubierto y ejerce su derecho a la alimentación.","El/la NNA deja o reduce la situación de calle según perfil.","El adulto responsable no ejerce violencia física ni psicológica.","Aumentaron su participación en actividades de desarrollo integral.","Acceso a servicios especializados según las necesidades del caso.","El/la NNA incorpora conductas de autocuidado personal.","El/la NNA y su familia construye un proyecto o plan de vida."],
+  3:["NNA dejan la situación de calle ejerciendo permanentemente sus derechos.","Las NNA desarrollan capacidades de autoprotección y habilidades para la vida.","Las NNA hacen uso de programas y servicios que restituyen sus derechos.","Persona adulta responsable presenta capacidades para garantizar la protección integral.","Las/os NNA y sus familias presentan y desarrollan sus proyectos de vida."]
+};
+
+function f05render(){
+  const tc=document.getElementById('f05-tabs');
+  tc.innerHTML=f05fases.map(f=>`<div class="tab ${f.id===f05a?'active':''}" onclick="f05go(${f.id})" style="${f.id===f05a?`border-bottom-color:var(--${f.c});color:var(--${f.c})`:''}">${f.l}</div>`).join('');
+  const c=f05a,items=f05items[c];
+  const cc=f05fases.find(f=>f.id===c).c;
+  document.getElementById('f05-ct').innerHTML=`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;background:var(--${cc}-soft);border:1px solid color-mix(in oklch,var(--${cc}) 30%,transparent);border-radius:6px;padding:10px 14px">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--${cc})" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      <span style="font-size:12px;font-weight:600;color:var(--${cc})">Fecha de Aplicación — Fase ${c}</span>
+      <input type="date" style="margin-left:8px;font-size:12px;border:1px solid color-mix(in oklch,var(--${cc}) 30%,transparent);border-radius:4px;padding:3px 8px;background:white;outline:none"/>
+    </div>
+    <div class="card" style="overflow:hidden;margin-bottom:16px">
+      <table class="tbl">
+        <thead><tr><th style="width:36px">N°</th><th>Indicador de Logro</th><th style="width:230px;text-align:center">Estado del Logro</th></tr></thead>
+        <tbody>${items.map((item,i)=>{const k=`${c}_${i}`,s=f05st[k]||null;return`<tr><td style="text-align:center;font-weight:600;color:var(--fg-muted)">${i+1}</td><td style="font-size:13px;line-height:1.4">${item}</td><td style="text-align:center"><div class="sbtns" style="justify-content:center"><button class="sbtn ${s==='si'?'si':'off'}" onclick="f05set('${k}','si');f05render()">SÍ</button><button class="sbtn ${s==='no'?'no':'off'}" onclick="f05set('${k}','no');f05render()">NO</button><button class="sbtn ${s==='pr'?'pr':'off'}" onclick="f05set('${k}','pr');f05render()">EN PROCESO</button></div></td></tr>`;}).join('')}
+        </tbody>
+      </table>
+    </div>
+    <div class="field"><label class="fl">Observaciones de la Fase ${c}</label><textarea class="ta" rows="3" placeholder="Ingrese observaciones relevantes, dificultades encontradas o logros específicos..."></textarea></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:48px;margin-top:28px;padding-top:20px;border-top:1px solid var(--border);text-align:center">
+      <div><div style="height:1px;background:var(--fg);margin-bottom:8px"></div><p style="font-size:12px;font-weight:600">Educador/a Responsable</p><p style="font-size:11px;color:var(--fg-muted)">Firma y Sello</p></div>
+      <div><div style="height:1px;background:var(--fg);margin-bottom:8px"></div><p style="font-size:12px;font-weight:600">Coordinador/a del Servicio</p><p style="font-size:11px;color:var(--fg-muted)">Firma y Sello</p></div>
+    </div>`;
+}
+function f05go(id){f05a=id;f05render();}
+function f05set(k,v){f05st[k]=f05st[k]===v?null:v;}
+
+// ── PTI ──
+let ptiObjs=[
+  {id:1,area:'IDENTIDAD',desc:'Gestionar la obtención del DNI del NNA ante RENIEC.',ind:'NNA cuenta con DNI físico.',acts:[{d:'Coordinación con RENIEC - Módulo Miraflores',r:'Educador',ini:'2024-04-01',fin:'2024-04-30'}]},
+  {id:2,area:'SALUD',desc:'Gestionar afiliación al SIS y control nutricional.',ind:'NNA afiliado al SIS y con control nutricional al día.',acts:[{d:'Coordinación con posta de salud',r:'Educador',ini:'2024-04-01',fin:'2024-04-15'},{d:'Acompañamiento a primera cita médica',r:'Educador',ini:'2024-04-16',fin:'2024-04-30'}]}
+];
+const ptiAC={SALUD:'danger',EDUCACION:'info',IDENTIDAD:'warning',FAMILIA:'success',OTROS:'neutral'};
+
+function ptiRender(){
+  document.getElementById('pti-ct').innerHTML=`<div style="max-width:900px">
+    <div class="field mb4"><label class="fl">Objetivo General de la Intervención</label><textarea class="ta" rows="2">Lograr la restitución de los derechos vulnerados del NNA y su reinserción familiar y escolar.</textarea></div>
+    ${ptiObjs.map((obj,idx)=>`
+    <div class="objcard">
+      <div class="objhd">
+        <span class="badge b${ptiAC[obj.area]||'neutral'}" style="flex-shrink:0">Obj. ${idx+1}</span>
+        <select style="font-size:11px;font-weight:700;border:none;background:transparent;cursor:pointer;color:var(--fg-2);outline:none" onchange="ptiObjs[${idx}].area=this.value;ptiRender()">
+          ${['SALUD','EDUCACION','IDENTIDAD','FAMILIA','OTROS'].map(a=>`<option${a===obj.area?' selected':''}>${a}</option>`).join('')}
+        </select>
+        <input style="flex:1;border:none;border-bottom:1px solid transparent;outline:none;background:transparent;font-size:13px;font-weight:600;color:var(--fg);padding:2px 4px" value="${obj.desc}" onfocus="this.style.borderBottomColor='var(--primary)'" onblur="this.style.borderBottomColor='transparent'" onchange="ptiObjs[${idx}].desc=this.value"/>
+        <button onclick="ptiObjs.splice(${idx},1);ptiRender()" style="background:none;border:none;cursor:pointer;color:var(--fg-muted);padding:4px;border-radius:4px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
+      </div>
+      <div class="objbd">
+        <div style="display:grid;grid-template-columns:1fr 110px 100px 100px 32px;gap:8px;margin-bottom:6px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--fg-muted);padding:0 8px"><span>Actividad / Tarea</span><span>Responsable</span><span>Inicio</span><span>Fin</span><span></span></div>
+        ${obj.acts.map((act,ai)=>`<div class="actrow"><input class="actinp" value="${act.d}" placeholder="Descripción de la actividad" onchange="ptiObjs[${idx}].acts[${ai}].d=this.value"/><input class="actinp" value="${act.r}" onchange="ptiObjs[${idx}].acts[${ai}].r=this.value"/><input class="actinp" type="date" value="${act.ini}" onchange="ptiObjs[${idx}].acts[${ai}].ini=this.value"/><input class="actinp" type="date" value="${act.fin}" onchange="ptiObjs[${idx}].acts[${ai}].fin=this.value"/><button onclick="ptiObjs[${idx}].acts.splice(${ai},1);ptiRender()" style="background:none;border:none;cursor:pointer;color:var(--border-strong)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>`).join('')}
+        <button onclick="ptiObjs[${idx}].acts.push({d:'',r:'Educador',ini:'',fin:''});ptiRender()" style="background:none;border:none;cursor:pointer;color:var(--primary);font-size:12px;font-weight:600;display:flex;align-items:center;gap:4px;margin-top:8px;padding:4px 8px;border-radius:4px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Agregar Actividad</button>
+        <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--fg-muted)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--fg-muted)">Indicador:</span><input style="flex:1;border:none;border-bottom:1px solid var(--border);outline:none;background:transparent;font-size:12px;font-style:italic;color:var(--fg-2);padding:2px 0" value="${obj.ind}" onfocus="this.style.borderBottomColor='var(--primary)'" onblur="this.style.borderBottomColor='var(--border)'" onchange="ptiObjs[${idx}].ind=this.value"/></div>
+      </div>
+    </div>`).join('')}
+    <div class="infobox mt4"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>Si no se logran los resultados esperados en 3 meses, se debe generar un Informe Técnico de Ampliación de Fase.</div>
+  </div>`;
+}
+function ptiAdd(){ptiObjs.push({id:Date.now(),area:'SALUD',desc:'',ind:'',acts:[]});ptiRender();}
+
+// ── F07 TALLERES ──
+let talleres=[
+  {id:1,nombre:'Taller de Habilidades Sociales',fecha:'2024-04-10',hora:'10:00',lugar:'Centro de Referencia San Martín',estado:'EVALUADO',tipo:'individual',logros:'El NNA mostró avances significativos en comunicación asertiva.'},
+  {id:2,nombre:'Manejo de Emociones',fecha:'2024-05-15',hora:'09:30',lugar:'Parque Kennedy, Miraflores',estado:'PLANIFICADO',tipo:'individual'}
+];
+
+function f07render(){
+  const c=document.getElementById('f07-ct');
+  const sc={PLANIFICADO:'bi',EJECUTADO:'bw',EVALUADO:'bs'};
+  c.innerHTML=`<div style="max-width:900px">
+    <div style="background:linear-gradient(135deg,oklch(0.38 0.14 254),oklch(0.28 0.16 260));border-radius:10px;padding:20px 24px;margin-bottom:20px;color:white">
+      <h2 style="font-size:16px;font-weight:700;margin-bottom:4px">Talleres Socioeducativos</h2>
+      <p style="font-size:12px;opacity:.8;margin-bottom:14px">Fase 2: Desarrollo e Intervención — Juan Carlos García López</p>
+      <div style="display:flex;gap:8px">
+        <button onclick="openModal('m07')" style="background:white;color:oklch(0.38 0.14 254);font-weight:700;font-size:12px;padding:8px 14px;border:none;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:6px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Planificar Taller Individual (F7)</button>
+        <button style="background:rgba(255,255,255,.15);color:white;font-weight:600;font-size:12px;padding:8px 14px;border:1px solid rgba(255,255,255,.3);border-radius:6px;cursor:pointer">Inscribir en Taller Grupal</button>
+      </div>
+    </div>
+    ${['PLANIFICADO','EJECUTADO','EVALUADO'].map(est=>{
+      const tls=talleres.filter(t=>t.estado===est);
+      if(!tls.length)return'';
+      const lbl={PLANIFICADO:'📋 Planificados',EJECUTADO:'⏳ Por Evaluar',EVALUADO:'✅ Historial'};
+      return`<div style="margin-bottom:16px"><h4 style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--fg-muted);letter-spacing:.06em;margin-bottom:8px">${lbl[est]}</h4>
+        ${tls.map(t=>`<div style="border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:8px;cursor:pointer;transition:all .12s" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border)'">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between">
+            <div>
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px"><span class="badge ${sc[t.estado]}">${t.estado}</span><span style="font-size:10px;color:var(--fg-muted)">${t.tipo==='individual'?'Individual':'Grupal'}</span></div>
+              <h4 style="font-size:13px;font-weight:600;margin-bottom:4px">${t.nombre}</h4>
+              <p style="font-size:12px;color:var(--fg-2);display:flex;align-items:center;gap:12px"><span style="display:flex;align-items:center;gap:4px"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/></svg>${t.fecha} · ${t.hora}</span><span style="display:flex;align-items:center;gap:4px"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/></svg>${t.lugar}</span></p>
+              ${t.logros?`<p style="font-size:12px;margin-top:6px;background:var(--success-soft);border-radius:4px;padding:5px 10px;color:var(--success)"><b>Logros:</b> ${t.logros}</p>`:''}
+            </div>
+            ${t.estado==='EJECUTADO'?`<button class="btn btn-sm" style="background:var(--warning-soft);color:var(--warning);border:1px solid color-mix(in oklch,var(--warning) 30%,transparent)">Evaluar (F8)</button>`:''}
+          </div>
+        </div>`).join('')}
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+function saveF07(){
+  const nm=document.getElementById('f07-nm').value;
+  const fe=document.getElementById('f07-fe').value;
+  const lu=document.getElementById('f07-lu').value;
+  if(!nm||!fe||!lu){toast_('Complete los campos requeridos','err');return;}
+  talleres.push({id:Date.now(),nombre:nm,fecha:fe,hora:document.getElementById('f07-hr').value,lugar:lu,estado:'PLANIFICADO',tipo:'individual'});
+  closeModal('m07');f07render();toast_('Taller planificado correctamente (F07)');
+}
+
+// ── F12 SEGUIMIENTO ──
+let segs=[
+  {id:1,fecha:'2024-04-05',hora:'10:30',lugar:'DOMICILIO',ent:'María López Quispe',par:'Madre',desc:'Se realizó visita domiciliaria. La madre expresa disposición para apoyar el proceso escolar.',res:'Comprometió asistir a la reunión de APAFA del próximo martes.'},
+  {id:2,fecha:'2024-04-19',hora:'11:00',lugar:'CENTRO REFERENCIA',ent:'María López Quispe',par:'Madre',desc:'Segunda sesión de consejería. Se trabajan pautas de crianza y comunicación familiar.',res:'Se establecieron acuerdos sobre horarios y responsabilidades del NNA.'}
+];
+const lugarIcon={DOMICILIO:'🏠',TRABAJO:'💼','CENTRO REFERENCIA':'🏢',CALLE:'🚶'};
+
+function f12render(){
+  document.getElementById('f12-ct').innerHTML=`<div style="max-width:900px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div><h2 style="font-size:16px;font-weight:600">Seguimiento Familiar (Fase 3)</h2><p style="font-size:12px;color:var(--fg-muted);margin-top:2px">Registro de visitas y consejerías — Formato F12</p></div>
+    </div>
+    ${segs.length===0?`<div style="text-align:center;padding:48px;background:var(--surface-muted);border-radius:8px;border:2px dashed var(--border)"><p style="color:var(--fg-muted)">No hay fichas de seguimiento registradas.</p></div>`:`
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px">
+      ${segs.map(s=>`<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px;transition:box-shadow .12s" onmouseover="this.style.boxShadow='var(--sh2)'" onmouseout="this.style.boxShadow='none'">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <span class="badge bp">${new Date(s.fecha).toLocaleDateString('es-PE')}</span>
+          <button style="background:none;border:none;cursor:pointer;color:var(--fg-muted);padding:4px" title="Descargar PDF"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
+        </div>
+        <div style="font-size:12px;color:var(--fg-2);margin-bottom:5px">${lugarIcon[s.lugar]||'📍'} ${s.lugar}</div>
+        <h4 style="font-size:13px;font-weight:600;margin-bottom:4px">${s.ent} <span style="font-weight:400;color:var(--fg-muted)">(${s.par})</span></h4>
+        <p style="font-size:12px;color:var(--fg-2);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${s.desc}</p>
+        ${s.res?`<div style="margin-top:8px;padding:5px 10px;background:var(--success-soft);border-radius:4px;font-size:11px;color:var(--success)"><b>Compromisos:</b> ${s.res}</div>`:''}
+        <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);font-size:11px;color:var(--fg-muted)">🕐 ${s.hora}</div>
+      </div>`).join('')}
+    </div>`}
+  </div>`;
+}
+function saveF12(){
+  segs.unshift({id:Date.now(),fecha:new Date().toISOString().split('T')[0],hora:'10:00',lugar:'DOMICILIO',ent:'Nuevo Registro',par:'',desc:'Visita registrada correctamente.',res:''});
+  closeModal('m12');f12render();toast_('Ficha de Seguimiento F12 guardada correctamente');
+}
+
+// ── F13 EGRESO ──
+let f13o={datos:true,modal:true,def:false,logros:true,firmas:false};
+function f13render(){
+  document.getElementById('f13-ct').innerHTML=`<div style="max-width:820px">
+  <div style="display:flex;align-items:center;justify-content:space-between;background:var(--success-soft);border:1px solid color-mix(in oklch,var(--success) 30%,transparent);border-radius:8px;padding:14px 18px;margin-bottom:14px">
+    <div><h2 style="font-size:16px;font-weight:600;color:var(--success)">Ficha de Egreso/Retiro (Formato 13)</h2><p style="font-size:12px;color:var(--success);opacity:.8">Usuario: Juan Carlos García López</p></div>
+    <button class="btn btn-sm" style="background:var(--success);color:white;border:none" onclick="toast_('Ficha de Egreso guardada correctamente')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/></svg>Guardar</button>
+  </div>
+  ${esecHtml('datos','Datos Generales del NNA','var(--primary)',`
+    <div class="g3 mb3"><div><label class="fl">Apellidos y Nombres</label><div class="fdisplay">GARCÍA LÓPEZ, JUAN CARLOS</div></div><div><label class="fl">F. Nacimiento</label><div class="fdisplay">15/04/2010</div></div><div><label class="fl">DNI</label><div class="fdisplay">72394810</div></div></div>
+    <div class="g3 mb3"><div><label class="fl">Sexo</label><div style="display:flex;gap:12px;margin-top:4px"><label style="display:flex;align-items:center;gap:4px;font-size:13px"><input type="radio" checked disabled/>M</label><label style="display:flex;align-items:center;gap:4px;font-size:13px"><input type="radio" disabled/>F</label></div></div><div class="field"><label class="fl">Seguro de Salud</label><select class="sel"><option>SIS</option><option>EsSalud</option><option>Ninguno</option></select></div><div><label class="fl">F. Ingreso al Servicio</label><div class="fdisplay">12/03/2024</div></div></div>
+    <div class="g2 mb3"><div class="field"><label class="fl">Fecha de Egreso <span class="req">*</span></label><input class="inp" type="date"/></div></div>
+    <div class="field"><label class="fl">Perfil del Usuario/a</label><div class="g2">${[{k:'ti',l:'Trabajo Infantil'},{k:'me',l:'Mendicidad'},{k:'ct',l:'Vida en Calle — Tránsito'},{k:'cv',l:'Vida en Calle — Con Vivienda'}].map(o=>`<label style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface-muted);border:1px solid var(--border);border-radius:5px;cursor:pointer;font-size:13px"><input type="checkbox" style="accent-color:var(--success);width:15px;height:15px"/>${o.l}</label>`).join('')}</div></div>
+  `)}
+  ${esecHtml('modal','Modalidad de Egreso','var(--warning)',`
+    <div style="margin-bottom:10px"><label style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--surface-muted);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:13px"><input type="checkbox" style="accent-color:var(--success);width:15px;height:15px"/><span class="fw6">Cumplió Fases (Culminación Exitosa)</span></label></div>
+    <div style="margin-bottom:6px"><label style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--surface-muted);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:13px"><input type="checkbox" style="accent-color:var(--success);width:15px;height:15px"/><span class="fw6">Mayoría de Edad</span></label></div>
+    <div style="margin-bottom:10px"><label style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--surface-muted);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:13px"><input type="checkbox" style="accent-color:var(--success);width:15px;height:15px"/><span class="fw6">Derivación a Servicios Complementarios</span></label></div>
+    <hr class="divider"/>
+    <label class="fl" style="margin-bottom:8px">Modalidad de Retiro</label>
+    <div style="border:1px solid var(--border);border-radius:6px;padding:11px 14px;cursor:pointer;margin-bottom:5px" onclick="this.style.borderColor='var(--warning)';this.style.background='var(--warning-soft)'"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px"><input type="radio" name="ret" style="accent-color:var(--warning);width:15px;height:15px"/><span class="fw6">Interés Superior del NNA</span></label></div>
+    <div style="border:1px solid var(--border);border-radius:6px;padding:11px 14px;cursor:pointer;margin-bottom:5px"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px"><input type="radio" name="ret" style="accent-color:var(--danger);width:15px;height:15px"/><span class="fw6">No Ubicado (3 meses o más)</span></label></div>
+    <div style="border:1px solid var(--border);border-radius:6px;padding:11px 14px;cursor:pointer;margin-bottom:5px"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px"><input type="radio" name="ret" style="accent-color:var(--warning);width:15px;height:15px"/><span class="fw6">No Desea Participar</span></label></div>
+    <label style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--surface-muted);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:13px;margin-top:4px"><input type="checkbox" style="accent-color:var(--fg-muted);width:15px;height:15px"/>No Resuelve UPE</label>
+    <div class="g2 mt3"><div class="field"><label class="fl">Cuenta con Resolución UPE</label><select class="sel"><option value="">Seleccionar…</option><option>SÍ</option><option>NO</option></select></div><div class="field"><label class="fl">Fase al Momento del Egreso</label><select class="sel"><option value="">Seleccionar…</option><option>FASE I</option><option>FASE II</option><option>FASE III</option></select></div></div>
+  `)}
+  ${esecHtml('def','Defensa Pública y Fase del Servicio','var(--fg-2)',`
+    <div class="g2 mb3"><div class="field"><label class="fl">Recibe Servicio de Defensa Pública</label><select class="sel"><option value="">Seleccionar…</option><option>SÍ</option><option>NO</option></select></div><div class="field"><label class="fl">Fase al Momento del Egreso</label><select class="sel"><option value="">Seleccionar…</option><option>FASE I</option><option>FASE II</option><option>FASE III</option></select></div></div>
+    <div class="field"><label class="fl">Descripción (Defensa Pública)</label><textarea class="ta" rows="2" placeholder="Detalles del servicio de defensa pública..."></textarea></div>
+  `)}
+  ${esecHtml('logros','Logros Cumplidos','var(--success)',
+    [["Niñas, niños y adolescentes dejan la situación de calle ejerciendo permanentemente sus derechos.","Las niñas, niños y adolescentes desarrollan capacidades de autoprotección y habilidades para la vida.","Las NNA hacen uso de programas y servicios que restituyen el ejercicio de sus derechos.","Persona adulta responsable presenta capacidades para garantizar la protección integral.","Las/os NNA presentan y desarrollan sus proyectos de vida con el cumplimiento de metas.","Padres, madres o tutor cuenta con herramientas para asumir el cuidado de sus hijos."]].flat().map((l,i)=>`<label style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;background:var(--surface-muted);border:1px solid var(--border);border-radius:6px;cursor:pointer;margin-bottom:6px"><input type="checkbox" style="accent-color:var(--success);width:16px;height:16px;flex-shrink:0;margin-top:1px"/><div><span style="font-size:12px;font-weight:700;color:var(--success)">Logro ${i+1}: </span><span style="font-size:13px;color:var(--fg)">${l}</span></div></label>`).join('')
+  )}
+  ${esecHtml('firmas','Datos del Educador/a y Coordinador/a','var(--fg-2)',`
+    <div class="g2 mb4">
+      <div style="background:var(--primary-soft);border:1px solid color-mix(in oklch,var(--primary) 20%,transparent);border-radius:7px;padding:14px">
+        <h4 style="font-size:12px;font-weight:700;color:var(--primary);margin-bottom:12px">EDUCADOR/A RESPONSABLE</h4>
+        <div class="g3 mb2"><div class="field"><label class="fl">Ap. Paterno</label><input class="inp"/></div><div class="field"><label class="fl">Ap. Materno</label><input class="inp"/></div><div class="field"><label class="fl">Nombres</label><input class="inp"/></div></div>
+        <div class="g2"><div class="field"><label class="fl">DNI</label><input class="inp" maxlength="8"/></div><div class="field"><label class="fl">Lugar / Fecha</label><input class="inp" placeholder="Lima, 15/05/2024"/></div></div>
+      </div>
+      <div style="background:var(--surface-muted);border:1px solid var(--border);border-radius:7px;padding:14px">
+        <h4 style="font-size:12px;font-weight:700;color:var(--fg-2);margin-bottom:12px">COORDINADOR/A V°B°</h4>
+        <div class="g3 mb2"><div class="field"><label class="fl">Ap. Paterno</label><input class="inp"/></div><div class="field"><label class="fl">Ap. Materno</label><input class="inp"/></div><div class="field"><label class="fl">Nombres</label><input class="inp"/></div></div>
+        <div class="g2"><div class="field"><label class="fl">DNI</label><input class="inp" maxlength="8"/></div><div class="field"><label class="fl">Lugar / Fecha</label><input class="inp" placeholder="Lima, 15/05/2024"/></div></div>
+      </div>
+    </div>
+  `)}
+  </div>`;
+}
+
+function esecHtml(key,title,color,body){
+  return`<div class="esec">
+    <div class="esec-hd" onclick="f13o['${key}']=!f13o['${key}'];f13render()">
+      <div style="display:flex;align-items:center;gap:8px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg><span class="fw6">${title}</span></div>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${f13o[key]?'<polyline points="18 15 12 9 6 15"/>':'<polyline points="6 9 12 15 18 9"/>'}</svg>
+    </div>
+    ${f13o[key]?`<div class="esec-bd">${body}</div>`:''}
+  </div>`;
+}
+
+// ── INIT ──
+f03render();f04render();f05render();ptiRender();f07render();f12render();f13render();
+</script>
+</body>
+</html>

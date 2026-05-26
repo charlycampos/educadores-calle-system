@@ -1,0 +1,22 @@
+{
+  "name": "@sec/shared",
+  "version": "1.0.0",
+  "description": "Librería compartida de tipos, middlewares y utilidades del sistema SEC",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.3"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.9.3"
+  }
+}

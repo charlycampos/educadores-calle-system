@@ -1,0 +1,16 @@
+node_modules/
+dist/
+venv/
+.env
+*.log
+.antigravitycli/
+brain/
+agy.exe
+*.pdf
+*.png
+*.xlsx
+*.zip
+*.tar.gz
+*.mp4
+*.jpg
+*.jpeg

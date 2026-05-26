@@ -1,0 +1,153 @@
+# Proyecto Educadores de Calle - Especificaciones de Base de Datos (Oracle)
+
+Este archivo contiene el mapeo oficial de las tablas proporcionadas por el usuario para el sistema SEC. Estas definiciones deben prevalecer sobre cualquier suposición previa.
+
+## Mapeo de Tablas y Columnas
+
+### 1. NNA (Beneficiarios)
+| Columna | Tipo | Nulable | Descripción |
+|---------|------|---------|-------------|
+| ID | NUMBER | N | ID Primario |
+| CODIGO_FICHA03 | VARCHAR2 | Y | Correlativo F03-YYYY-NNNN |
+| NOMBRES | VARCHAR2 | N | |
+| APELLIDO_PATERNO | VARCHAR2 | N | |
+| APELLIDO_MATERNO | VARCHAR2 | Y | |
+| TIPO_DOC | VARCHAR2 | N | DNI, SIN_DOC, etc. |
+| NUMERO_DOC | VARCHAR2 | Y | |
+| FECHA_NACIMIENTO | TIMESTAMP | Y | |
+| TIENE_PARTIDA_NACIMIENTO | NUMBER | Y | 0=No, 1=Sí |
+| DETALLE_SIN_DOC | VARCHAR2 | Y | |
+| DEPARTAMENTO_NAC | VARCHAR2 | Y | |
+| PROVINCIA_NAC | VARCHAR2 | Y | |
+| DISTRITO_NAC | VARCHAR2 | Y | |
+| SEXO | VARCHAR2 | Y | |
+| NACIONALIDAD | VARCHAR2 | Y | |
+| CARPETA_ID | NUMBER | Y | Relación con NNA_CARPETA |
+| DOMICILIO_ACTUAL | VARCHAR2 | Y | |
+| REFERENCIA_DOMICILIO | VARCHAR2 | Y | |
+| DEPARTAMENTO_DOM | VARCHAR2 | Y | |
+| PROVINCIA_DOM | VARCHAR2 | Y | |
+| DISTRITO_DOM | VARCHAR2 | Y | |
+| TELEFONO_CONTACTO | VARCHAR2 | Y | |
+| NOMBRE_TUTOR | VARCHAR2 | Y | |
+| VIVE_CON | VARCHAR2 | Y | |
+| DETALLE_VIVE_CON | VARCHAR2 | Y | |
+| TIENE_HERMANOS | NUMBER | Y | 0=No, 1=Sí |
+| CANT_HERMANOS | NUMBER | Y | |
+| DETALLES_HERMANOS | VARCHAR2 | Y | |
+| LUGAR_PERNOCTE | VARCHAR2 | Y | |
+| DETALLE_LUGAR_PERNOCTE | VARCHAR2 | Y | |
+| TIENE_ANTECEDENTE_ALBERGUE | NUMBER | Y | |
+| DETALLE_ANTECEDENTE_ALBERGUE | VARCHAR2 | Y | |
+| AFILIADO_SIS | VARCHAR2 | Y | |
+| AFILIADO_OTRO_SEGURO | VARCHAR2 | Y | |
+| DETALLE_OTRO_SEGURO | VARCHAR2 | Y | |
+| SUFRE_ENFERMEDAD | NUMBER | Y | |
+| DETALLE_ENFERMEDAD | VARCHAR2 | Y | |
+| OBSERVACIONES_SALUD | VARCHAR2 | Y | |
+| TIENE_DISCAPACIDAD | NUMBER | Y | |
+| TIPO_DISCAPACIDAD | VARCHAR2 | Y | |
+| DETALLE_DISCAPACIDAD | VARCHAR2 | Y | |
+| ESTUDIA_ACTUALMENTE | NUMBER | Y | |
+| NIVEL_EDUCATIVO | VARCHAR2 | Y | |
+| GRADO_ESTUDIO | VARCHAR2 | Y | |
+| INSTITUCION_EDUCATIVA | VARCHAR2 | Y | |
+| MODALIDAD_ESTUDIO | VARCHAR2 | Y | |
+| DETALLE_NO_ESTUDIA | VARCHAR2 | Y | |
+| ACTIVIDADES_TIEMPO_LIBRE | VARCHAR2 | Y | |
+| FOTO_URL | VARCHAR2 | Y | |
+| CARACTERISTICAS | VARCHAR2 | Y | |
+| CREATED_AT | TIMESTAMP | N | |
+| UPDATED_AT | TIMESTAMP | N | |
+| EDAD | NUMBER | Y | |
+| UNIDAD_EDAD | VARCHAR2 | Y | ANIOS, MESES, DIAS |
+| DATOS_F03 | CLOB | Y | Respaldo JSON |
+
+### 2. NNA_CASO (Intervenciones)
+| Columna | Tipo | Nulable |
+|---------|------|---------|
+| ID | NUMBER | N |
+| CODIGO_CASO | VARCHAR2 | N |
+| NNA_ID | NUMBER | N |
+| SEDE_ID | NUMBER | N |
+| RESPONSABLE_ID | NUMBER | N |
+| DISTRITO_INTERVENCION | VARCHAR2 | Y |
+| ZONA_INTERVENCION | VARCHAR2 | Y |
+| PERFIL | VARCHAR2 | N |
+| ACTIVIDAD_REALIZADA | VARCHAR2 | Y |
+| TIEMPO_EN_CALLE | VARCHAR2 | Y |
+| HORARIO_INICIO | VARCHAR2 | Y |
+| HORARIO_FIN | VARCHAR2 | Y |
+| HORARIO_INICIO2 | VARCHAR2 | Y |
+| HORARIO_FIN2 | VARCHAR2 | Y |
+| DIAS_TRABAJO | VARCHAR2 | Y |
+| CONDICION | VARCHAR2 | Y |
+| ANTECEDENTE_INSTITUCIONAL | VARCHAR2 | Y |
+| FECHA_ABORDAJE | TIMESTAMP | Y |
+| FECHA_INGRESO | TIMESTAMP | Y |
+| FECHA_REINGRESO | TIMESTAMP | Y |
+| FECHA_CAMBIO_PERFIL | TIMESTAMP | Y |
+| ESTADO | VARCHAR2 | N |
+| NIVEL_RIESGO | VARCHAR2 | Y |
+| SITUACION_CALLE | VARCHAR2 | Y |
+| FECHA_APERTURA | TIMESTAMP | N |
+| FECHA_CIERRE | TIMESTAMP | Y |
+| UPDATED_AT | TIMESTAMP | N |
+| FASE | VARCHAR2 | N |
+| FECHA_APERTURA_EXPEDIENTE | TIMESTAMP | Y |
+
+### 3. DIAGNOSTICO_SOCIAL (Formato 04)
+| Columna | Tipo | Nulable |
+|---------|------|---------|
+| ID | NUMBER | N |
+| CODIGO_FICHA_04 | VARCHAR2 | Y |
+| NNA_ID | NUMBER | N |
+| SITUACION_CALLE | VARCHAR2 | Y |
+| TIEMPO_EN_CALLE | VARCHAR2 | Y |
+| MOTIVO_INGRESO | VARCHAR2 | Y |
+| LUGAR_PERNOTA | VARCHAR2 | Y |
+| ACTIVIDAD_CALLE | VARCHAR2 | Y |
+| CONSUMO_SUSTANCIAS | NUMBER | Y |
+| NOMBRE_TUTOR | VARCHAR2 | Y |
+| DNI_TUTOR | VARCHAR2 | Y |
+| DIRECCION_TUTOR | VARCHAR2 | Y |
+| TELEFONO_TUTOR | VARCHAR2 | Y |
+| DATOS_EXTRA | CLOB | Y |
+| CREATED_AT | TIMESTAMP | N |
+| UPDATED_AT | TIMESTAMP | N |
+
+### 4. EXP_FOLIO (Expediente Digital)
+| Columna | Tipo | Nulable |
+|---------|------|---------|
+| ID | NUMBER | N |
+| CASO_ID | NUMBER | N |
+| SEDE_ID | NUMBER | N |
+| NUMERO_FOLIO | NUMBER | N |
+| TIPO_DOCUMENTO | VARCHAR2 | N |
+| TITULO | VARCHAR2 | N |
+| ARCHIVO_URL | VARCHAR2 | N |
+| HASH_DOCUMENTO | VARCHAR2 | Y |
+| CREADO_POR_ID | NUMBER | N |
+| FECHA_CREACION | TIMESTAMP | N |
+
+### 5. DERIVACION
+| Columna | Tipo | Nulable |
+|---------|------|---------|
+| ID | NUMBER | N |
+| CASO_ID | NUMBER | N |
+| SEDE_ID | NUMBER | N |
+| TIPO | VARCHAR2 | N |
+| ENTIDAD_EXTERNA | VARCHAR2 | Y |
+| REMITENTE_ID | NUMBER | N |
+| DESTINATARIO_ID | NUMBER | Y |
+| MOTIVO | VARCHAR2 | N |
+| ESTADO | VARCHAR2 | Y |
+| FECHA_DERIVACION | TIMESTAMP | N |
+| FECHA_RESPUESTA | TIMESTAMP | Y |
+| OBSERVACIONES | VARCHAR2 | Y |
+
+## Convenciones de Desarrollo
+- Los campos booleanos se almacenan como `NUMBER(1)` (0 o 1).
+- Los campos de texto largo (como familiares adicionales o detalles complejos) se almacenan en `CLOB` como JSON.
+- Cada registro de `NNA_CASO` debe tener una `FASE` (I, II o III) y un `ESTADO`.
+- El foliado del expediente (`EXP_FOLIO`) es correlativo por cada `CASO_ID`.

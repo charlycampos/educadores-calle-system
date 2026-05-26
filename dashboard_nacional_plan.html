@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+  body { background: #f1f5f9; padding: 16px; font-size: 13px; color: #1e293b; }
+
+  /* HEADER */
+  .header { background: #1e40af; color: white; border-radius: 12px; padding: 16px 20px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; }
+  .header-title { font-size: 17px; font-weight: 800; }
+  .header-sub { font-size: 11px; opacity: 0.7; margin-top: 2px; }
+  .header-badge { background: rgba(255,255,255,0.15); border-radius: 8px; padding: 6px 12px; font-size: 11px; font-weight: 700; text-align:center; }
+
+  /* KPI ROW */
+  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
+  .kpi { background: white; border-radius: 10px; padding: 12px 14px; border: 1px solid #e2e8f0; }
+  .kpi-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; }
+  .kpi-value { font-size: 26px; font-weight: 900; margin-top: 2px; }
+  .kpi-sub { font-size: 10px; color: #94a3b8; margin-top: 2px; }
+  .kpi.blue .kpi-value { color: #2563eb; }
+  .kpi.green .kpi-value { color: #16a34a; }
+  .kpi.red .kpi-value { color: #dc2626; }
+  .kpi.violet .kpi-value { color: #7c3aed; }
+
+  /* SECTION TITLE */
+  .section-title { font-size: 12px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+  .section-title .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+  /* MAIN GRID: semaforo sedes + ranking */
+  .main-grid { display: grid; grid-template-columns: 1fr 320px; gap: 12px; margin-bottom: 14px; }
+
+  /* SEMÁFORO GRID */
+  .semaforo-panel { background: white; border-radius: 10px; border: 1px solid #e2e8f0; padding: 14px; }
+  .sede-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .sede-card { border-radius: 8px; padding: 10px 11px; border: 1.5px solid; }
+  .sede-card.verde  { border-color: #bbf7d0; background: #f0fdf4; }
+  .sede-card.amarillo { border-color: #fde68a; background: #fffbeb; }
+  .sede-card.rojo   { border-color: #fecaca; background: #fef2f2; }
+  .sede-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
+  .sede-nombre { font-size: 11px; font-weight: 700; color: #1e293b; line-height: 1.3; }
+  .sede-codigo { font-size: 9px; color: #94a3b8; font-family: monospace; }
+  .semaforo-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; margin-top: 1px; }
+  .verde .semaforo-dot  { background: #22c55e; }
+  .amarillo .semaforo-dot { background: #f59e0b; }
+  .rojo .semaforo-dot   { background: #ef4444; }
+  .sede-stats { display: flex; gap: 8px; }
+  .sede-stat { font-size: 10px; color: #64748b; }
+  .sede-stat strong { font-size: 13px; font-weight: 900; display: block; color: #1e293b; }
+  .mini-bar { height: 3px; border-radius: 2px; background: #e2e8f0; margin-top: 7px; overflow: hidden; display: flex; gap: 1px; }
+  .mini-bar-seg { height: 100%; border-radius: 1px; }
+  .more-sedes { border: 1.5px dashed #e2e8f0; border-radius: 8px; padding: 10px; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 11px; font-weight: 600; gap: 4px; }
+
+  /* RANKING PANEL */
+  .ranking-panel { background: white; border-radius: 10px; border: 1px solid #e2e8f0; padding: 14px; }
+  .rank-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #f1f5f9; }
+  .rank-item:last-child { border-bottom: none; }
+  .rank-num { font-size: 11px; font-weight: 900; color: #94a3b8; width: 16px; flex-shrink: 0; text-align: right; }
+  .rank-info { flex: 1; min-width: 0; }
+  .rank-nombre { font-size: 11px; font-weight: 700; truncate; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rank-region { font-size: 9px; color: #94a3b8; }
+  .rank-bar-wrap { width: 80px; }
+  .rank-bar-bg { height: 5px; background: #f1f5f9; border-radius: 3px; overflow: hidden; }
+  .rank-bar-fill { height: 100%; border-radius: 3px; background: #3b82f6; }
+  .rank-val { font-size: 11px; font-weight: 800; color: #2563eb; width: 24px; text-align: right; flex-shrink: 0; }
+
+  /* BOTTOM ROW */
+  .bottom-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .bottom-panel { background: white; border-radius: 10px; border: 1px solid #e2e8f0; padding: 14px; }
+  .region-row { display: flex; align-items: center; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #f8fafc; }
+  .region-row:last-child { border-bottom: none; }
+  .region-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+  .region-name { font-size: 11px; font-weight: 600; color: #334155; flex: 1; margin-left: 6px; }
+  .region-count { font-size: 11px; font-weight: 800; color: #1e293b; }
+  .region-sub { font-size: 9px; color: #94a3b8; margin-left: 4px; }
+
+  /* FASE DONUT simplified */
+  .fase-list { space-y: 4px; }
+  .fase-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+  .fase-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+  .fase-label { font-size: 11px; color: #475569; flex: 1; }
+  .fase-bar-bg { width: 60px; height: 5px; background: #f1f5f9; border-radius: 3px; overflow: hidden; }
+  .fase-bar-fill { height: 100%; border-radius: 3px; }
+  .fase-val { font-size: 11px; font-weight: 800; color: #1e293b; width: 22px; text-align: right; }
+
+  /* ALERTAS TABLE */
+  .alerta-row { display: flex; align-items: center; gap: 6px; padding: 5px 0; border-bottom: 1px solid #f8fafc; }
+  .alerta-row:last-child { border-bottom: none; }
+  .alerta-badge { font-size: 9px; font-weight: 800; padding: 1px 5px; border-radius: 4px; flex-shrink: 0; }
+  .alerta-badge.critico { background: #fee2e2; color: #dc2626; }
+  .alerta-badge.alto { background: #ffedd5; color: #ea580c; }
+  .alerta-badge.medio { background: #fef9c3; color: #ca8a04; }
+  .alerta-tipo { font-size: 11px; color: #334155; flex: 1; }
+  .alerta-num { font-size: 13px; font-weight: 900; }
+  .alerta-num.critico { color: #dc2626; }
+  .alerta-num.alto { color: #ea580c; }
+  .alerta-num.medio { color: #ca8a04; }
+
+  /* LABEL ANNOTATIONS */
+  .annotation { display: inline-block; background: #fef3c7; border: 1px solid #fcd34d; color: #92400e; border-radius: 4px; font-size: 9px; font-weight: 700; padding: 1px 5px; margin-left: 4px; }
+  .annotation.new { background: #dbeafe; border-color: #93c5fd; color: #1d4ed8; }
+  .annotation.backend { background: #f3e8ff; border-color: #c4b5fd; color: #6d28d9; }
+
+  .pill { display: inline-block; font-size: 9px; font-weight: 700; border-radius: 999px; padding: 1px 6px; }
+  .pill.norte { background: #fef3c7; color: #92400e; }
+  .pill.centro { background: #dbeafe; color: #1e40af; }
+  .pill.sur { background: #d1fae5; color: #065f46; }
+  .pill.oriente { background: #ede9fe; color: #5b21b6; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div>
+    <div class="header-title">Dashboard Nacional · DGNNA</div>
+    <div class="header-sub">Programa Educadores de Calle · Vista consolidada por sede</div>
+  </div>
+  <div style="display:flex;gap:8px;">
+    <div class="header-badge">📍 24 Sedes<br><span style="font-size:9px;opacity:0.7;">registradas</span></div>
+    <div class="header-badge">🔄 En vivo<br><span style="font-size:9px;opacity:0.7;">actualizar</span></div>
+  </div>
+</div>
+
+<!-- KPI ROW -->
+<div class="kpi-row">
+  <div class="kpi blue">
+    <div class="kpi-label">NNA en Programa</div>
+    <div class="kpi-value">247</div>
+    <div class="kpi-sub">Total nacional activos</div>
+  </div>
+  <div class="kpi green">
+    <div class="kpi-label">Sedes Operativas</div>
+    <div class="kpi-value">8</div>
+    <div class="kpi-sub">Con casos activos</div>
+  </div>
+  <div class="kpi red">
+    <div class="kpi-label">Alertas Críticas</div>
+    <div class="kpi-value">14</div>
+    <div class="kpi-sub">Requieren acción</div>
+  </div>
+  <div class="kpi violet">
+    <div class="kpi-label">Egresados (mes)</div>
+    <div class="kpi-value">12</div>
+    <div class="kpi-sub">NNA egresados este mes</div>
+  </div>
+</div>
+
+<!-- MAIN: SEMÁFORO DE SEDES + RANKING -->
+<div class="main-grid">
+
+  <!-- SEMÁFORO GRID -->
+  <div class="semaforo-panel">
+    <div class="section-title" style="color:#2563eb;margin-bottom:10px;">
+      <span class="dot"></span> Estado de Sedes <span class="annotation new">SECCIÓN NUEVA</span>
+      <span style="margin-left:auto;font-size:10px;font-weight:400;color:#94a3b8;">🟢 OK &nbsp; 🟡 Alertas &nbsp; 🔴 Crítico</span>
+    </div>
+    <div class="sede-grid">
+
+      <!-- SEDE ROJA -->
+      <div class="sede-card rojo">
+        <div class="sede-card-header">
+          <div><div class="sede-nombre">Lima Metropolitana</div><div class="sede-codigo">LIM-01</div></div>
+          <div class="semaforo-dot"></div>
+        </div>
+        <div class="sede-stats">
+          <div class="sede-stat"><strong>87</strong>NNA</div>
+          <div class="sede-stat"><strong>7</strong>Prof.</div>
+          <div class="sede-stat"><strong>5</strong>⚠️</div>
+        </div>
+        <div class="mini-bar">
+          <div class="mini-bar-seg" style="width:15%;background:#94a3b8;"></div>
+          <div class="mini-bar-seg" style="width:25%;background:#fbbf24;"></div>
+          <div class="mini-bar-seg" style="width:45%;background:#60a5fa;"></div>
+          <div class="mini-bar-seg" style="width:15%;background:#4ade80;"></div>
+        </div>
+      </div>
+
+      <!-- SEDE AMARILLA -->
+      <div class="sede-card amarillo">
+        <div class="sede-card-header">
+          <div><div class="sede-nombre">Huaral</div><div class="sede-codigo">LIM-02</div></div>
+          <div class="semaforo-dot"></div>
+        </div>
+        <div class="sede-stats">
+          <div class="sede-stat"><strong>34</strong>NNA</div>
+          <div class="sede-stat"><strong>5</strong>Prof.</div>
+          <div class="sede-stat"><strong>2</strong>⚠️</div>
+        </div>
+        <div class="mini-bar">
+          <div class="mini-bar-seg" style="width:20%;background:#94a3b8;"></div>
+          <div class="mini-bar-seg" style="width:30%;background:#fbbf24;"></div>
+          <div class="mini-bar-seg" style="width:40%;background:#60a5fa;"></div>
+          <div class="mini-bar-seg" style="width:10%;background:#4ade80;"></div>
+        </div>
+      </div>
+
+      <!-- SEDE VERDE -->
+      <div class="sede-card verde">
+        <div class="sede-card-header">
+          <div><div class="sede-nombre">Arequipa</div><div class="sede-codigo">AQP-01</div></div>
+          <div class="semaforo-dot"></div>
+        </div>
+        <div class="sede-stats">
+          <div class="sede-stat"><strong>41</strong>NNA</div>
+          <div class="sede-stat"><strong>6</strong>Prof.</div>
+          <div class="sede-stat"><strong>0</strong>✅</div>
+        </div>
+        <div class="mini-bar">
+          <div class="mini-bar-seg" style="width:10%;background:#94a3b8;"></div>
+          <div class="mini-bar-seg" style="width:20%;background:#fbbf24;"></div>
+          <div class="mini-bar-seg" style="width:55%;background:#60a5fa;"></div>
+          <div class="mini-bar-seg" style="width:15%;background:#4ade80;"></div>
+        </div>
+      </div>
+
+      <div class="sede-card verde">
+        <div class="sede-card-header">
+          <div><div class="sede-nombre">Trujillo</div><div class="sede-codigo">LAL-01</div></div>
+          <div class="semaforo-dot"></div>
+        </div>
+        <div class="sede-stats">
+          <div class="sede-stat"><strong>29</strong>NNA</div>
+          <div class="sede-stat"><strong>4</strong>Prof.</div>
+          <div class="sede-stat"><strong>0</strong>✅</div>
+        </div>
+        <div class="mini-bar">
+          <div class="mini-bar-seg" style="width:12%;background:#94a3b8;"></div>
+          <div class="mini-bar-seg" style="width:28%;background:#fbbf24;"></div>
+          <div class="mini-bar-seg" style="width:50%;background:#60a5fa;"></div>
+          <div class="mini-bar-seg" style="width:10%;background:#4ade80;"></div>
+        </div>
+      </div>
+
+      <div class="sede-card amarillo">
+        <div class="sede-card-header">
+          <div><div class="sede-nombre">Chiclayo</div><div class="sede-codigo">LAM-01</div></div>
+          <div class="semaforo-dot"></div>
+        </div>
+        <div class="sede-stats">
+          <div class="sede-stat"><strong>22</strong>NNA</div>
+          <div class="sede-stat"><strong>3</strong>Prof.</div>
+          <div class="sede-stat"><strong>1</strong>⚠️</div>
+        </div>
+        <div class="mini-bar">
+          <div class="mini-bar-seg" style="width:25%;background:#94a3b8;"></div>
+          <div class="mini-bar-seg" style="width:35%;background:#fbbf24;"></div>
+          <div class="mini-bar-seg" style="width:30%;background:#60a5fa;"></div>
+          <div class="mini-bar-seg" style="width:10%;background:#4ade80;"></div>
+        </div>
+      </div>
+
+      <!-- más sedes placeholder -->
+      <div class="more-sedes">+ 19 sedes sin casos activos</div>
+
+    </div>
+
+    <!-- LEYENDA mini-bar -->
+    <div style="display:flex;gap:12px;margin-top:10px;padding-top:8px;border-top:1px solid #f1f5f9;">
+      <span style="font-size:10px;color:#64748b;display:flex;align-items:center;gap:3px;"><span style="display:inline-block;width:10px;height:4px;background:#94a3b8;border-radius:2px;"></span>Captación</span>
+      <span style="font-size:10px;color:#64748b;display:flex;align-items:center;gap:3px;"><span style="display:inline-block;width:10px;height:4px;background:#fbbf24;border-radius:2px;"></span>Diagnóstico</span>
+      <span style="font-size:10px;color:#64748b;display:flex;align-items:center;gap:3px;"><span style="display:inline-block;width:10px;height:4px;background:#60a5fa;border-radius:2px;"></span>Intervención</span>
+      <span style="font-size:10px;color:#64748b;display:flex;align-items:center;gap:3px;"><span style="display:inline-block;width:10px;height:4px;background:#4ade80;border-radius:2px;"></span>Pre-egreso</span>
+    </div>
+  </div>
+
+  <!-- RANKING -->
+  <div class="ranking-panel">
+    <div class="section-title" style="color:#7c3aed;margin-bottom:10px;">
+      <span class="dot"></span> Ranking por NNA Activos
+    </div>
+    <div>
+      <div class="rank-item">
+        <div class="rank-num">1</div>
+        <div class="rank-info"><div class="rank-nombre">Lima Metropolitana</div><div class="rank-region"><span class="pill centro">CENTRO</span></div></div>
+        <div class="rank-bar-wrap"><div class="rank-bar-bg"><div class="rank-bar-fill" style="width:100%;background:#ef4444;"></div></div></div>
+        <div class="rank-val">87</div>
+      </div>
+      <div class="rank-item">
+        <div class="rank-num">2</div>
+        <div class="rank-info"><div class="rank-nombre">Arequipa</div><div class="rank-region"><span class="pill sur">SUR</span></div></div>
+        <div class="rank-bar-wrap"><div class="rank-bar-bg"><div class="rank-bar-fill" style="width:47%;background:#3b82f6;"></div></div></div>
+        <div class="rank-val">41</div>
+      </div>
+      <div class="rank-item">
+        <div class="rank-num">3</div>
+        <div class="rank-info"><div class="rank-nombre">Huaral</div><div class="rank-region"><span class="pill centro">CENTRO</span></div></div>
+        <div class="rank-bar-wrap"><div class="rank-bar-bg"><div class="rank-bar-fill" style="width:39%;background:#3b82f6;"></div></div></div>
+        <div class="rank-val">34</div>
+      </div>
+      <div class="rank-item">
+        <div class="rank-num">4</div>
+        <div class="rank-info"><div class="rank-nombre">Trujillo</div><div class="rank-region"><span class="pill norte">NORTE</span></div></div>
+        <div class="rank-bar-wrap"><div class="rank-bar-bg"><div class="rank-bar-fill" style="width:33%;background:#3b82f6;"></div></div></div>
+        <div class="rank-val">29</div>
+      </div>
+      <div class="rank-item">
+        <div class="rank-num">5</div>
+        <div class="rank-info"><div class="rank-nombre">Chiclayo</div><div class="rank-region"><span class="pill norte">NORTE</span></div></div>
+        <div class="rank-bar-wrap"><div class="rank-bar-bg"><div class="rank-bar-fill" style="width:25%;background:#3b82f6;"></div></div></div>
+        <div class="rank-val">22</div>
+      </div>
+      <div class="rank-item">
+        <div class="rank-num">6</div>
+        <div class="rank-info"><div class="rank-nombre">Cusco</div><div class="rank-region"><span class="pill sur">SUR</span></div></div>
+        <div class="rank-bar-wrap"><div class="rank-bar-bg"><div class="rank-bar-fill" style="width:19%;background:#3b82f6;"></div></div></div>
+        <div class="rank-val">17</div>
+      </div>
+      <div class="rank-item">
+        <div class="rank-num">7</div>
+        <div class="rank-info"><div class="rank-nombre">Piura</div><div class="rank-region"><span class="pill norte">NORTE</span></div></div>
+        <div class="rank-bar-wrap"><div class="rank-bar-bg"><div class="rank-bar-fill" style="width:13%;background:#3b82f6;"></div></div></div>
+        <div class="rank-val">11</div>
+      </div>
+      <div class="rank-item">
+        <div class="rank-num">8</div>
+        <div class="rank-info"><div class="rank-nombre">Iquitos</div><div class="rank-region"><span class="pill oriente">ORIENTE</span></div></div>
+        <div class="rank-bar-wrap"><div class="rank-bar-bg"><div class="rank-bar-fill" style="width:7%;background:#3b82f6;"></div></div></div>
+        <div class="rank-val">6</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- BOTTOM ROW -->
+<div class="bottom-row">
+
+  <!-- POR REGIÓN -->
+  <div class="bottom-panel">
+    <div class="section-title" style="color:#0891b2;margin-bottom:10px;">
+      <span class="dot"></span> NNA por Región <span class="annotation backend">nuevo endpoint</span>
+    </div>
+    <div class="region-row"><span class="region-dot" style="background:#3b82f6;"></span><span class="region-name">CENTRO</span><span class="region-count">121</span><span class="region-sub">NNA</span></div>
+    <div class="region-row"><span class="region-dot" style="background:#f59e0b;"></span><span class="region-name">NORTE</span><span class="region-count">62</span><span class="region-sub">NNA</span></div>
+    <div class="region-row"><span class="region-dot" style="background:#22c55e;"></span><span class="region-name">SUR</span><span class="region-count">58</span><span class="region-sub">NNA</span></div>
+    <div class="region-row"><span class="region-dot" style="background:#8b5cf6;"></span><span class="region-name">ORIENTE</span><span class="region-count">6</span><span class="region-sub">NNA</span></div>
+  </div>
+
+  <!-- FASES NACIONAL -->
+  <div class="bottom-panel">
+    <div class="section-title" style="color:#0891b2;margin-bottom:10px;">
+      <span class="dot"></span> Distribución por Fase
+    </div>
+    <div class="fase-list">
+      <div class="fase-row"><div class="fase-dot" style="background:#94a3b8;"></div><div class="fase-label">Captación</div><div class="fase-bar-bg"><div class="fase-bar-fill" style="width:20%;background:#94a3b8;"></div></div><div class="fase-val">49</div></div>
+      <div class="fase-row"><div class="fase-dot" style="background:#fbbf24;"></div><div class="fase-label">Diagnóstico</div><div class="fase-bar-bg"><div class="fase-bar-fill" style="width:35%;background:#fbbf24;"></div></div><div class="fase-val">87</div></div>
+      <div class="fase-row"><div class="fase-dot" style="background:#60a5fa;"></div><div class="fase-label">Intervención</div><div class="fase-bar-bg"><div class="fase-bar-fill" style="width:80%;background:#60a5fa;"></div></div><div class="fase-val">198</div></div>
+      <div class="fase-row"><div class="fase-dot" style="background:#4ade80;"></div><div class="fase-label">Pre-egreso</div><div class="fase-bar-bg"><div class="fase-bar-fill" style="width:18%;background:#4ade80;"></div></div><div class="fase-val">44</div></div>
+    </div>
+  </div>
+
+  <!-- ALERTAS NACIONALES -->
+  <div class="bottom-panel">
+    <div class="section-title" style="color:#dc2626;margin-bottom:10px;">
+      <span class="dot"></span> Alertas Nacionales <span class="annotation backend">nuevo endpoint</span>
+    </div>
+    <div class="alerta-row">
+      <span class="alerta-badge critico">CRÍTICO</span>
+      <span class="alerta-tipo">Sin diagnóstico F04</span>
+      <span class="alerta-num critico">8</span>
+    </div>
+    <div class="alerta-row">
+      <span class="alerta-badge alto">ALTO</span>
+      <span class="alerta-tipo">Evaluación retrasada</span>
+      <span class="alerta-num alto">6</span>
+    </div>
+    <div class="alerta-row">
+      <span class="alerta-badge medio">MEDIO</span>
+      <span class="alerta-tipo">PII por vencer</span>
+      <span class="alerta-num medio">3</span>
+    </div>
+    <div style="margin-top:10px;padding-top:8px;border-top:1px solid #f1f5f9;font-size:10px;color:#94a3b8;">
+      Las alertas críticas se consolidan de todas las sedes. Click en una sede del mapa para ver su detalle.
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

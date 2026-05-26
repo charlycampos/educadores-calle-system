@@ -1,0 +1,538 @@
+Ya, ahora sí, disculpen la interrupción.
+Entonces, este eh acá están las seres por usuario, ¿no? Para saber qué usuarios tienen. Si picamos en uno que no tiene usuarios, por ejemplo, acá no va a salir nada, ¿no?
+Acá podemos filtrar, ¿no? Es básicamente. Este es un modelito chiquito, ¿no? Ya.
+Eh, luego eh la misma tener. acceso a los casos a los bueno talleres acá y usuarios del sistema, ¿no? Ahora vamos al al educadores.
+Ya.
+Entonces también tiene así, ¿no? Un tablerom
+primero el tablero donde están todo lo que los pendientes, ¿no? A nivel general de puesto acá, ¿no? Los pendientes, en qué fases están, cuántos casos están tales fases.
+Ajá.
+No. Y vínculos, ¿no? Para los casos. Los casos Cuando se desarrolle van a ser desde acá,
+¿ya?
+Eh, si quiero hacer un nuevo registro de un caso,
+mm
+entro acá y esto me basado en la ficha, ¿no? Este, yo, por ejemplo, este, ingreso acá algunos datos,
+plaza, ¿no?
+Eh, le pongo trabajo en calle o trabajo en calle, tránsito y calle, le pongo la la fecha de abordaje,
+eh, la fecha de ingreso,
+eso todavía no. No. O si no reingreso, no creo, ¿no? Dependiendo del caso, hay casos de reingreso y hay casos de cambio de perfil, pero digamos que lo usual es que sean usuarios nuevos.
+Ah, okay. Okay. Entonces, le doy siguiente. Me voy al otro, a datos personales, ¿no? Este, ingreso,
+pongo una referencia,
+eh, ingreso a la ubicación geográfica de la el domicilio, ¿no?
+Digamos así. Y un teléfono de refer Y acá ingreso el dato netamente el NNA, ¿no? Del niño ni adolescente. A ver, este Álvarez Ríos Juan. Pongo el sexo, en este caso masculino, la fecha de nacimiento, digamos que sea del 2000, se eh actualiza la edad, ¿no? En años. Acá puedos ponerlo meses o días. La nacionalidad, ¿no? Acá está para afinar, lógicamente. Pongo el lugar de nacimiento. También voy a ponerle como referencia eh también el tipo de documento. Acá también está para final eh y pongo el dato de DNI. También acá está para validar y afinar si es que tiene partido o no. Y si caso no tenga o no tenga documento, le ponga el data, no puedo agregar hermano. Todavía me falta afinar ahí para el tema de hermano porque ya depende de lo que me digan ustedes, ¿no? En ese caso hermano como usuario,
+o sea, uno de esos es el expediente, ¿no? O sea, ustedes generan un expediente, ¿verdad?
+Claro. Sí,
+expediente. Ya. El expediente, digamos que tiene un número, ¿no? Y acá va a ir hermano uno.
+Los hermanos ingresan con su propio expediente.
+Ah, cada uno ingresa con su propio expediente. Se supone que ingresa cuando sea, señor
+ya. Así, así ingresa. No, si son dos hermanos, el primer hermano. José Luis, José Luis, discúlpame, no logro comprender lo que me indicas. No escucho bien.
+Hola. Hola. ¿Me escuchas? José Luis,
+¿me escuchas?
+Ya, ahora sí. Ahora sí. Ya. Claro, a lo que me refería es que los hermanos
+ya
+este solamente ingresan con su propio expediente siempre y cuando tengan la misma situación que el niño,
+o sea, si es que es un niño trabajador en mendicidad y su hermano también.
+Si no, no es necesario que ingrese. Queda como parte de la familia nada más.
+Ya. La misma situación, ¿no? Normalmente es la misma situación, creo yo, ¿no?
+Claro. O sea, por ejemplo, son dos hermanos que trabajan, entonces cada uno se ingresa a su propio expediente. Ya. Entonces, si tengo dos hermanos que tienen la misma situación, el código uno va con el primer hermano, digamos, uno de los hermanos y el código dos con el otro hermano. Así,
+correcto. Sí, cada uno tendría su código, digamos.
+Ya, mejor aún todavía.
+Cuando es uno, cuando es dos en uno, un expediente es más complicado.
+Claro, mejor es uno individual. Ajá.
+Ya, ya. Ahí tengo un poco más claro. Ya. Okay. Entonces, este hermano ya le quitaría de acá, pues, ¿no? Este esto de acá. Claro. El siguiente paso voy y pongo las actividades que realiza, ¿no? Acá lo voy a poner. Esto es una prueba. Las actividades. Eh, ¿hace cuánto tiempo realiza esa actividad en la calle? Este, esto también le pongo una prueba. Puede ser 6 meses o dependiendo de lo que consideren usted,
+el tiempo que establezca.
+Ajá. Acá también este tendría que decirme, ¿no?, cómo realizar esta parte porque
+ahí puede ser de tal hora, tal hora, como está ahí.
+Ajá. Pero, ¿cuántas eh cuántos campos, digamos, de este tipo?
+Está bien dos porque puede ser que
+aunque no se diferenciaría, ¿no? Por ejemplo, trabaja de 10 a tres,
+lunes, martes, miércoles y jueves y los viernes, sábado y domingo trabaja este eh de 10 de la mañana a 6 de la tarde, de repente trabaja más.
+Ajá. Ya.
+Entonces, no sé si eso se te diferenciaría ahí. Eh, vamos a hacer un ejemplo. Por ejemplo, me dices eh lunes, martes, por decirte,
+lunes, martes, miércoles y jueves trabaja de cu de 10.
+Ah, ya, ya, ya, ya entiendo.
+Esto de acá lo voy a poner arriba y esto abajo, pero mientras va bajando, más este va marcando
+ya
+puedo ponerle un dato. Eh, ahí lo voy a lo voy a ver.
+Claro. En ese caso, claro. Ahí, por ejemplo, tú ves, digamos, cómo desarrolla su jornada, pero de repente a nosotros nos interesa saber el global. de las horas, ¿no? En total son, por decirte 25 horas que trabaja la semana.
+Ah, ya, ya.
+Ajá.
+Ah, pero puedo ponerle entonces un valor ahí de
+Claro.
+Las horas, cantidad de horas. Claro, pero que lo calcule la máquina porque se lo calculó el educador y viene el problema.
+Claro. Sí, sí, sí. Si no hay problema. Cantidad de horas por semana y por
+cantidad de horas por semana. Ajá. No, porque más eso o
+claro, porque ese sería el la información de referencia, ¿no? Lo otro no sé si sería mensual también, aunque sumarías las semanas nada más, ¿no?
+Ajá.
+Cálculo automático.
+Ajá.
+Al la al mes me dices, ¿no? Pero también se puede hacer al mes, pero considerando lo que señalas, ¿no?
+Claro. O sea, lo interesante es que haya una referencia por semana y por mes.
+Ya. Cantidad de horas por mes. ¿Ya? Entonces, imaginemos que es la primera y no sé, pues lunes y martes. Luego este realizas la actividad solo, acompañar lo pondrente. Eh, si estudias actualmente, si estudias el marcas y pones el nivel educativo,
+perfecto.
+El grado, no sé, no, este, tercer año, o sea, acá también se puede mejorar poner un combo, ¿no? Porque que estar digitando también.
+Claro,
+puede llegar a falla.
+Ajá.
+La institución educativa,
+¿no? Y la modalidad de de lo que está estudiando, pues no regular, alternativo.
+Sí, yo te espero. Ya, listo. Gracias. Disculpa.
+No, no te preocupes. Este, ya no lo voy a poner regular en este caso, ¿no? Eh, si hay alguna variable más también me pueden indicar para agregar acá, ¿no? Eh, de ahí sigue salud, ¿no? Si estás afiliado al SIS, si estás afiliado algún otro tipo de seguro de salud, ¿no?
+Claro, de repente ahí podrías poner eh los otros tipos de salud que hay, ¿no? Si no es ese salud, sino ese salud. Este puede ser fuerzas armadas o policiales y si no ningún Ah, pues sería un seguro privado y por último, ningún seguro.
+Seguro privado.
+Sí.
+Y por último, ningún seguro.
+Ya. La mayoría está en el sis.
+Ya. Bacán. Eso lo voy a considerar ahí. Eh, claro, acá en el segundo sería, ¿no? Porque si marcas ya lo demás ya le pongo el
+lo cierras. Claro.
+Ajá. Ya. Bacán. Eh, ¿ses alguna enfermedad? Sí. No, si es sí. Eh, se abre este casilla y pone acá
+Ajá.
+Eh, si presenta algún tipo de discapacidad. Eh, he considerado estas, pero creo que eso lo voy a sacar de la
+Claro.
+De las variables que tiene.
+Hay un hay un este cuadro, una base de datos que se presenta que se llama REN, donde creo que que conadis y el Ministerio de Cultura han presentado como unos requerimientos que tienen que haber ahí, ¿no? O sea,
+en el caso de cultura si se identifica con quechua, español
+y así como en el censo y en el caso de discapacidad preguntan si tiene carnet, si tiene certificado,
+como que hay que poner obligatoriamente en todas las bases de datos,
+¿ya?
+Entonces, no sé si sería aplicable ponerlo acá.
+Sí, lo puedo poner, no hay ningún problema. La cosa es que que estén, ¿no?
+Ya. Entonces, yo te paso el esa esos campos de la rene para que consideres esa parte.
+Eh, sería bueno también que me pases la RENC, pero la Ren con su hay una que es de diccionario de datos con sus var con sus con sus opciones, ¿no?
+Ajá. Ese lo tienes.
+No, no, no. ¿Podrías pasármelo porfa?
+Ya. Este, Mireella de repente tú lo puedes pasar porque es un link
+y acá lo lo voy aumentando. Claro, correcto. Eh, Mireya te lo va a pasar.
+Ya, bacán, bacán. Este, ya de acá marco, eh, digamos que tenga motriz física, ¿no? Para hacer la prueba y aqu el detalle, ¿no? Entonces, acá también por si necesitas llenar alguna observación, lo doy siguiente. Eh, viene el caso de la familia, ¿no? ¿Con quién vives? Bueno, solo con la madre. Voy a poner como ejemplo, ¿dónde duermes habitualmente? No, digamos que en su casa
+ahí te lo mandó a
+te lo copié en el chat.
+Ya voy a copiarlo. Ya. Entonces vamos por acá y acá ingreso eh los datos del familiar, ¿no? Acá creo que debería separarlo por apellidos, por casillas cada cada nombre y apellidos. diferente, ¿no? Es diferente casilla
+que ayuda al no a la data. Está bien. Este, lo que pasa que estaba probando de manera rápido, por eso que ya no lo
+eh no sé obrero. Estas estas variables están bien para un familiar.
+Sí, un dato. Ya. Okay.
+Eh, podrías de repente incluir grado de instrucción,
+este, si tiene DNI, ¿no? El DNI, este, porque a veces los papás también tienen problemas de documento. Y hay que apoyarles a ellos porque si no no pueden registrar a sus hijas.
+Eh, que no tenga DNI.
+Claro, hay casos de papás que no tienen tipo de documentos me falta agregarle.
+Claro,
+porque algunos son extranjeros también.
+Entonces, los extranjeros tienen su carnet de extranjería, su
+Sí. O su documento de otro país, ¿no? Incluso eso también pasa con los chicos, con los niños.
+Ya, eso también voy a considerar. No, no le he puesto, creo, tipo documento. Ya. Okay. Lo voy a agregar y va a salir acá, ¿no? En la en una grilla, ¿no? Mientras vas agregando más familiares va saliendo acá.
+Ya. Acá,
+¿eh? Y luego viene la parte siete, ¿no? De la ficha que dice, "¿Ha estado en estancia hogar o albergue.
+¿Ya?
+¿Sí o no? Esto sí debería de, no sé si jalar de algún lado, ¿no? Pero eso puede ser una interoperabilidad con con el sistema que estamos armando.
+Ah, claro. Sería excelente. Ajá.
+Porque puede ser que el niño tampoco se acuerde, ¿no?
+Claro. Normalmente,
+normalmente cuando pasa eso, este es porque el niño ha salido, se ha escapado de del hogar, digamos, del del albergue, algo así.
+Ah, bueno, eh, usualmente sí, pues puede ser, es el caso, ¿no? Cuando hablando de niños de calle que generalmente ingresan a los este cars, siempre terminan escapándose, ¿no?
+No lo encuentran y él sigue haciendo su vida en calle nuevamente, ¿no?
+Entonces, tú le preguntas, te dice, Sí, sí, he estado en un carro. En el en cuál, en el carro San Ricardo, en el carro
+ya X de nombre X, ¿no? Por eso sería interesante que también salga el nombre del car.
+Ya. Okay. Okay. Entonces, tengo la eh la parte de actividades de tiempo libre, pues es para llenar nada más. También lo de observaciones también es para llenar.
+Ahí también puede no ser una sola cosa, ¿no? Pueden ser dos o tres. Ajá. Ya. Okay. Sí. Eh, digamos que cómo se requiere acá que sigan tipeando o se puede poner
+se puede puede ponerse que se tipee también, ¿no? El asunto está en que sí, sí, yo creo que sí porque no
+no necesariamente hacerlo por separado nos permite alguna data especial
+o o se requiere o se requiere, por ejemplo, que acá sea este, digamos, que se pueda tipear bastante texto y y ponerle con viñetas o mayúsculas, minúsculas, algo así.
+Ah, no, está bien poner así con coma, jugar, ver televisión, leer libros.
+Okay.
+Lo interesante sería poner un cuadrito que diga qué cantidad de tiempo le dedicas a esto, ¿no?
+A ver, a ver.
+Porque eso nos permitiría construir, digamos, su día a día, su cómo distribuye sus horas, ¿no? Tantas horas en el colegio, tantas horas trabajando, tantas horas estud este estudiando, tantas horas jugando, ¿no? Tantas horas durmiendo, tantas horas, qué sé yo.
+Tienes tienes algunas este eh valores así conocidos, o sea, como para colocarlo ahí y sea un check y de repente
+hacerle un una suerte de que
+de que ingrese acá le pongo un botón, por decirte así, agregar familiar, eh, acá lo pongo en jugar que de el click y salga acá este eh por decir y jugar, no le pongo acá horas que que le toma y a otra variable más, no sé. Y ahí va agregándose en una casilla, ¿no? Una una grilla,
+¿ya?
+Para poder tener el tiempo, ¿no? Con eso puedes calcular,
+¿ya?
+O sea, digo un ejemplo, ¿no? Si tuvieras las
+la las opciones que que se pone acá, ¿no?
+Que tú me estás diciendo, por ejemplo, jugar, verte, ver deporte.
+Claro.
+No. también se ponga este actividades de tiempo libre, este no entran todas esas de ahí y al costadito tenga la cantidad de tiempo que le dedica a eso,
+pero puede ser tipeado, ¿no? Tipeado. Y ya tipeado lo voy a poner.
+Claro. Y y de ahí otro campo que diga este eh tiempo de estudios eh o tiempo que le dedicas al estudio, tiempo que asistes en al colegio, aunque eso lo podía jalar de la data del colegio. Este tiempo que le dedicas a hacer las tareas, no sé, poniendo cosas, temas así,
+podría ser así, mira, este que abre un una grilla, un este un modal así con una ventanita y que diga actividad, que tipe la actividad y el tiempo que en horas, ¿no?
+Claro, perfecto. Y ya el sistema lo suma y dice así: "Distribuye sus horas el niño
+y la cantidad que necesita saber es a la semana también." Igual
+podría ser eso por día, ¿no? Porque eso es aplicable. Ajá.
+Porque más o menos sería el parámetro, ¿no? El niño las 24 horas las instruí y podríamos ver si es que eso está afectando su sueño, si está afectando su escolaridad,
+¿no? De repente en uso del tiempo libre tiene cero, ¿no? En dormir tiene 4 horas, en trabajar tiene más tiempo, ¿no? Este,
+eh, ¿qué otra cosa más? En hacer las tareas también tiene otra cantidad de tiempo,
+¿ya?
+No así podrías ver, digamos, ¿no? Hacer un cálculo para ver cómo ordenar el la el horario de niño de manera correcta.
+Ya, bacán. Ya, eso lo voy a lo voy a este afinar.
+Ya
+voy a poner en una ventanita. En observaciones generales queda así, ¿no?
+Sí, ahí no hay problema porque observación.
+Ya. Entonces acá ya como entre comillas ha terminado la ficha, le doy guardar. No. Uy, me sale error. Ah, bueno, no me salía error. A ver. Creo que no se está conectando. Ah, ya. Eso lo voy a ver después. Creo que es por el nombre.
+Claro, de repente después algún dato y
+ya eso lo voy a ver después, pero el resultado es que se genera una ficha, ¿no? Se genera una ficha y acá puedo editarlo,
+puedo editar los datos, todo lo que lleno. Y este esa era mi pregunta, ¿no? Primero ver si esta derivación, ¿no?, que he hecho corresponde. No, en como ya me estás diciendo que solamente es educador, yo lo estaba considerando derivar del educador, digamos, ¿no? Por ejemplo, al psicólogo.
+Ah, no, no. Claro. Es el educador el que se encarga de todo el proceso con el niño y el coordinador eh controla o verifica que el educador cumpla los procedimientos, que haga los expedientes, que cumpla las visitas, ¿no? Digamos que es como el administrador, ¿no? Y el que organiza el trabajo de educador y además tiene una relación con las instituciones de la comunidad.
+Ya. Entonces, el coordinador tendría acceso a también a los expedientes, solamente a ver los expedientes, ¿no? A generar, ¿verdad? O también
+claro, no podría verlos, podría conocer información de si los expedientes están al día, ¿no? Con la fecha de referencia de ingreso, si es que eh el educador tiene la cantidad de niños que debe tener, que es 60, ¿no? Este, ver si es que ah están todos Los datos que pide la base están registrados,
+¿ya?
+No, él básicamente es como un supervisor, ¿no? Un monitor de lo que hace el educador.
+Ya. Ya. Okay. Eh, en el caso de hm traslados de derivaciones entre sedes,
+ya el el coordinador podría ser el que pide el traslado de una zona a otra o lo indica por alguna cuestión, ¿no? Es el que podría autorizar de repente,
+¿no? que él tenga el botón, ¿no? De
+Claro. De autorización. El educador le pide y él aprueba si es que se mueven.
+Igual si es que es un desplazamiento de un departamento a otro, también debería haber una aprobación del monitor. El monitor es el como el sectorista de la ciudad en la sede central.
+Eh, ahí tendría otro rol también. Otro usuario. Él también va a tener acceso. Entonces,
+sí, o sea, los accesos serían educador, coordinador, monitor y coordinador del servicio del programa.
+Eh, ¿y quién más? Y la estadística, ¿no?
+Claro, un usuario eh estadística. Estadístico,
+claro. O sea, es este, digamos, quien aquí en este caso es quien la junta las bases, hace los cuadros, hace la arma la rene, junta las 23 bases, verifica que carguen la información en cada sede, limpia la data, la consistencia, ¿no? La para que
+pueda esto llegar a plamiento Dinab. Claro,
+claro. Digamos, digamos que este podría ser eh que le pongas sol netamente descargas eh un dashboard, unas un una un módulo de reportería netamente descargas de Excel, ¿no? Con todas las sedes, ¿no? Por sedes, digamos así.
+Claro. Ajá. Perfecto.
+Ya. Pero no tendría acceso a a los expedientes,
+¿no? Porque que en realidad no le corresponde.
+Ah, hay una hay una un personal acá que es el la trabajadora social, digamos, que es la que verifica que los expedientes sean adecuadamente llenos, ¿no? O sea, esa función es del coordinador, pero digamos que tiene una ayuda o un apoyo en esta trabajadora social que ve estos casos casi a nivel nacional, hace capacitaciones o cosas por el estilo en temas de expedientes, de llenado de datos y probablemente va a querer un acceso,
+digamos, una supervisión de expedientes,
+¿no? Para ver si están hechos y cómo los llenó, si los llenó bien, ¿no? Entonces, sería interesante que tengan un acceso, pero no para crear el expediente, sino solamente para revisarlo y hacerle llegar al educador la corrección.
+Ya. Okay. Ya. Este, esta ventanita lo había hecho eso, ¿no? Para poder este derivar entre este digamos
+entre personal, entre compañeros, ¿no? O sea, profesionales uno le pasa al otro,
+pero esto lo podría poner como que para la derivación interna entre sedes, digamos así, ¿no? Si es que sería el caso.
+Claro. Y ponerle una un cuadradito, ¿no? Una un botoncito para que sea el coordinador el que la pruebe.
+Eh, o sea, la derivación la puede hacer el educador.
+Claro, el educador la propone Y el coordinador la prueba. Puede ser.
+Sí, sí, claro. El coordinador la prueba
+ya para derivaciones internas. Así le llaman. Derivación interna.
+Sí, derivación interna.
+Ya. Okay. Ahora, este, también hay derivación externa,
+¿correcto? Es
+lo que he estado viendo, ¿no? Pero este acá eh tratar de hacer un resumen, depende de la directiva.
+Ajá. Pero ahí podíate Ajá. Este, una transferencia externa y el botoncito de aprobación podría ser este la trasfara social, se me ocurre.
+¿Para cuál? Para cuál
+para las transferencias externas, como es de un departamento a otro.
+El visto bueno lo podría dar la trabajadora social.
+Ah, ya.
+Correcto. Claro, porque es un aspecto más técnico, ¿no? Que hay razones que se mudó, se cambió, ¿no? O también podría hacerlo el monitor. Eso lo dejo a tu criterio.
+Ya, claro. Esta esto va a ser eh como una eh va a ser ventana no más, ya porque todavía no.
+Claro,
+o sea, es referencial, ¿no? La lista sí me la dicen después, ¿no? Para poder acomodar esto
+ya la lista de nombres o de
+de estas entidades, digamos, a dónde se deriva de manera externa. a los ex, a los mismos a entre los mismos porque se llama externa a los movimientos que hay
+dentro de una ciudad a otra,
+¿ya?
+Y también a podría ser a la UPE, a la de Muna, a Programa de Violencia. Básicamente es eso.
+Ya.
+Eso. Ajá. Tal vez algún caso a una comisaría o alguna fiscalía o juzgado cuando es un caso, por ejemplo, de trata, de trabajo forzoso. o de explotación sexual.
+Ya,
+básicamente eso.
+Ya, bacán.
+Ya. Entonces, acá voy a cancelarlo porque es esto era referencial, ¿no? Eso lo voy a cambiar.
+Ya, correcto.
+Ajá. Eh, luego eh vamos al Ya. Ah, y la numeración del expediente, ¿cómo generan ustedes su número de expediente?
+Ya, normalmente no tenemos número de expediente. Eh, alguna vez trató de hacerse algo en función a al DNI de El niño creo, pero creo que nunca se se concretó.
+Otra cosa es que le pongas un número correlativo con un código de ciudad,
+entonces sabría que ese niño es este el niño, por decir 007 de la ciudad tal,
+¿no?
+Ajá.
+Y así ir aumentando 7, 8, 9, 10 o 11
+o guion puede ser o
+claro podría ser
+guion y eh sec le pongo secar. por ejemplo, por decir Ajá. Y el número correlativo o con
+el DNI y Piura
+y la persona que el N el niño que no tenga DNI.
+Ah, se se fregó. Bueno, en teoría todos deberían tener este DNI, pero tienes razón, pues, ¿no? El niño que no tiene
+Claro, yo recomiendo como se hacen acá también en algunos en una supe, por ejemplo, eh el código que ves ahí, ¿no? Pero lógicamente Eh, no sería cuatro dígitos, sino sería un poco más. Creo que es ustedes tienen
+claro más cantidad, como dice, nosotros tenemos como 10,000 niños. Este año vamos a tener 9000
+ya.
+Entonces, pero para que no llegue hacia el 9000 podrías poner, ¿no? Como dice Se piura 001, Seura 200, Sectura 211. No,
+a ver, voy a No sé si ponerle seis dígitos o cinco nada más.
+Vamos a M, cinco, creo.
+Cinco, claro, seis dígitos. Creo que no vamos a llegar. Cinco dígitos suficientes.
+Eh, ya así podría ser. Te mando por el por el este por el chat
+chat.
+Eh, me dices si si está bien esto o o lo corrigen.
+Mm, digamos que podría ser así, una alternativa. O le pones un guion, no sé, no. ¿Lo viste? Hola. Creo que estás en modo
+ya. Sí. Lo que pasa es que pongo la barra espaciadora para que no se filtren los ruidos de acá de la oficina, pero sí estoy de acuerdo. Correcto.
+Ya, claro, eso es referencial, ¿no? Después ya se pues se puede perfeccionar, cambiar. Claro, claro.
+Ya. El también de las fichas me van a ir diciendo, ¿no? Porque creo que hay varias fichas, ¿no? Entonces ya eh en el caso de la de la grilla que ve ahí, este, ¿está bien esa cantidad de de columnas,
+no?
+Por ejemplo, en la REN están todos los datos que usualmente nos piden, ¿no? O sea, nos pide el ministerio para hacer sus cuadros también. Claro, ¿no? Ahí vamos a supongo que debe ser todo lo que están en las fichas, ¿no? Que que ustedes tienen.
+Claro. Pero no hay una ligación directa, digamos, ¿no? Porque hay datos que pide la REN que no están en las fichas,
+¿no? Como eso que pide el Ministerio de Cultura, lo que pide el Ministerio el CONADI, ¿no? Respecto a alguna data.
+Este, pero muchas de las fichas que nosotros tenemos solamente son manejadas por el educador y están en su expediente. Ahora, gracias a esto, podríamos tener esa información y caracterizar mejor a la población.
+Claro, ¿no? Bueno, básicamente yo me refería a a las columnas que están acá, ¿no? Que el educador pueda visualizar, ¿no? Expediente, el nombre, la ficha, ¿no?
+Ajá. Porque si por ejemplo necesita hacer algo, ¿no? Marca lo que corresponde acá de la derecha para ver si la modifica, la imprime, ¿no?
+Para que saque cuántos niños está teniendo de repente, ¿no?
+Imprimir. Me falta imprender. Ya,
+claro.
+Eh, toda esa lo firman, ¿no?
+Eh, no, pero este podría ser algo que pondríamos ahí para que ellos saquen su firma electrónica, tal vez, ¿no?
+Ah, ya voy a proponer eso, este, porque acá están utilizando la la firma del SGD,
+que es la que tiene un certificado digital, ¿no? En cada máquina.
+Ajá. Normalmente acá los coordinadores tienen firma digital, los educadores no. En todo caso
+podría ser la firma digital del coordinador, nada más. para que conste como que revisó la carga de información.
+Firma de coordinador. Ya.
+Firma de coordinador. Ajá. El educador podía tener una firma interna, un el numerito, ¿no? Este, porque él no necesariamente tiene que firmar
+o ponerle el nombre, ¿no? De manera de
+que es es del, ¿no? O sea, un campo que diga que es de
+Claro. Correcto. Llenado por el educador fulano, ¿no?
+Claro. Ya. Este, ya después entramos al expediente, por decirte este. Estamos un expediente y básicamente le he considerado acá esta digamos este menú de para hacer lo más rápido hecho las fichas, todas las fichas he puesto acá
+las fichas y acá al lado derecho va a mostrarse cada parámetro de la ficha. Primero este puesto recién estoy trabajando este resumen del caso donde pueda va a ir datos de directamente del niño ni adolescente
+luego el perfil de lo que viene lo que ya he registrado en la ficha de inscripción. Correcto.
+Va a jalar acá los datos. No, jalo datos. Claro, me falta afinar ahí un poco para jalar todos los datos.
+Ya.
+Eh, también el torno de familia, el familiar, si tiene hermanos, ¿no? Eh, que eh Claro, acá me falta, si se dan cuenta, repiten, ¿no? Acá me falta colocar bien eh los datos del domicilio, ¿no? La situación y la situación de calle, ¿no? El último, eh, ¿qué tipo de perfil de ingreso tiene eh la asignación? al educador y los sitios de tiempo del proceso de primer abbordaje de las fechas que se ha ingresado,
+se va cargando. Claro,
+acá me falta final porque creo que no sé si has jalado bien acá ya después viene, bueno, la misma ficha de inscripción que repetido, creo que lo voy a retirar. De ahí viene la ficha de diagnóstico, ¿no? Ahí sí me van indicando cómo cómo es que se procede, ¿no?
+Después de ingresar la ficha de descripción, ¿qué es lo que hacen? La ficha de diagnóstico.
+Sí, claro. Una vez que haces la ficha de inscripción, aplicas la ficha de diagnóstico y al final de la ficha de diagnóstico hay como unad unos cuadraditos para armar un plan de intervención,
+¿ya?
+Ya. Que se que se va renovando cada cierto tiempo, digamos, ¿no? Cada 3 meses, 6 meses se va cambiando o se va actualizando.
+Y luego de eso eh hay una ficha que se llama ficha de pase entre fase, ficha interface. este donde están los logros que se espera en primera fase, los logros que se esperan en segunda fase y los logros que se esperan en tercera fase.
+Claro que sirve como para controlar si es que el educador está logrando lo que tiene que lograr, ¿no? Como una lista de cotejo, ¿no? Como diciendo, si cumples todos estos íems, ya puedes pasar a la siguiente etapa.
+Si cumples estos pasas a la siguiente etapa. Si cumples todos estos de la tercera fase, el niño regresa.
+Ya. Entonces, voy haciendo ver, voy haciéndoles ver este todos los formatos que he considerado y por ejemplo este es el la diagnóstico social, ¿no? Todo lo que está en sus variables, eso todavía no lo he probado, pero es básicamente las variables que tienen en su ficha, ¿no? Los has incluido acá.
+Claro, eso es la información que se necesita, ¿no? Que necesitaría el educador.
+Claro. Entonces, luego viene lo de la familia, básicamente todo esto.
+Ya.
+Luego de la educad educación, ¿no?
+Que va jalar también los datos que van yendo eh adquiriendo en lo anterior.
+¿Correcto?
+Y también lo de alimentación, salud, higiene, recreación de intereses del NNA, ¿no?
+Ya.
+Y necesidades, ¿no? Necesidades. Agrega una necesidad acá, ¿no? Esto no sé si está. Creo que sí es la primera fase, segunda fase, tercera fase de lo que es la necesidad,
+¿correcto?
+Y luego tengo la ficha de egreso, ficha de logros, perdón.
+Ya.
+Ficha de logros. Acá son ejemplos. Ya,
+acá voy agregando eh la ficha de logros, primera fase, segunda fase.
+Esa es la que te digo que son que es la que establece los resultados que debe tener, ¿no?
+Ya cuando todos sean sí corresponde que pase
+ya
+a la siguiente.
+Okay. Si es sí, acá digamos que se abre lo demás, digamos, a partir de informe situacional.
+Claro, podría ser que tú pongas si hay algún no sigue estando en primera fase una vez que todos los ítems sí. se marquen los cinco íems sí se marquen. Entonces el sistema de podría sugerirle pase segunda fase,
+¿ya? Okay.
+Segunda fase igual, ¿no? Que ahí están los íems de
+ll íems y le dice fase tercera fase.
+Ya. Okay.
+Los cinco de tercera fase egreso.
+Ya. Okay. Y eso cuando ya le lo genero genero el digamos el la fichas Se se vuelve así, ¿no? Se vuelve así.
+La primera fase, eh, acá le podemos hacer, ¿no?, finalizados si no se pasa la segunda fase y así que vaya como un registro, ¿no? De la primera, segunda y tercera.
+Claro. Claro.
+Para ver la temporada de la evaluación.
+Ya. Entonces, luego tenemos el informe situacional, que es básicamente eh una plantilla de un informe.
+Ajá.
+No, que y cada cada este ficha le va a arrojar un un PDF, ¿no?
+Ah, me estaba olvidando, eh, me faltaba de acá, me estaba saltando el expediente digital. En el expediente digital se va a colocar este por fila todos los documentos que que va a ir generándose.
+Ah, ya. Por ejemplo, el DNI, la libreta de notas, el certificado de salud,
+cualquier documento que que se ingrese va a ir acá.
+Claro. Lo escaneas y lo cargas.
+Exacto. Puedes cargarlo o puedes este generar desde acá, ¿no? Del mismo sistema. Se va a ir generando, se va a ir registrando acá.
+Ya. subirlo, no puede subirlo o este por la por lo de las fichas que se que se van generando va a ir acumulándose, ¿no?
+Perfecto.
+Sí. Y también he visto una funcionalidad de poder juntar, ¿no? Los PDFs en uno solo, ¿no?
+Ya.
+Se va a ir este ahí puedo ir afinando.
+Ah, ya. Excelente. Hasta ahora todo lo que veo está muy bien.
+Ajá. Entonces, este, estamos acá en el informe situacional, ¿no? Es Básicamente, como le digo, es la plantilla que se utiliza. De repente, no sé si si está bien estrategias, el análisis, ahí me van indicando ustedes que qué otra cosa se puede incluir, ¿no? Este, y luego de eso tenemos a la a la fase dos, ¿ya está bien llamarle fase uno, fase dos, así o?
+Claro, claro. Correcto. Porque justamente la intervención está organizada por fases, ¿no?
+Ya, bacán. Este, luego vamos a la fase dos, está el plan de intervención individual. Eh, es como un PTI, creo, ¿no? Porque he visto PTI, está parecido a esto.
+Yo hasta ahora no he conocido un PTI, pero no
+es parecido. Es parecido.
+Ya, bac.
+Es parecido. Este eh acá está agregado una actividad, creo. A ver, coordina. Sí, sí, acá está una actividad. Este es un objetivo, ¿no? Este que está por como referencia,
+¿ya?
+No. Y le puedo dar para agregar otro objetivo, ¿no? Este, primero puedo ya acá se ha agregado un una actividad, puedo agregar otra actividad, ¿no? Y así voy agregando más actividades para este objetivo, en el objetivo uno,
+¿correcto? Claro.
+Y el indicador cuenta no recuerdo cómo lo puse, pero la cosa es que vas agregando otro objetivo más y puede ser en el área de salud, ¿no? Este, cuestionar Eh, seguro seguro es alumno, claro,
+algo así, nomm
+No. Eh, y una actividad, ¿no? Y vas agregando la actividad.
+Inscripción en el SIS.
+Claro, inscripción en el SISS, por ejemplo, ¿no? Y ahí vas agregando otra actividad así, ¿no? Y cada uno tiene sus pues sus fechas, ¿no? Vas poniendo sus
+Claro. Ahíico de todo lo que estás haciendo con
+Claro. Entonces, así también se puede agregar acá este Si está cumpliendo el plazo, ¿no? Si está dentro del plazo, semáforos, puedo decir, ¿no? Por colores.
+Ajá. Ex.
+También se puede agregar.
+Sí, sí.
+No, no he llegado todavía esta ficha porque he hecho así rápido nada más. Eh, luego tenemos los talleres socioeducativos. Eso sí no no he entendido muy bien en la en la directiva,
+¿no? Básicamente el educador lo que hace es plantear un taller, ¿no? En la ficha que tiene, plantear el taller, establecer los materiales, cuándo lo va a hacer y después tiene una ficha de evaluación. del taller, donde pone los resultados, la participación, pero digamos que eso no necesariamente tiene que estar ahí con campos, podría ser un PDF de la ficha, ¿ya?
+Ajá. O ponerle una ficha ahí para tenerlo registrado, ¿no? Pero pueden haber muchos muchos talleres, ¿no? Como hay varias ocasiones de taller,
+podrí no es muy relevante, digamos, ¿no? En término de
+Okay, ya. Sí, porque estaba que me descuadraba la cabeza. ¿Cómo
+cómo era, no?
+Claro, no, no todo creo que tendría que estar ahí, ¿no?
+Porque este acá veía que bueno, la directiva veía que era un taller individual y otro también grupal.
+Claro.
+Eh,
+ajá. Podría ser este eh en realidad cuando nosotros hicimos talleres de repente nos referimos a las sesiones, ¿no?
+Ah, ya.
+Podrían estar, ¿no? La ficha, escanear la ficha que el educador llena y nada más, ¿no?
+Okay.
+Ya. Mejor para no hacerlo.
+Claro. Para no hacerlo más pesado,
+complicado. Claro.
+Claro. Porque esto, si te has dado cuenta, eh, acá está amarrado con este talleres que está acá a la izquierda.
+Ajá. Claro.
+Y este a la izquierda es para más ya grupal, ¿no? Y
+Ajá.
+Y hacer, digamos, una sesión, no sé, pues capacitación de algo, ¿no? Y inscribir a todos los niños que que puedan
+asistir ese día, digamos, ¿no?
+Claro. De repente podríamos poner, se me ocurre, talleres, dos puntos de formación para la vida, de competencias parentales, o sea, agruparlas por temáticas, ¿no? Para que solamente carguen lo que han hecho en esa ocasión para esa finalidad y que ellos recuerden que esos son los módulos, digamos, o los talleres que tienen que realizar.
+Claro. No sé, o sea, lo podemos hacer si si me explican bien, o sea, y pueda yo analizarlo, necesita una idea por ahí que me surja.
+Ajá.
+Porque si es para padres también podría ser conveniente porque por ahí podemos sacar este algunos indicadores. No,
+claro. O sea, los educadores hacen una serie de de repente te voy a pasar el modelo operacional del creo de repente no te lo he pasado, no me acuerdo. Este, pero
+no sería bueno.
+Claro, porque digamos que el educador tiene que hacer eh para los niños y para los padres competencias parentales, bueno, sobre todo para los papás.
+Tiene que hacer este eh capacitación en, por ejemplo, no drogarse,
+evitar las relaciones sexuales tempranas. este eh no fumar, no tomar, no este eso le denominamos formación para la vida, pero también algunos talleres que puede ser de para que planifique eh su proyecto de vida en el caso de adolescentes.
+Claro.
+Este yo creo que sí, yo creo que sí podría ser porque este esto también me me preguntó Mec alguna vez para los del tema del CAR, porque este la ministra siempre le pide es eh estadística sobre proyecto de vida, ¿no?
+Claro.
+¿Qué es lo que nosotros como institución pues este actuamos en ese sentido, no?
+Claro. Pero si tú, por ejemplo, vas a hacer la ficha ahí de taller,
+ya
+podría suponer que redactes bastante, ¿no?
+Eh, porque no porque de hecho los educadores lo realizan actualmente físicamente, ¿no? Y el y ese documento lo
+di digamos, lo tienen en el expediente de los niños, ¿no? Ellos lo usan básicamente para para ellos y en el sistema de repente podría copiarse la ficha, ¿no?
+Sí,
+porque registrar todos los campos que tiene podría ser un poco complicado, ¿no?
+H, ya.
+Claro.
+Hay bastante, entonces bastante campos, bastantes variables.
+Ajá.
+Ah, okay.
+Ajá. Entonces, de repente podría hacer una
+una ficha que diga este, como dice ificación del taller donde diga el tema, eh, qué día lo hizo, con cuántos niños lo hizo, incluso de repente poner con qué niños lo hizo, este, cómo se desenvolvió el taller,
+eh, y cuáles son los resultados que obtuvo y nada más.
+Claro, en el caso del taller, recuerdo que acá no sé si está funcionando, eh, acá ponía un taller, no sé si a ver, quiero jalar este taller que está registrado acá. A ver. Si me deja en evaluación. Sí, ya acá busco al niño. No, no me acuerdo si arriba. No, entonces voy agregando a uno. Sale error, pero acá se se va agregando. Mira acá eh participante, asistencia, ¿no? Y evaluación.
+Claro. Entonces lista acá.
+Claro. Entonces esa información, por ejemplo, es importante, pero este eso supondría que se cargue ahí el no eh del taller, quiénes participaron, ¿no? Para que te diga esa parte, digamos, no te jale el tema, el nombre del tema y pero básicamente eso, ¿no?
+Claro,
+de repente al al personal de OMEV, a la ministra ya no le interesa exactamente el detalle del nombre y cómo lo hizo, ¿no?
+Claro,
+no este o cuánto le costó, qué insumos usó, si no solamente le interesa la parte de qué temas y cuántos participaron.
+Claro. Ajá. Sí, se puede sacar. Sí. Claro, eso sería lo único importante, ¿no? Para que no sea tan grande, tan engorroso.
+Claro. Ya.
+Eh, claro. De repente te puedo mandar las fichas. Creo que tenemos ahí fotocopiado un expediente. No me acuerdo si te lo mandé.
+M, no, te paso mi correo. Eh,
+ya
+pasa mi correo. Lo que sí sería importante para mí, este, si tuvieran algún este, ¿cómo se llama?, algún mapro, alguna parte de diagrama, ¿no? Eso me haría entender bastante mejor. también eh para poder plasmar en el sistema, ¿no? Eh, creo que estás en mute, José Luis. Hola. Hola.
+Ya regresé. Okay. que estaba copiando tu dirección. Okay. Este
+este no me acuerdo en qué me quedé.
+Estábamos en talleres socioeducativos.
+Ya. Entonces, porque lo que interesa básicamente, como te digo, eso, el nombre del taller y cuántos participaron, ¿no? Que sería la información que le interesa al tomador de decisiones, ¿no?
+Ya,
+pero el detalle de la del taller, eso en todo caso es más de manejo de ador y de los logros que espera obtener. Por eso es que la ficha de logros, digamos, te indica si es que la cosa está yendo por buen camino, ¿no?
+Ya,
+claro, porque esa es la que recoge los resultados de todos estos talleres de actividades que el educador realiza, porque si no nos perderíamos en hacerle un seguimiento a todas las actividades que son un montón
+en la ficha de logros, me dices.
+Claro. Ajá.
+Ya. Pero acá este entonces en la fase dos no estaría este talleres de socioeducativos.
+Bueno, en esa etapa lo hacen, digamos, lo hacen con más este frecuencia porque algunos también van desde primera fase, ¿no?
+Ya
+digamos que eh la mayor cantidad de talleres se hace durante la segunda fase porque es lo que nos permite tener los logros que necesitamos para que pueda pasar la siguiente fase.
+¿Ya? Entonces, esta ficha de logros no estaría ahí o está bien ahí ese a ese nivel.
+Ah, podría estar en segunda fase, tal vez. Ajá.
+Ya,
+claro.
+Ahí voy a voy a checar. bien a la ficha para qué qué garantíficas tiene para poder este dónde lo dónde lo coloco.
+Claro. Ajá.
+Ya. Luego viene la fase tres, este lo de seguimiento familiar, ¿no?
+Y es la ficha del formato 12
+donde está la zona de intervención, seguimiento, dirección, eh persona entrevistada,
+¿no? Básicamente la ficha que corresponde la a la número dos.
+Claro. Y qué nos dirá en todo caso si es que logró lo esperado o lo sostiene, ¿no?
+Claro, esa es la determinación pues del del educador, ¿no? Esto ya evalúa ello, ¿no?
+Correcto.
+Ah, okay. Okay.
+Ya. Entonces, eh de esta variable utilizan algo de esta evaluación, o sea, si es favorable, desfavorable.
+Claro. O sea, este sí puede ser, pues, ¿no? O sea, que sean los ems para calificar la el resultado de la visita, ¿no? Ya, ese es cuando eh no no me ubico acá en esta parte, o sea, sigue eh va a visitarle y después de tener los logros ya plasmados, este va a ser el seguimiento,
+¿no? En realidad el seguimiento es algo que a veces haces constantemente durante la segunda fase,
+porque tú vas viendo cómo le está yendo a la familia respecto a los cambios o o la ¿Cómo se dice? Las tareas que tú has planteado realizar durante la segunda o primera fase, ¿no? ¿Te acuerdas que hiciste un plan, no? De repente el niño hay que inscribirlo en el seguro, en un seguro de salud, en el sis,
+¿ya?
+Entonces para eso necesita alguna documentación o de repente la mamá tiene que ir con con el educador, ¿no? Entonces de repente la visita domiciliaria está en relación a a quedar, en qué día y a qué hora se van a encontrar o si el educador va a recogerlas, ¿no? O si se van a encontrar en el lugar, qué documentación tiene que llevar,
+¿no? para poder este hacer realidad esa esa inscripción, ¿no? Entonces, de repente a eso se refiere porque el seguimiento familiar es más o menos la explicación de qué hiciste en la visita familiar que realizaste, ¿no? Para que fuiste a hablar con la mamá, ¿no? O de repente fuiste a capacitarla sobre un tema porque ella no pudo estar en el momento en que hiciste el taller por su trabajo, ¿no? Entonces, la vas a visitar a su casa, vas a visitar cómo está viviendo con con sus niños, con la familia. No, si es que las cosas están ordenadas, si es que hay limpieza o no la hay, ¿no?
+Ya,
+claro. Entonces, son ese es ese seguimiento familiar que nos referimos.
+Claro. Entonces, va a haber, digamos, de uno a más registros de ese segimiento.
+Claro, claro.
+Ya. Entonces, la última parte es el lo que es la ficha de egreso.
+Ya, claro. La evaluación final, digamos, ¿no?
+Una vez que has logrado esos cinco ítems, o sea, has llenado toda tu ficha de logro si llenaste las figuritas del álbum,
+entonces ya corresponde que el niño egrese, ¿no? Y entonces ahí
+cargas esa información, ¿no? Que tiene que ver con los resultados alcanzados, este como el informe final, ¿no? Que justifica logros
+el fin del caso. Verador, coordinador, el coordinador y educador son los que aprueban eso.
+Claro, el educador lo hace y es el coordinador el que lo aprueba. Ya. Ya. Y por último, ah, mira, acá hay otro seguimiento. Ya, este es el ya el supongo que la última parte será esa todavía no lo he desarrollado. Diario de campo y seguimiento.
+Todo lo que me has enseñado, en realidad
+ese campo ya estaría un poco de más.
+Ah, okay.
+Observaciones, notas, ¿no?
+Claro. Ya te lo podemos dejar ahí hasta que de repente por ahí alguien nos diga si si es necesario, ¿no? Correcto, correcto.
+Ya. Entonces, mira, hasta ahí he avanzado. Eh,
+con lo que la información que me va que me has proporcionado y con lo que me vas a enviar por correo,
+este, ya la voy afinando poco a poco y supongo que una semana, una semana y media o dos, puedo dar una una referencia, ¿no? Una referencia de lo que he avanzado.
+Claro. Agradecerte lo que has avanzado, ¿no? Ya es estamos viendo algo más allá, ¿no? O sea, lo que hay es un montón para nosotros, ¿no? Y si eso se llega a ser realidad, va a ser una gran diferencia en el trabajo que hacemos.
+Claro. Este, yo todavía no lo no lo presento como como algo pues este aterrizado porque como verán faltan unas cositas.
+Claro.
+Pero sí, este yo ya me comprometí pues con la dirección general
+de niños adolescentes para presentar algo, ¿no?
+Excelente.
+Eh, lo había propuesto como un un análisis diseño, pero como eh está utilizando la cuando ya tengo aterrizado esto, ya hago el análisis diseño con documentación y todo y si se logra completar lo completo, lo muestro a ustedes, ustedes me aprueban.
+Perfecto.
+Y este podría llevarlo a a OGTI de acá para ponerle un servidor y hacer una prueba, ¿no?
+Ah, excelente, excelente.
+Claro, ya depende de cuánto me pueda demorar, ¿no? Porque sí toma su tiempo, ¿no? Toma su tiempo. Tenemos tiempo, o sea,
+claro,
+sí,
+en paralelo a lo que lo que este Uti está desarrollando, ¿no?
+Claro que no sé en qué irán, pero ahí van.
+Sí, es el otro tema, ¿no? Cuando pregunté,
+sí,
+cuando pregunté este y quería, estaba convencido de que iban a terminar,
+ah,
+y quería este proponer pues este una interconexión, ¿no? Con el sistema, ¿no? Para, tal como te había comentado la vez pasada, ¿no?
+Claro.
+Eh, plasmarlo en en ya como presupuesto para el próximo año, ¿no? Y
+y como que todavía no estaban
+claro tanto
+seguro de avanzar tan rápido.
+Así es. Ellos han dado un plazo un poco más grande, ¿no? Pero
+Ajá. Claro, pero de hecho tú estás,
+creo yo, más avanzado en ese sentido, ¿no? Y
+digamos que y tengo entendido, pues, que es parte de este programa
+grande que está de interoper interoperatividad, interoperatividad que quiere implementar este la degenano.
+Sí. Eh, lo que pasa que me está causando mucho mucha preocupación también por el lado de que como nos demoramos mucho para hacerlo los sistemas
+este y eh OGTI no había considerado los últimos tres, ¿no? Porque seguro habrán visto, ¿no? Que es de que el programa de Inabiv, ¿no? Y mejor lo hacemos, habrán dicho, hacemos lo que es el la sede central y después avanzamos lo otro, ¿no?
+Claro.
+Pero al final pues este como se demoraba ya me causó preocupación porque, o sea, los otros tres faltaban, pues no.
+Mm. Claro.
+Y yo decía, "¿Cuándo vamos a empezar? Mejor arranco con el análisis diseño
+y ya en el camino pues vi alguna alternativa con como están viendo para poder desarrollar, ¿no?
+Claro.
+Hasta que como ya acá en OGTI también están utilizando IA para hacer algunas aplicaciones
+y me dieron el pase para para poder hacerlo con tales tecnologías. Ya una vez que se termina ya les paso a ellos y ellos lo evalúan. Este hacen temas de segur afinan
+y pues podemos ponerlo aunque sea primero en desarrollo, ¿no? Y después calidad y ya cuando ustedes verifiquen y est todo okay ya producción
+excelente, excelente.
+Aquí estamos esperando con ansias.
+Sí. O sea, la cosa es que también este eh voy a necesitar el feedback, pero de la parte operativa, ¿no?
+Eh si bien es cierto que
+nosotros como parte pues este administ operativa y de que estamos más arriba en la sede central, a veces se nos escapan muchas cosas de la parte operativa.
+Ah, claro, claro.
+Ajá.
+Ajá. Pero ahí vamos avanzando, no hay ningún problema, ¿no? Y después de repente podemos ver reuniones con otras eh personas o miembros del equipo que puedan hacer algunas observaciones, ¿no? Aportes
+para ir perfeccionando esta esta herramienta.
+Ya, José Luis, más bien necesito, porfa este si tienes ahí un diagrama de procesos, un mapro.
+Sí.
+Eh, un poquito más específico para yo guiarme y poder trabajar y poder este también ponerlo como como base este de datos en para la guía
+y que siga un camino y mientras voy
+desarrollando con la guía tenga una referencia.
+Ya ese mapa de procesos te lo puedo mandar rápido por tu WhatsApp porque justo
+ya no hay problema recibido ahora. Ajá. Y este y te voy mandando todo lo demás en el transcurso.
+Ya. Ya. Excelente. Eh, no te olvides también de la del diccionario de datos porque eso voy a colocarlo en las Claro, entra por ahí y lo bajas.
+Ya. Sí, sí, lo copié.
+Ya,
+perfecto.
+Ya, José Luis,
+gracias.
+Gracias, bien. Gracias por el
+Gracias. Nos vemos

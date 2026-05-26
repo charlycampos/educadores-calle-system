@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SEC · Paso 5 — ExpedientePage + Formularios</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+:root {
+  --primary:      oklch(0.43 0.14 254);
+  --primary-soft: oklch(0.95 0.025 254);
+  --primary-fg:   #fff;
+  --bg:           oklch(0.985 0.003 250);
+  --surface:      #fff;
+  --surface-muted:oklch(0.975 0.004 250);
+  --border:       oklch(0.92 0.005 250);
+  --border-strong:oklch(0.85 0.008 250);
+  --fg:           oklch(0.22 0.018 257);
+  --fg-2:         oklch(0.42 0.015 257);
+  --fg-muted:     oklch(0.55 0.012 257);
+  --success:      oklch(0.58 0.13 155);
+  --success-soft: oklch(0.95 0.04 155);
+  --warning:      oklch(0.68 0.15 70);
+  --warning-soft: oklch(0.96 0.05 80);
+  --danger:       oklch(0.55 0.20 25);
+  --danger-soft:  oklch(0.96 0.04 25);
+  --info:         oklch(0.58 0.12 230);
+  --info-soft:    oklch(0.95 0.03 230);
+  --sh2: 0 2px 8px rgba(15,23,42,.06),0 1px 2px rgba(15,23,42,.04);
+  --sh3: 0 12px 32px rgba(15,23,42,.10),0 2px 4px rgba(15,23,42,.04);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{font-family:"Inter",system-ui,sans-serif;background:var(--bg);color:var(--fg);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.wrapper{max-width:1280px;margin:0 auto;padding:40px 24px 96px}
+.hero{padding-bottom:32px;border-bottom:1px solid var(--border);margin-bottom:56px}
+.hero h1{font-size:26px;font-weight:700;letter-spacing:-.02em;margin-bottom:6px}
+.hero p{font-size:14px;color:var(--fg-2)}
+.screen-section{margin-bottom:72px}
+.screen-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--fg-muted);margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.screen-label .num{background:var(--primary);color:#fff;width:18px;height:18px;border-radius:999px;display:grid;place-items:center;font-size:10px;font-weight:700}
+.screen-title{font-size:20px;font-weight:600;letter-spacing:-.015em;color:var(--fg);margin-bottom:4px}
+.screen-desc{font-size:13px;color:var(--fg-2);margin-bottom:18px}
+.frame{border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--surface)}
+
+/* atoms */
+.badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px}
+.bd-success{background:var(--success-soft);color:var(--success)}
+.bd-warning{background:var(--warning-soft);color:var(--warning)}
+.bd-danger{background:var(--danger-soft);color:var(--danger)}
+.bd-info{background:var(--info-soft);color:var(--info)}
+.bd-primary{background:var(--primary-soft);color:var(--primary)}
+.bd-neutral{background:var(--surface-muted);border:1px solid var(--border);color:var(--fg-2)}
+.dot{width:6px;height:6px;border-radius:999px;display:inline-block}
+
+.btn{display:inline-flex;align-items:center;gap:6px;font-family:inherit;font-size:13px;font-weight:500;padding:7px 13px;border-radius:7px;border:0;cursor:pointer;transition:background .12s}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-secondary{background:var(--surface);color:var(--fg);border:1px solid var(--border-strong)}
+.btn-sm{font-size:12px;padding:5px 10px}
+
+.micro{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--fg-muted)}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl thead tr{border-bottom:1px solid var(--border);background:var(--surface-muted)}
+.tbl th{padding:9px 16px;font-size:12px;font-weight:600;color:var(--fg-2);text-align:left}
+.tbl tbody tr{border-bottom:1px solid var(--border)}
+.tbl tbody tr:last-child{border:0}
+.tbl tbody tr:hover{background:var(--surface-muted)}
+.tbl td{padding:10px 16px;color:var(--fg);vertical-align:middle}
+.input{font-family:inherit;font-size:13px;padding:8px 12px;border-radius:6px;border:1px solid var(--border-strong);background:var(--surface);color:var(--fg);width:100%}
+.input:focus{outline:none;border-color:var(--primary)}
+.field-label{font-size:12px;font-weight:500;color:var(--fg-2);display:block;margin-bottom:5px}
+
+/* shell */
+.app-shell{display:flex;height:660px;overflow:hidden}
+.sidebar{width:220px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column}
+.sb-header{padding:12px 14px;border-bottom:1px solid var(--border)}
+.sb-nav{flex:1;overflow-y:auto;padding:10px;space-y:2px}
+.nav-item{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:6px;font-size:12px;font-weight:500;color:var(--fg-2);cursor:pointer;border:1px solid transparent;margin-bottom:2px}
+.nav-item:hover{background:var(--surface-muted);color:var(--fg)}
+.nav-item.active{background:var(--primary-soft);color:var(--primary);border-color:color-mix(in oklch,var(--primary) 20%,transparent)}
+.nav-phase{padding:4px 10px;margin:6px 0 2px}
+.nav-phase-label{display:inline-flex;align-items:center;gap:3px;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700;margin-bottom:2px}
+.nav-phase-title{font-size:12px;font-weight:600;color:var(--fg)}
+.main{flex:1;overflow-y:auto;padding:24px 28px;background:var(--bg)}
+
+/* Form layout */
+.form-shell{display:flex;height:660px;overflow:hidden}
+.form-sidebar{width:200px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column}
+.form-header{padding:12px 14px;background:var(--primary);border-bottom:1px solid color-mix(in oklch,var(--primary) 70%,black)}
+.form-steps{flex:1;overflow-y:auto;padding:8px}
+.step-item{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:6px;margin-bottom:2px;cursor:pointer}
+.step-item.active{background:var(--primary-soft)}
+.step-num{width:20px;height:20px;border-radius:999px;display:grid;place-items:center;font-size:10px;font-weight:700;flex-shrink:0}
+.step-label{font-size:12px;font-weight:600}
+.form-progress{padding:10px 14px;border-top:1px solid var(--border);background:var(--surface-muted)}
+.form-main{flex:1;background:var(--surface);overflow-y:auto;padding:28px 32px}
+.form-footer{padding:14px 24px;border-top:1px solid var(--border);background:var(--surface);display:flex;align-items:center;justify-content:flex-end;gap:10px}
+
+.status-card{padding:14px 16px;border-radius:7px;border:1px solid;display:flex;flex-direction:column;gap:6px}
+.sc-success{background:var(--success-soft);border-color:color-mix(in oklch,var(--success) 30%,transparent);color:var(--success)}
+.sc-warning{background:var(--warning-soft);border-color:color-mix(in oklch,var(--warning) 30%,transparent);color:var(--warning)}
+.sc-danger{background:var(--danger-soft);border-color:color-mix(in oklch,var(--danger) 30%,transparent);color:var(--danger)}
+
+.phase-pill{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;font-size:11px;font-weight:600;border:1px solid}
+.pp-done{background:var(--success-soft);border-color:color-mix(in oklch,var(--success) 30%,transparent);color:var(--success)}
+.pp-active{background:var(--primary);border-color:var(--primary);color:#fff}
+.pp-pending{background:var(--surface);border-color:var(--border);color:var(--fg-muted)}
+
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.mt-2{margin-top:8px}.mt-3{margin-top:12px}.mt-4{margin-top:16px}.mb-3{margin-bottom:12px}.mb-4{margin-bottom:16px}
+.fw6{font-weight:600}.fw5{font-weight:500}
+.c-muted{color:var(--fg-muted)}.c-2{color:var(--fg-2)}.c-primary{color:var(--primary)}
+.mono{font-family:ui-monospace,"SF Mono",Menlo,monospace}
+.flex{display:flex}.items-c{align-items:center}.jb{justify-content:space-between}.gap-2{gap:8px}.gap-3{gap:12px}
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <!-- Hero -->
+  <div class="hero">
+    <div class="flex items-c gap-3 mb-4">
+      <div style="width:32px;height:32px;border-radius:8px;background:var(--primary);display:grid;place-items:center">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M5 18 Q 12 10, 19 6" stroke="white" stroke-width="2.2" stroke-linecap="round"/><circle cx="5" cy="18" r="2.2" fill="white"/><circle cx="19" cy="6" r="2.2" fill="white"/></svg>
+      </div>
+      <div style="line-height:1.2"><p style="font-size:13px;font-weight:600">SEC · Educadores de Calle</p><p style="font-size:11px;color:var(--fg-muted)">INABIF · DGNNA · MIMP</p></div>
+    </div>
+    <h1>Paso 5 — ExpedientePage + Formularios NNA</h1>
+    <p>ExpedientePage · NnaCreatePage (F03) · FormFields rediseñados</p>
+  </div>
+
+  <!-- ══ 1. EXPEDIENTE PAGE ══ -->
+  <div class="screen-section">
+    <div class="screen-label"><span class="num">01</span> Expediente Digital</div>
+    <div class="screen-title">ExpedientePage — vista completa</div>
+    <div class="screen-desc">NavButton con primary-soft. Sidebar de fases con badges de token. Phase tracker limpio. StatusCards con tokens semánticos. Sin shadow coloreada.</div>
+    <div class="frame">
+      <div class="app-shell">
+
+        <!-- Sidebar -->
+        <div class="sidebar">
+          <div class="sb-header" style="padding-bottom:10px">
+            <!-- Header del expediente (compacto) -->
+            <div class="flex items-c jb mb-2">
+              <a style="font-size:12px;color:var(--fg-2);display:flex;align-items:center;gap:4px;text-decoration:none">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+                Padrón
+              </a>
+              <span class="badge bd-success"><span class="dot" style="background:var(--success)"></span>ACTIVO</span>
+            </div>
+            <p style="font-size:13px;font-weight:700;color:var(--fg);line-height:1.2">JUAN CARLOS<br/>GARCÍA LÓPEZ</p>
+            <p class="c-muted" style="font-size:11px;margin-top:2px">DNI: 72394810 · 14 años</p>
+            <div style="display:flex;gap:4px;margin-top:8px;align-items:center">
+              <div class="phase-pill pp-done" style="font-size:10px;padding:3px 7px"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>F1</div>
+              <div style="width:16px;height:1px;background:color-mix(in oklch,var(--success) 40%,transparent)"></div>
+              <div class="phase-pill pp-active" style="font-size:10px;padding:3px 7px">F2</div>
+              <div style="width:16px;height:1px;background:var(--border)"></div>
+              <div class="phase-pill pp-pending" style="font-size:10px;padding:3px 7px">F3</div>
+            </div>
+          </div>
+
+          <div class="sb-nav" style="padding:10px 8px">
+            <!-- Resumen -->
+            <div class="nav-item active">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+              Resumen del Caso
+            </div>
+            <!-- Fase 1 -->
+            <div class="nav-phase">
+              <span class="nav-phase-label" style="background:var(--primary-soft);color:var(--primary)">Fase 1</span>
+              <p class="nav-phase-title">Contacto e Integración</p>
+            </div>
+            <div class="nav-item"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>Ficha de Inscripción<span class="c-muted" style="font-size:10px;margin-left:auto">F3</span></div>
+            <div class="nav-item"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>Diagnóstico Social<span class="c-muted" style="font-size:10px;margin-left:auto">F4</span></div>
+            <div class="nav-item"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Ficha de Logros<span class="c-muted" style="font-size:10px;margin-left:auto">F5</span></div>
+            <!-- Fase 2 -->
+            <div class="nav-phase">
+              <span class="nav-phase-label" style="background:var(--info-soft);color:var(--info)">Fase 2</span>
+              <p class="nav-phase-title">Desarrollo e Intervención</p>
+            </div>
+            <div class="nav-item"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Plan de Intervención</div>
+            <div class="nav-item"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Talleres<span class="c-muted" style="font-size:10px;margin-left:auto">F7/F8</span></div>
+            <!-- Fase 3 -->
+            <div class="nav-phase">
+              <span class="nav-phase-label" style="background:var(--success-soft);color:var(--success)">Fase 3</span>
+              <p class="nav-phase-title">Seguimiento y Egreso</p>
+            </div>
+            <div class="nav-item"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/></svg>Seguimiento Familiar<span class="c-muted" style="font-size:10px;margin-left:auto">F12</span></div>
+            <div class="nav-item"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>Ficha de Egreso<span class="c-muted" style="font-size:10px;margin-left:auto">F13</span></div>
+          </div>
+        </div>
+
+        <!-- Main -->
+        <div class="main">
+          <!-- Status cards -->
+          <div class="grid-3 mb-4">
+            <div class="status-card sc-success">
+              <div class="flex items-c jb"><span style="font-size:11px;font-weight:600;opacity:.8;text-transform:uppercase">Salud</span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+              <p style="font-size:14px;font-weight:600">Afiliado al SIS</p>
+            </div>
+            <div class="status-card sc-danger">
+              <div class="flex items-c jb"><span style="font-size:11px;font-weight:600;opacity:.8;text-transform:uppercase">Educación</span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/></svg></div>
+              <p style="font-size:14px;font-weight:600">No estudia actualmente</p>
+            </div>
+            <div class="status-card sc-success">
+              <div class="flex items-c jb"><span style="font-size:11px;font-weight:600;opacity:.8;text-transform:uppercase">Identidad</span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg></div>
+              <p style="font-size:14px;font-weight:600">DNI: 72394810</p>
+            </div>
+          </div>
+
+          <!-- Docs header -->
+          <div class="flex items-c jb mb-3">
+            <div>
+              <h2 style="font-size:16px;font-weight:600;color:var(--fg)">Documentos del Expediente</h2>
+              <p style="font-size:12px;color:var(--fg-2);margin-top:2px">Vista consolidada y foliada</p>
+            </div>
+            <div class="flex items-c gap-2">
+              <button class="btn btn-primary btn-sm" style="gap:5px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>Subir documentos</button>
+              <div style="background:var(--primary-soft);color:var(--primary);padding:5px 10px;border-radius:6px;border:1px solid color-mix(in oklch,var(--primary) 20%,transparent);font-size:12px;font-weight:500;display:flex;align-items:center;gap:5px">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                Folios: 008
+              </div>
+            </div>
+          </div>
+
+          <!-- Docs table -->
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:7px;overflow:hidden">
+            <table class="tbl">
+              <thead><tr><th style="width:36px;text-align:center">N°</th><th>Documento</th><th>Fecha</th><th>Responsable</th><th style="text-align:center">Folios</th><th style="width:48px"></th></tr></thead>
+              <tbody>
+                <tr>
+                  <td style="text-align:center;color:var(--fg-muted);font-weight:600">1</td>
+                  <td><div class="flex items-c gap-3">
+                    <div style="padding:7px;border-radius:5px;background:var(--primary-soft);color:var(--primary);border:1px solid color-mix(in oklch,var(--primary) 20%,transparent)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg></div>
+                    <div><p style="font-weight:600;font-size:13px">COPIA DNI (NNA)</p><span style="font-size:10px;font-weight:600;font-family:monospace;background:var(--warning-soft);color:var(--warning);padding:1px 5px;border-radius:4px">#DOC-001</span></div>
+                  </div></td>
+                  <td style="font-size:12px;color:var(--fg-2)">12/03/2024</td>
+                  <td><div style="display:inline-flex;align-items:center;gap:6px;background:var(--surface-muted);border:1px solid var(--border);padding:4px 9px;border-radius:5px;font-size:12px">Ana López</div></td>
+                  <td style="text-align:center"><div style="display:inline-flex;flex-direction:column;align-items:center"><div style="background:var(--primary);color:#fff;font-size:9px;font-weight:700;padding:1px 8px;border-radius:3px 3px 0 0;text-transform:uppercase">Exp.</div><div style="background:var(--primary-soft);color:var(--primary);border:1px solid color-mix(in oklch,var(--primary) 20%,transparent);border-top:0;padding:2px 8px;border-radius:0 0 3px 3px;font-size:11px;font-weight:700">2 págs</div></div></td>
+                  <td style="text-align:center"><button style="padding:5px;border:0;background:transparent;cursor:pointer;color:var(--fg-muted);border-radius:4px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></td>
+                </tr>
+                <tr>
+                  <td style="text-align:center;color:var(--fg-muted);font-weight:600">2</td>
+                  <td><div class="flex items-c gap-3">
+                    <div style="padding:7px;border-radius:5px;background:var(--primary-soft);color:var(--primary);border:1px solid color-mix(in oklch,var(--primary) 20%,transparent)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg></div>
+                    <div><p style="font-weight:600;font-size:13px">COPIA SIS</p><span style="font-size:10px;font-weight:600;font-family:monospace;background:var(--warning-soft);color:var(--warning);padding:1px 5px;border-radius:4px">#DOC-002</span></div>
+                  </div></td>
+                  <td style="font-size:12px;color:var(--fg-2)">12/03/2024</td>
+                  <td><div style="display:inline-flex;align-items:center;gap:6px;background:var(--surface-muted);border:1px solid var(--border);padding:4px 9px;border-radius:5px;font-size:12px">Ana López</div></td>
+                  <td style="text-align:center"><div style="display:inline-flex;flex-direction:column;align-items:center"><div style="background:var(--primary);color:#fff;font-size:9px;font-weight:700;padding:1px 8px;border-radius:3px 3px 0 0;text-transform:uppercase">Exp.</div><div style="background:var(--primary-soft);color:var(--primary);border:1px solid color-mix(in oklch,var(--primary) 20%,transparent);border-top:0;padding:2px 8px;border-radius:0 0 3px 3px;font-size:11px;font-weight:700">6 págs</div></div></td>
+                  <td style="text-align:center"><button style="padding:5px;border:0;background:transparent;cursor:pointer;color:var(--fg-muted);border-radius:4px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ 2. NNA CREATE PAGE ══ -->
+  <div class="screen-section">
+    <div class="screen-label"><span class="num">02</span> Formulario F03</div>
+    <div class="screen-title">NnaCreatePage — Ficha de Inscripción</div>
+    <div class="screen-desc">Sidebar con bg-primary (no hardcodeado). Steps con primary-soft activo. Perfil cards con tokens. Sin shadow coloreada. Sin alert().</div>
+    <div class="frame">
+      <div class="form-shell">
+
+        <!-- Form sidebar -->
+        <div class="form-sidebar">
+          <div class="form-header">
+            <p style="color:#fff;font-weight:600;font-size:13px;line-height:1.2">Ficha de Inscripción</p>
+            <p style="color:rgba(255,255,255,.7);font-size:11px;margin-top:2px">Formato F03 · Registro Oficial</p>
+          </div>
+          <div class="form-steps">
+            <div class="step-item active">
+              <div class="step-num" style="background:var(--primary);color:#fff">1</div>
+              <div><p class="step-label" style="color:var(--primary)">Datos Generales</p><p style="font-size:10px;color:var(--fg-muted)">Intervención y fechas</p></div>
+            </div>
+            <div class="step-item">
+              <div class="step-num" style="background:var(--primary-soft);color:var(--primary)">2</div>
+              <div><p class="step-label c-2">Datos Personales</p><p style="font-size:10px;color:var(--fg-muted)">Identidad y domicilio</p></div>
+            </div>
+            <div class="step-item">
+              <div class="step-num" style="background:var(--surface-muted);color:var(--fg-muted);border:1px solid var(--border)">3</div>
+              <div><p class="step-label c-2">Datos Perfil</p><p style="font-size:10px;color:var(--fg-muted)">Actividad en calle</p></div>
+            </div>
+            <div class="step-item">
+              <div class="step-num" style="background:var(--surface-muted);color:var(--fg-muted);border:1px solid var(--border)">4</div>
+              <div><p class="step-label c-2">Educación</p><p style="font-size:10px;color:var(--fg-muted)">Situación educativa</p></div>
+            </div>
+            <div class="step-item">
+              <div class="step-num" style="background:var(--surface-muted);color:var(--fg-muted);border:1px solid var(--border)">5</div>
+              <div><p class="step-label c-2">Salud</p><p style="font-size:10px;color:var(--fg-muted)">Seguro y discapacidad</p></div>
+            </div>
+            <div class="step-item">
+              <div class="step-num" style="background:var(--surface-muted);color:var(--fg-muted);border:1px solid var(--border)">6</div>
+              <div><p class="step-label c-2">Familia / Otros</p><p style="font-size:10px;color:var(--fg-muted)">Vivienda y obs.</p></div>
+            </div>
+          </div>
+          <div class="form-progress">
+            <div class="flex items-c jb mb-2"><span style="font-size:10px;color:var(--fg-muted);font-weight:500">Progreso</span><span style="font-size:10px;color:var(--primary);font-weight:600">1/6</span></div>
+            <div style="width:100%;background:var(--border);border-radius:999px;height:4px;overflow:hidden">
+              <div style="width:16.7%;height:100%;background:var(--primary);border-radius:999px"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Form main -->
+        <div class="form-main">
+          <div style="border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:20px">
+            <h2 style="font-size:18px;font-weight:600;color:var(--fg)">I. Datos Generales</h2>
+            <p style="font-size:12px;color:var(--fg-2);margin-top:3px">Ubicación de la intervención y marco temporal.</p>
+          </div>
+
+          <div class="mb-4">
+            <label class="field-label">Zona de Intervención <span style="color:var(--danger)">*</span></label>
+            <input class="input" placeholder="Ej: Plaza de Armas, Jr. Comercio…" value="Parque Kennedy, Miraflores" />
+          </div>
+
+          <!-- Perfil -->
+          <div class="mb-4">
+            <label class="field-label">Perfil del NNA</label>
+            <div class="grid-4" style="gap:8px">
+              <label style="cursor:pointer;border:1px solid var(--primary);border-radius:7px;padding:10px 8px;background:var(--primary-soft);display:flex;flex-direction:column;align-items:center;gap:6px">
+                <span style="font-size:10px;font-weight:700;color:var(--primary);text-align:center;text-transform:uppercase">Trabajo en Calle</span>
+                <div style="width:12px;height:12px;border-radius:999px;border:2px solid var(--primary);display:grid;place-items:center"><div style="width:6px;height:6px;background:var(--primary);border-radius:999px"></div></div>
+              </label>
+              <label style="cursor:pointer;border:1px solid var(--border);border-radius:7px;padding:10px 8px;display:flex;flex-direction:column;align-items:center;gap:6px">
+                <span style="font-size:10px;font-weight:600;color:var(--fg-2);text-align:center;text-transform:uppercase">Mendicidad</span>
+                <div style="width:12px;height:12px;border-radius:999px;border:2px solid var(--border-strong)"></div>
+              </label>
+              <label style="cursor:pointer;border:1px solid var(--border);border-radius:7px;padding:10px 8px;display:flex;flex-direction:column;align-items:center;gap:6px">
+                <span style="font-size:10px;font-weight:600;color:var(--fg-2);text-align:center;text-transform:uppercase">Vida en Calle</span>
+                <div style="width:12px;height:12px;border-radius:999px;border:2px solid var(--border-strong)"></div>
+              </label>
+              <label style="cursor:pointer;border:1px solid var(--border);border-radius:7px;padding:10px 8px;display:flex;flex-direction:column;align-items:center;gap:6px">
+                <span style="font-size:10px;font-weight:600;color:var(--fg-2);text-align:center;text-transform:uppercase">Explotación Sexual</span>
+                <div style="width:12px;height:12px;border-radius:999px;border:2px solid var(--border-strong)"></div>
+              </label>
+            </div>
+          </div>
+
+          <!-- Modalidad -->
+          <div class="mb-4">
+            <label class="field-label">Modalidad de permanencia</label>
+            <div class="flex items-c gap-3">
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:8px 12px;border:1px solid var(--primary);border-radius:6px;background:var(--primary-soft);font-size:13px;font-weight:500;color:var(--primary)">
+                <input type="radio" name="sit" checked style="accent-color:var(--primary)" /> Tránsito en Calle
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-weight:500;color:var(--fg-2)">
+                <input type="radio" name="sit" style="accent-color:var(--primary)" /> Convivencia en Calle
+              </label>
+            </div>
+          </div>
+
+          <!-- Fechas -->
+          <div class="grid-4" style="gap:10px">
+            <div><label class="field-label">Fecha de Abordaje</label><input class="input" type="date" value="2024-03-10" /></div>
+            <div><label class="field-label">Fecha de Ingreso</label><input class="input" type="date" value="2024-03-12" /></div>
+            <div><label class="field-label">Fecha Reingreso</label><input class="input" type="date" /></div>
+            <div><label class="field-label">Cambio de Perfil</label><input class="input" type="date" /></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="form-footer">
+        <button class="btn btn-secondary btn-sm" style="opacity:.5;cursor:not-allowed">← Atrás</button>
+        <button class="btn btn-primary btn-sm">Siguiente →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ 3. FORMFIELDS ══ -->
+  <div class="screen-section">
+    <div class="screen-label"><span class="num">03</span> Componentes de formulario</div>
+    <div class="screen-title">FormFields — InputField, SelectField, SectionHeader, FooterButtons</div>
+    <div class="screen-desc">Labels visibles y accesibles. Tokens consolidados. Sin rounded-xl ni shadow-blue-200. Error state con danger token.</div>
+    <div class="frame" style="padding:28px 32px">
+      <div style="max-width:520px">
+        <div style="padding-bottom:12px;border-bottom:1px solid var(--border);margin-bottom:20px">
+          <h3 style="font-size:17px;font-weight:600;color:var(--fg)">V. Salud</h3>
+          <p style="font-size:12px;color:var(--fg-2);margin-top:3px">Aseguramiento y condición de salud.</p>
+        </div>
+        <div class="grid-2" style="margin-bottom:14px">
+          <div>
+            <label class="field-label">¿Afiliado al SIS?</label>
+            <div style="position:relative">
+              <select class="input" style="appearance:none;padding-right:32px"><option selected>Sí</option><option>No</option><option>No sabe</option></select>
+              <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--fg-muted)"><svg width="13" height="13" viewBox="0 0 20 20" fill="currentColor"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg></div>
+            </div>
+          </div>
+          <div>
+            <label class="field-label">¿Otro seguro?</label>
+            <div style="position:relative">
+              <select class="input" style="appearance:none;padding-right:32px"><option>No</option><option>Sí</option></select>
+              <div style="position:absolute;right:10px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--fg-muted)"><svg width="13" height="13" viewBox="0 0 20 20" fill="currentColor"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg></div>
+            </div>
+          </div>
+        </div>
+        <!-- Campo con error -->
+        <div style="margin-bottom:14px">
+          <label class="field-label">Nombre de la institución educativa <span style="color:var(--danger)">*</span></label>
+          <input class="input" style="border-color:var(--danger)" placeholder="Nombre del colegio" />
+          <p style="color:var(--danger);font-size:11px;font-weight:500;margin-top:4px">Este campo es requerido</p>
+        </div>
+        <!-- Campo normal con valor -->
+        <div style="margin-bottom:14px">
+          <label class="field-label">Observaciones de salud</label>
+          <input class="input" value="Presenta leve desnutrición, en seguimiento con posta médica." />
+        </div>
+        <!-- Footer buttons -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding-top:16px;border-top:1px solid var(--border);margin-top:4px">
+          <button class="btn btn-secondary btn-sm" style="gap:5px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>Atrás</button>
+          <div class="flex items-c gap-2">
+            <button class="btn btn-primary btn-sm" style="gap:5px">Siguiente<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p style="text-align:center;font-size:11px;color:var(--fg-muted);margin-top:32px">© 2026 MIMP · INABIF · DGNNA — Sistema de Educadores de Calle</p>
+</div>
+</body>
+</html>
