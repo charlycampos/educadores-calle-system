@@ -17,7 +17,9 @@ import {
     Smile,
     Baby,
     Clock, // Forced recompile for HMR
+    FolderOpen,
 } from 'lucide-react';
+import { ExpedienteDigitalDocs } from '../ExpedientePage';
 
 interface ResumenCasoProps {
     nna: any;
@@ -30,6 +32,7 @@ const TABS = [
     { id: 'perfil', label: 'Perfil Personal', icon: User },
     { id: 'familiar', label: 'Entorno y Familia', icon: Home },
     { id: 'intervencion', label: 'Situación de Calle', icon: Activity },
+    { id: 'expediente', label: 'Expediente Digital', icon: FolderOpen },
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -115,7 +118,126 @@ const AlertChip = ({ text, type = 'warning' }: { text: string; type?: 'warning' 
     );
 };
 
-// ─── Tab 1: NNA Atendidos ─────────────────────────────────────────────────────
+// Dictionaries for numerical values/keys to Spanish text translation
+const TIPO_DOC_MAP: Record<string, string> = {
+    '1': 'DNI',
+    '2': 'SIN_DOC',
+    '3': 'PARTIDA_NACIMIENTO',
+    '4': 'CE',
+    'DNI': 'DNI',
+    'SIN_DOC': 'Sin Documento',
+    'PARTIDA_NACIMIENTO': 'Partida de Nacimiento',
+    'CE': 'Carné de Extranjería',
+};
+
+const SEXO_MAP: Record<string, string> = {
+    '1': 'Hombre',
+    '2': 'Mujer',
+    'HOMBRE': 'Hombre',
+    'MUJER': 'Mujer',
+};
+
+const TIPO_DISCAPACIDAD_MAP: Record<string, string> = {
+    '1': 'Motriz o física',
+    '2': 'Sensorial',
+    '3': 'Cognitivo-intelectual',
+    '4': 'Psicosocial o psíquica',
+    '5': 'Otros (especificar)',
+    '1: Motriz o física': 'Motriz o física',
+    '2: Sensorial': 'Sensorial',
+    '3: Cognitivo-intelectual': 'Cognitivo-intelectual',
+    '4: Psicosocial o psíquica': 'Psicosocial o psíquica',
+    '5: Otros (especificar)': 'Otros (especificar)',
+};
+
+const MODALIDAD_ESTUDIO_MAP: Record<string, string> = {
+    '1': 'Básica / Regular (EBR)',
+    '2': 'Alternativa (EBA)',
+    '3': 'Especial (EBE)',
+    '4': 'Superior Técnica',
+    '5': 'Superior Universitaria',
+    '6': 'CETPRO',
+    '1: Básica / regular': 'Básica / Regular (EBR)',
+    '2: Alternativa (EBA)': 'Alternativa (EBA)',
+    '3: Especial': 'Especial (EBE)',
+    '4: Superior Técnica': 'Superior Técnica',
+    '5: Superior Universitaria': 'Superior Universitaria',
+    '6: CETPRO': 'CETPRO',
+    'EBR': 'Básica / Regular (EBR)',
+    'EBA': 'Alternativa (EBA)',
+    'EBE': 'Especial (EBE)',
+};
+
+const GRADO_ESTUDIO_MAP: Record<string, string> = {
+    '1': 'Inicial',
+    '2': '1ro primaria',
+    '3': '2do primaria',
+    '4': '3ro primaria',
+    '5': '4to primaria',
+    '6': '5to primaria',
+    '7': '6to primaria',
+    '8': '1ro secundaria',
+    '9': '2do secundaria',
+    '10': '3ro secundaria',
+    '11': '4to secundaria',
+    '12': '5to secundaria',
+    '13': 'Ciclo I (EBA)',
+    '14': 'Ciclo II (EBA)',
+    '15': 'Ciclo III (EBA)',
+    '16': 'Ciclo IV (EBA)',
+    '17': 'Ciclo V (EBA)',
+    '18': 'Ciclo VI (EBA)',
+    '19': 'Ciclo VII (EBA)',
+    '20': 'Ciclo VIII (EBA)',
+    '21': 'Ciclo IX (EBA)',
+    '22': 'Ciclo X (EBA)',
+    '99': 'No aplica / No sabe',
+    '1: Inicial': 'Inicial',
+    '2: 1ro prim': '1ro primaria',
+    '3: 2do prim': '2do primaria',
+    '4: 3ro prim': '3ro primaria',
+    '5: 4to prim': '4to primaria',
+    '6: 5to prim': '5to primaria',
+    '7: 6to prim': '6to primaria',
+    '8: 1ro sec': '1ro secundaria',
+    '9: 2do sec': '2do secundaria',
+    '10: 3ro sec': '3ro secundaria',
+    '11: 4to sec': '4to secundaria',
+    '12: 5to sec': '5to secundaria',
+    '13: Ciclo I': 'Ciclo I (EBA)',
+    '14: Ciclo II': 'Ciclo II (EBA)',
+    '15: Ciclo III': 'Ciclo III (EBA)',
+    '16: Ciclo IV': 'Ciclo IV (EBA)',
+    '17: Ciclo V': 'Ciclo V (EBA)',
+    '18: Ciclo VI': 'Ciclo VI (EBA)',
+    '19: Ciclo VII': 'Ciclo VII (EBA)',
+    '20: Ciclo VIII': 'Ciclo VIII (EBA)',
+    '21: Ciclo IX': 'Ciclo IX (EBA)',
+    '22: Ciclo X': 'Ciclo X (EBA)',
+    '99: No aplica / No sabe': 'No aplica / No sabe',
+};
+
+const NIVEL_EDUCATIVO_MAP: Record<string, string> = {
+    '1': 'Sin Instrucción',
+    '2': 'Inicial',
+    '3': 'Primaria Completa',
+    '4': 'Primaria Incompleta',
+    '5': 'Secundaria Completa',
+    '6': 'Secundaria Incompleta',
+    '7': 'EBE (Esp. Básica)',
+    '8': 'Superior',
+    '1: Sin nivel': 'Sin nivel',
+    '2: Inicial': 'Inicial',
+    '3: Primaria Incompleta': 'Primaria Incompleta',
+    '4: Primaria Completa': 'Primaria Completa',
+    '5: Secundaria Incompleta': 'Secundaria Incompleta',
+    '6: Secundaria Completa': 'Secundaria Completa',
+    '7: Superior No Universitaria Incompleta': 'Superior No Univ. Incompleta',
+    '8: Superior No Universitaria Completa': 'Superior No Univ. Completa',
+    '9: Superior Universitario Incompleto': 'Superior Univ. Incompleto',
+    '10: Superior Universitario Completo': 'Superior Univ. Completo',
+    '11: Básica Especial': 'Básica Especial',
+};
 
 const TabAtendidos = ({ nnaActual, familia }: { nnaActual: any; familia: any[] }) => {
     return (
@@ -135,6 +257,12 @@ const TabAtendidos = ({ nnaActual, familia }: { nnaActual: any; familia: any[] }
                     const casoActivo = miembro.casos?.find((c: any) => c.estado !== 'CERRADO')
                         || (miembro.casos?.length > 0 ? miembro.casos[0] : null);
                     const esPrincipal = miembro.id === nnaActual.id;
+
+                    const tipoDocLabel = TIPO_DOC_MAP[miembro.tipoDoc] || miembro.tipoDoc || 'DNI';
+                    const sexoLabel = SEXO_MAP[miembro.sexo] || miembro.sexo || '—';
+                    const nivelEducativoLabel = miembro.estudiaActualmente 
+                        ? (NIVEL_EDUCATIVO_MAP[miembro.nivelEducativo] || fmt(miembro.nivelEducativo))
+                        : 'No estudia';
 
                     return (
                         <div
@@ -161,11 +289,11 @@ const TabAtendidos = ({ nnaActual, familia }: { nnaActual: any; familia: any[] }
                                     </div>
                                     <div>
                                         <p className={`font-bold text-[15px] leading-tight ${esPrincipal ? 'text-primary' : 'text-fg'}`}>
-                                            {miembro.nombres} {miembro.apellidoPaterno} {miembro.apellidoMaterno}
+                                            {miembro.nombres} {miembro.apellidoPaterno} {miembro.apellidoMaterno || ''}
                                         </p>
                                         <div className="flex items-center gap-3 mt-1.5 flex-wrap">
                                             <span className="flex items-center gap-1 text-[12px] text-fg-muted font-bold">
-                                                <FileText size={12} /> {miembro.tipoDoc}: {miembro.numeroDoc || 'S/D'}
+                                                <FileText size={12} /> {tipoDocLabel}: {miembro.numeroDoc || 'S/D'}
                                             </span>
                                             <span className="w-1 h-1 bg-border rounded-full" />
                                             <span className="text-[12px] text-fg-muted font-medium">
@@ -173,7 +301,7 @@ const TabAtendidos = ({ nnaActual, familia }: { nnaActual: any; familia: any[] }
                                             </span>
                                             <span className="w-1 h-1 bg-border rounded-full" />
                                             <span className="text-[12px] text-fg-muted capitalize font-medium">
-                                                {miembro.sexo || '—'}
+                                                {sexoLabel}
                                             </span>
                                         </div>
                                     </div>
@@ -194,13 +322,17 @@ const TabAtendidos = ({ nnaActual, familia }: { nnaActual: any; familia: any[] }
                                 <div>
                                     <p className="text-[9px] text-fg-muted/70 uppercase font-black tracking-widest">Salud</p>
                                     <p className="text-[11px] font-bold text-fg">
-                                        {miembro.afiliadoSIS === 'SI' ? '✓ SIS' : 'Sin SIS'}
+                                        {(miembro.afiliadoSIS === 'SI' || miembro.afiliadoSIS === 'SÍ' || miembro.afiliadoSIS === '1' || miembro.afiliadoSIS === 1 || miembro.afiliadoSIS === true) 
+                                            ? '✓ SIS' 
+                                            : (miembro.afiliadoOtroSeguro === 'SI' || miembro.afiliadoOtroSeguro === 'SÍ' || miembro.afiliadoOtroSeguro === '1' || miembro.afiliadoOtroSeguro === 1 || miembro.afiliadoOtroSeguro === true)
+                                                ? `✓ ${miembro.detalleOtroSeguro || miembro.afiliadoOtroSeguro || 'Otro Seguro'}`
+                                                : 'Sin SIS'}
                                     </p>
                                 </div>
                                 <div>
                                     <p className="text-[9px] text-fg-muted/70 uppercase font-black tracking-widest">Educación</p>
                                     <p className="text-[11px] font-bold text-fg">
-                                        {miembro.estudiaActualmente ? fmt(miembro.nivelEducativo) : 'No estudia'}
+                                        {nivelEducativoLabel}
                                     </p>
                                 </div>
                                 <div>
@@ -223,7 +355,11 @@ const TabPerfil = ({ nna }: { nna: any }) => {
     const alertas: { text: string; type: 'warning' | 'danger' | 'success' }[] = [];
     if (!nna.numeroDoc) alertas.push({ text: 'Sin DNI', type: 'danger' });
     if (!nna.tienePartidaNacimiento) alertas.push({ text: 'Sin Partida', type: 'warning' });
-    if (nna.afiliadoSIS !== 'SI') alertas.push({ text: 'Sin SIS', type: 'warning' });
+    
+    const tieneSIS = nna.afiliadoSIS === 'SI' || nna.afiliadoSIS === 'SÍ' || nna.afiliadoSIS === '1' || nna.afiliadoSIS === 1 || nna.afiliadoSIS === true;
+    const tieneOtroSeguro = nna.afiliadoOtroSeguro === 'SI' || nna.afiliadoOtroSeguro === 'SÍ' || nna.afiliadoOtroSeguro === '1' || nna.afiliadoOtroSeguro === 1 || nna.afiliadoOtroSeguro === true;
+    
+    if (!tieneSIS && !tieneOtroSeguro) alertas.push({ text: 'Sin Seguro', type: 'warning' });
     if (!nna.estudiaActualmente) alertas.push({ text: 'No Escolarizado', type: 'danger' });
     if (nna.tieneDiscapacidad) alertas.push({ text: 'Discapacidad', type: 'warning' });
     if (nna.sufreEnfermedad === 'SI' || nna.sufreEnfermedad === true) alertas.push({ text: 'Padece Enfermedad', type: 'warning' });
@@ -247,10 +383,10 @@ const TabPerfil = ({ nna }: { nna: any }) => {
                     <div className="grid grid-cols-2 gap-y-4 gap-x-6">
                         <InfoRow label="Nombres" value={nna.nombres} highlight />
                         <InfoRow label="Apellidos" value={`${nna.apellidoPaterno} ${nna.apellidoMaterno || ''}`} highlight />
-                        <InfoRow label="Documento" value={nna.numeroDoc ? `${nna.tipoDoc}: ${nna.numeroDoc}` : 'No cuenta'} />
+                        <InfoRow label="Documento" value={nna.numeroDoc ? `${TIPO_DOC_MAP[nna.tipoDoc] || nna.tipoDoc || 'DNI'}: ${nna.numeroDoc}` : 'No cuenta'} />
                         <InfoRow label="Partida Nac." value={nna.tienePartidaNacimiento ? 'Sí' : 'No'} />
                         <InfoRow label="Nacionalidad" value={nna.nacionalidad} />
-                        <InfoRow label="Sexo" value={fmt(nna.sexo)} />
+                        <InfoRow label="Sexo" value={SEXO_MAP[nna.sexo] || fmt(nna.sexo)} />
                         <InfoRow label="Fecha Nac." value={nna.fechaNacimiento ? new Date(nna.fechaNacimiento).toLocaleDateString() : null} />
                         <InfoRow label="Lugar Nac." value={[nna.distritoNac, nna.provinciaNac, nna.departamentoNac].filter(Boolean).join(', ') || null} />
                     </div>
@@ -262,17 +398,22 @@ const TabPerfil = ({ nna }: { nna: any }) => {
                 </SectionCard>
 
                 {/* Salud */}
-                <SectionCard title="Salud y Seguros" icon={HeartPulse} color={(nna.afiliadoSIS === 'SI' || nna.afiliadoOtroSeguro === 'SI') ? 'success' : 'warning'}>
+                <SectionCard title="Salud y Seguros" icon={HeartPulse} color={(tieneSIS || tieneOtroSeguro) ? 'success' : 'warning'}>
                     <div className="grid grid-cols-2 gap-y-4 gap-x-6">
-                        <InfoRow label="Afiliación SIS" value={nna.afiliadoSIS === 'SI' ? 'Sí — Activo' : 'No cuenta'} highlight />
-                        <InfoRow label="Otro Seguro" value={nna.afiliadoOtroSeguro === 'SI' ? nna.detalleOtroSeguro : 'No cuenta'} />
+                        <InfoRow label="Afiliación SIS" value={tieneSIS ? 'Sí — Activo' : 'No cuenta'} highlight />
+                        <InfoRow label="Otro Seguro" value={tieneOtroSeguro ? `Sí (${nna.detalleOtroSeguro || 'Especificado'})` : 'No cuenta'} />
                         <InfoRow label="Enfermedad" value={nna.sufreEnfermedad === 'SI' || nna.sufreEnfermedad === true ? 'Sí — Requiere atención' : 'No'} />
                         <InfoRow label="Discapacidad" value={nna.tieneDiscapacidad ? 'Sí — Registrado' : 'No'} />
                     </div>
                     {(nna.detalleEnfermedad || nna.tipoDiscapacidad || nna.observacionesSalud) && (
                         <div className="mt-4 pt-3 border-t border-border/40 space-y-3">
                             {nna.detalleEnfermedad && <InfoRow label="Detalle de Enfermedad" value={nna.detalleEnfermedad} />}
-                            {nna.tipoDiscapacidad && <InfoRow label="Tipo de Discapacidad" value={`${nna.tipoDiscapacidad} ${nna.detalleDiscapacidad ? '(' + nna.detalleDiscapacidad + ')' : ''}`} />}
+                            {nna.tipoDiscapacidad && (
+                                <InfoRow 
+                                    label="Tipo de Discapacidad" 
+                                    value={`${TIPO_DISCAPACIDAD_MAP[nna.tipoDiscapacidad] || nna.tipoDiscapacidad} ${nna.detalleDiscapacidad ? '(' + nna.detalleDiscapacidad + ')' : ''}`} 
+                                />
+                            )}
                             {nna.observacionesSalud && <InfoRow label="Observaciones de Salud" value={nna.observacionesSalud} />}
                         </div>
                     )}
@@ -282,9 +423,9 @@ const TabPerfil = ({ nna }: { nna: any }) => {
                 <SectionCard title="Escolaridad y Educación" icon={GraduationCap} color={nna.estudiaActualmente ? 'success' : 'danger'}>
                     <div className="grid grid-cols-2 gap-y-4 gap-x-6">
                         <InfoRow label="Estado Actual" value={nna.estudiaActualmente ? 'Estudiando' : 'No escolarizado'} highlight />
-                        <InfoRow label="Nivel Educativo" value={fmt(nna.nivelEducativo)} />
-                        <InfoRow label="Grado / Año" value={nna.gradoEstudio} />
-                        <InfoRow label="Modalidad" value={fmt(nna.modalidadEstudio)} />
+                        <InfoRow label="Nivel Educativo" value={NIVEL_EDUCATIVO_MAP[nna.nivelEducativo] || fmt(nna.nivelEducativo)} />
+                        <InfoRow label="Grado / Año" value={GRADO_ESTUDIO_MAP[nna.gradoEstudio] || nna.gradoEstudio} />
+                        <InfoRow label="Modalidad" value={MODALIDAD_ESTUDIO_MAP[nna.modalidadEstudio] || fmt(nna.modalidadEstudio)} />
                         <div className="col-span-2">
                             <InfoRow label="Institución Educativa" value={nna.institucionEducativa} />
                         </div>
@@ -299,8 +440,110 @@ const TabPerfil = ({ nna }: { nna: any }) => {
                 {/* Otros Datos */}
                 <SectionCard title="Características y Otros" icon={Smile}>
                     <div className="space-y-4">
-                        <InfoRow label="Actividades de Tiempo Libre" value={nna.actividadesTiempoLibre} />
-                        <InfoRow label="Características Generales" value={nna.caracteristicas} />
+                        <div className="flex flex-col gap-2">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-fg-muted/70 flex items-center gap-1.5 mb-1">
+                                Actividades de Tiempo Libre y Rutinas
+                            </span>
+                            {(() => {
+                                const texto = nna.actividadesTiempoLibre || '';
+                                const esRiesgoCritico = texto.includes('Riesgo');
+                                
+                                // Clean up the string to extract numerical statistics using regex
+                                // Standard format: Est:XXh Tra:XXh Dor:XXh Jug:XXh | Prom.sueño:XXh/día
+                                const estMatch = texto.match(/Est:?(\d+)h?/i);
+                                const traMatch = texto.match(/Tra:?(\d+)h?/i);
+                                const dorMatch = texto.match(/Dor:?(\d+)h?/i);
+                                const jugMatch = texto.match(/Jug:?(\d+)h?/i);
+                                const suenoMatch = texto.match(/Prom\.sueño:?(\d+)h?/i);
+                                
+                                if (estMatch || traMatch || dorMatch || jugMatch || suenoMatch) {
+                                    const est = estMatch ? estMatch[1] : '0';
+                                    const tra = traMatch ? traMatch[1] : '0';
+                                    const dor = dorMatch ? dorMatch[1] : '0';
+                                    const jug = jugMatch ? jugMatch[1] : '0';
+                                    const sueno = suenoMatch ? suenoMatch[1] : '0';
+                                    
+                                    return (
+                                        <div className="space-y-4">
+                                            {esRiesgoCritico && (
+                                                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-danger-soft text-danger border border-danger/20 text-[10px] font-black tracking-wider uppercase animate-pulse shadow-sm">
+                                                    <AlertCircle size={12} /> Riesgo Crítico en la Distribución del Tiempo
+                                                </div>
+                                            )}
+                                            
+                                            <div className="grid grid-cols-2 gap-3 mt-1">
+                                                {/* Estudio */}
+                                                <div className="p-3 rounded-xl border border-border/60 bg-surface-muted/30 flex items-center gap-3">
+                                                    <div className="w-8 h-8 rounded-lg bg-info-soft text-info flex items-center justify-center flex-shrink-0">
+                                                        <BookOpen size={16} />
+                                                    </div>
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[10px] font-bold text-fg-muted uppercase">Horas de Estudio</span>
+                                                        <span className="text-[14px] font-black text-fg">{est} horas / sem</span>
+                                                    </div>
+                                                </div>
+                                                
+                                                {/* Trabajo */}
+                                                <div className={`p-3 rounded-xl border flex items-center gap-3 ${Number(tra) > 0 ? 'border-danger/30 bg-danger-soft/10' : 'border-border/60 bg-surface-muted/30'}`}>
+                                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${Number(tra) > 0 ? 'bg-danger/20 text-danger' : 'bg-surface-muted text-fg-muted'}`}>
+                                                        <Activity size={16} />
+                                                    </div>
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[10px] font-bold text-fg-muted uppercase">Horas de Trabajo</span>
+                                                        <span className={`text-[14px] font-black ${Number(tra) > 0 ? 'text-danger' : 'text-fg'}`}>{tra} horas / sem</span>
+                                                    </div>
+                                                </div>
+                                                
+                                                {/* Ocio / Descanso */}
+                                                <div className="p-3 rounded-xl border border-border/60 bg-surface-muted/30 flex items-center gap-3">
+                                                    <div className="w-8 h-8 rounded-lg bg-success-soft text-success flex items-center justify-center flex-shrink-0">
+                                                        <Clock size={16} />
+                                                    </div>
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[10px] font-bold text-fg-muted uppercase">Horas Descanso/Ocio</span>
+                                                        <span className="text-[14px] font-black text-fg">{dor} horas / sem</span>
+                                                    </div>
+                                                </div>
+                                                
+                                                {/* Juego / Recreación */}
+                                                <div className="p-3 rounded-xl border border-border/60 bg-surface-muted/30 flex items-center gap-3">
+                                                    <div className="w-8 h-8 rounded-lg bg-warning-soft text-warning flex items-center justify-center flex-shrink-0">
+                                                        <Smile size={16} />
+                                                    </div>
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[10px] font-bold text-fg-muted uppercase">Horas Recreación</span>
+                                                        <span className="text-[14px] font-black text-fg">{jug} horas / sem</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Promedio Sueño Diario */}
+                                            <div className="p-3 rounded-xl border border-primary/20 bg-primary-soft/10 flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-8 h-8 rounded-lg bg-primary-soft text-primary flex items-center justify-center flex-shrink-0">
+                                                        <HeartPulse size={16} />
+                                                    </div>
+                                                    <span className="text-[11px] font-bold text-fg-2 uppercase">Promedio de Sueño Diario</span>
+                                                </div>
+                                                <span className={`text-[14px] font-black px-2.5 py-1 rounded-lg ${Number(sueno) < 6 ? 'bg-danger text-white' : 'bg-surface border border-primary/10 text-primary'}`}>
+                                                    {sueno} horas / día
+                                                </span>
+                                            </div>
+                                        </div>
+                                    );
+                                }
+                                
+                                return (
+                                    <span className="text-[13px] font-medium leading-tight text-fg-2 italic">
+                                        {texto || 'Sin registrar'}
+                                    </span>
+                                );
+                            })()}
+                        </div>
+                        <InfoRow 
+                            label="Características Generales (Observaciones / Detalle Cualitativo)" 
+                            value={nna.caracteristicas || 'Sin observaciones o características especiales registradas.'} 
+                        />
                     </div>
                 </SectionCard>
             </div>
@@ -426,7 +669,12 @@ const TabIntervencion = ({ nna, caso }: { nna: any; caso: any }) => {
                     <InfoRow label="Tiempo en Calle" value={caso?.tiempoEnCalle} />
                     
                     <InfoRow label="Actividad Realizada" value={caso?.actividadRealizada} />
-                    <InfoRow label="Condición" value={fmt(caso?.condicion)} />
+                    <InfoRow label="Condición" value={
+                        caso?.condicion === 'SOLO' ? 'Solo' :
+                        caso?.condicion === 'PARES' ? 'Acompañado de Pares' :
+                        caso?.condicion === 'FAMILIA' ? 'Acompañado de Familiar' :
+                        fmt(caso?.condicion)
+                    } />
                     <InfoRow label="Días de Trabajo" value={caso?.diasTrabajo} />
                     <InfoRow label="Antecedente Institucional" value={caso?.antecedenteInstitucional} />
                     
@@ -528,7 +776,9 @@ export const ResumenCaso = ({ nna, caso, familia }: ResumenCasoProps) => {
                             </div>
                             <div className="flex flex-col">
                                 <span className="text-[10px] font-black text-fg-muted uppercase tracking-widest">Documento</span>
-                                <span className="text-[14px] font-bold text-fg">{nna.numeroDoc || 'S/D'}</span>
+                                <span className="text-[14px] font-bold text-fg">
+                                    {nna.numeroDoc ? `${TIPO_DOC_MAP[nna.tipoDoc] || nna.tipoDoc || 'DNI'}: ${nna.numeroDoc}` : 'S/D'}
+                                </span>
                             </div>
                             <div className="flex flex-col">
                                 <span className="text-[10px] font-black text-fg-muted uppercase tracking-widest">Edad</span>
@@ -577,6 +827,9 @@ export const ResumenCaso = ({ nna, caso, familia }: ResumenCasoProps) => {
                 )}
                 {activeTab === 'intervencion' && (
                     <TabIntervencion nna={nna} caso={caso} />
+                )}
+                {activeTab === 'expediente' && (
+                    <ExpedienteDigitalDocs nna={nna} caso={caso} />
                 )}
             </div>
         </div>

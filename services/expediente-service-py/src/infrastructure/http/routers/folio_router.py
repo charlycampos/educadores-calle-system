@@ -33,7 +33,7 @@ async def get_expediente(caso_id: int, user: dict = Depends(get_current_user)):
             "hash_documento": f.hash_documento,
             "creado_por_id":  f.creado_por_id,
             "fecha_creacion": str(f.fecha_creacion) if f.fecha_creacion else None,
-            "usuarioResponsable": f.usuario_responsable,
+            "nombreResponsable": f.usuario_responsable,
         }
         for f in folios
     ]

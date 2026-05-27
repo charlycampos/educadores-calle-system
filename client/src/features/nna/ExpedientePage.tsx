@@ -207,7 +207,7 @@ export const ExpedientePage = () => {
             case 'seguimiento':
                 return <PlaceholderModule title="Diario de Campo y Seguimiento" description="Registro de visitas, abordajes en calle y evoluciones." />;
             default:
-                return <ExpedienteDigitalDocs nna={mainNna} caso={activeCase} />;
+                return <ResumenCaso nna={mainNna} caso={activeCase} familia={selectedExpediente || [mainNna]} />;
         }
     };
 
@@ -298,20 +298,6 @@ export const ExpedientePage = () => {
                             <span className="inline-block px-2 py-0.5 rounded text-[10px] font-black bg-primary-soft text-primary uppercase tracking-wider mb-1">Fase 1</span>
                             <p className="text-[12px] font-bold text-fg">Contacto e Integración</p>
                         </div>
-                        <NavButton
-                            active={activeTab === 'mapeo'}
-                            onClick={() => setActiveTab('mapeo')}
-                            icon={Map}
-                            label="Expediente Digital"
-                            subLabel="Identificación"
-                        />
-                        <NavButton
-                            active={activeTab === 'ficha'}
-                            onClick={() => setActiveTab('ficha')}
-                            icon={FileText}
-                            label="Ficha de Inscripción"
-                            subLabel="Empadronamiento F3"
-                        />
                         <NavButton
                             active={activeTab === 'social'}
                             onClick={() => setActiveTab('social')}
@@ -415,7 +401,7 @@ const NavButton = ({ active, onClick, icon: Icon, label, subLabel }: any) => (
     </button>
 );
 
-const ExpedienteDigitalDocs = ({ nna, caso }: any) => {
+export const ExpedienteDigitalDocs = ({ nna, caso }: any) => {
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
     const { documents, uploadPhysicalDocument } = useNnaStore();
     const [isPdfOpen, setIsPdfOpen] = useState(false);
@@ -447,27 +433,129 @@ const ExpedienteDigitalDocs = ({ nna, caso }: any) => {
     // 3. Invertir la lista foliada para mostrarla en orden estrictamente descendente (el más reciente arriba)
     const documentsFoliated = [...documentsFoliatedAsc].reverse();
 
+    // Catálogos oficiales para mapeo dinámico de combos
+    const NIVEL_EDUCATIVO_MAP: Record<string, string> = {
+        "1": "Sin nivel",
+        "2": "Inicial",
+        "3": "Primaria Incompleta",
+        "4": "Primaria Completa",
+        "5": "Secundaria Incompleta",
+        "6": "Secundaria Completa",
+        "7": "Superior No Univ. Incompleta",
+        "8": "Superior No Univ. Completa",
+        "9": "Superior Univ. Incompleta",
+        "10": "Superior Univ. Completa",
+        "11": "Básica Especial"
+    };
+
+    const GRADO_ESTUDIO_MAP: Record<string, string> = {
+        "1": "Inicial",
+        "2": "1ro Primaria",
+        "3": "2do Primaria",
+        "4": "3ro Primaria",
+        "5": "4to Primaria",
+        "6": "5to Primaria",
+        "7": "6to Primaria",
+        "8": "1ro Secundaria",
+        "9": "2do Secundaria",
+        "10": "3ro Secundaria",
+        "11": "4to Secundaria",
+        "12": "5to Secundaria",
+        "13": "Ciclo I (EBA)",
+        "14": "Ciclo II (EBA)",
+        "15": "Ciclo III (EBA)",
+        "16": "Ciclo IV (EBA)",
+        "17": "Ciclo V (EBA)",
+        "18": "Ciclo VI (EBA)",
+        "19": "Ciclo VII (EBA)",
+        "20": "Ciclo VIII (EBA)",
+        "21": "Ciclo IX (EBA)",
+        "22": "Ciclo X (EBA)",
+        "99": "No aplica / No sabe"
+    };
+
+    const TIPO_DOC_MAP: Record<string, string> = {
+        "1": "DNI",
+        "2": "Carné Extr.",
+        "3": "Pasaporte",
+        "4": "Doc. Extranjero",
+        "5": "CUI / Acta Nac.",
+        "6": "CNV",
+        "7": "Sin Doc"
+    };
+
+    // ─── 1. CÁLCULO DINÁMICO DE TARJETA: SITUACIÓN DE SALUD ───────────────────
+    const tieneSIS = nna.afiliadoSIS === 'SI' || nna.afiliadoSIS === '1' || nna.afiliadoSIS === 1 || nna.afiliadoSIS === true;
+    const tieneOtroSeguro = nna.afiliadoOtroSeguro === 'SI' || nna.afiliadoOtroSeguro === '1' || nna.afiliadoOtroSeguro === 1 || nna.afiliadoOtroSeguro === true;
+    let saludStatus = 'warning';
+    let saludDetails = 'Sin afiliación registrada';
+
+    if (tieneSIS) {
+        saludStatus = 'success';
+        saludDetails = 'Afiliado al SIS';
+    } else if (tieneOtroSeguro) {
+        saludStatus = 'success';
+        saludDetails = nna.detalleOtroSeguro || 'Afiliado a otro seguro';
+    }
+
+    // ─── 2. CÁLCULO DINÁMICO DE TARJETA: SITUACIÓN EDUCATIVA ──────────────────
+    let educacionStatus = 'danger';
+    let educacionDetails = 'No estudia actualmente';
+
+    // studies can be represented as bool, number 1, or string "SI"
+    const estudiaActualmente = nna.estudiaActualmente === true || nna.estudiaActualmente === 1 || nna.estudiaActualmente === '1' || nna.estudiaActualmente === 'SI' || nna.estudiaActualmente === 'PROCESO';
+    
+    if (estudiaActualmente) {
+        if (nna.estudiaActualmente === 'PROCESO') {
+            educacionStatus = 'warning';
+            educacionDetails = 'En proceso de matrícula';
+        } else {
+            educacionStatus = 'success';
+            const nivelMapped = NIVEL_EDUCATIVO_MAP[nna.nivelEducativo] || nna.nivelEducativo || '';
+            const gradoMapped = GRADO_ESTUDIO_MAP[nna.gradoEstudio] || nna.gradoEstudio || '';
+            if (nivelMapped || gradoMapped) {
+                educacionDetails = `${nivelMapped}${nivelMapped && gradoMapped ? ' - ' : ''}${gradoMapped}`;
+            } else {
+                educacionDetails = 'Estudia actualmente';
+            }
+        }
+    } else if (nna.detalleNoEstudia) {
+        educacionDetails = nna.detalleNoEstudia;
+    }
+
+    // ─── 3. CÁLCULO DINÁMICO DE TARJETA: IDENTIDAD (DNI) ──────────────────────
+    let identidadStatus = 'danger';
+    let identidadDetails = 'Sin Documento de Identidad';
+
+    if (nna.numeroDoc) {
+        identidadStatus = 'success';
+        const tipoDocMapped = TIPO_DOC_MAP[nna.tipoDoc] || nna.tipoDoc || 'DNI';
+        identidadDetails = `${tipoDocMapped}: ${nna.numeroDoc}`;
+    } else if (nna.detalleSinDoc) {
+        identidadDetails = nna.detalleSinDoc;
+    }
+
     return (
         <div className="space-y-6 relative">
             {/* Status Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <StatusCard
                     title="Situación de Salud"
-                    status={nna.afiliadoSIS === 'SI' ? 'success' : 'warning'}
+                    status={saludStatus}
                     icon={HeartPulse}
-                    details={nna.afiliadoSIS === 'SI' ? 'Afiliado al SIS' : 'Sin afiliación registrada'}
+                    details={saludDetails}
                 />
                 <StatusCard
                     title="Situación Educativa"
-                    status={nna.estudiaActualmente ? 'success' : 'danger'}
+                    status={educacionStatus}
                     icon={GraduationCap}
-                    details={nna.estudiaActualmente ? `${nna.nivelEducativo} - ${nna.gradoEstudio}` : 'No estudia actualmente'}
+                    details={educacionDetails}
                 />
                 <StatusCard
                     title="Identidad (DNI)"
-                    status={nna.numeroDoc ? 'success' : 'danger'}
+                    status={identidadStatus}
                     icon={FileText}
-                    details={nna.numeroDoc ? `DNI: ${nna.numeroDoc}` : 'Sin Documento de Identidad'}
+                    details={identidadDetails}
                 />
             </div>
 
@@ -544,8 +632,8 @@ const ExpedienteDigitalDocs = ({ nna, caso }: any) => {
                                 <td className="px-4 py-2.5">
                                     <div className="flex items-center gap-1.5 bg-surface-muted px-2 py-1 rounded w-fit border border-border">
                                         <User size={12} className="text-fg-muted" />
-                                        <span className="text-[12px] text-fg-2 truncate max-w-[150px]" title={doc.usuarioResponsable || doc.user}>
-                                            {doc.usuarioResponsable || doc.user}
+                                        <span className="text-[12px] text-fg-2 truncate max-w-[150px]" title={doc.nombreResponsable}>
+                                            {doc.nombreResponsable}
                                         </span>
                                     </div>
                                 </td>

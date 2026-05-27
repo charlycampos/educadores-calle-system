@@ -390,7 +390,7 @@ export const useNnaStore = create<NnaState>((set, get) => ({
                 date: nnaData.createdAt || new Date().toISOString(),
                 pages: realPages,
                 // Intentar obtener el responsable real del caso si está cargado
-                user: nnaData.casos?.[0]?.responsable?.nombreCompleto || 'Registro Inicial',
+                nombreResponsable: nnaData.casos?.[0]?.responsableNombre || 'Registro Inicial',
                 status: 'APROBADO'
             });
         }
@@ -407,16 +407,14 @@ export const useNnaStore = create<NnaState>((set, get) => ({
                 if (response.ok) {
                     const folios = await response.json();
                     backendDocs = folios.map((f: any) => {
-                        // Intentar deducir páginas o usar 1 por defecto (a menos que se guarde)
                         return {
                             id: f.id,
                             nnaId,
                             type: f.tipo_documento || 'DOCUMENTO SUBIDO',
                             code: f.hash_documento ? f.hash_documento.toUpperCase() : `FOLIO-${f.numero_folio}`,
                             date: f.fecha_creacion || new Date().toISOString(),
-                            pages: 1, // Por defecto 1 o estimar
-                            user: f.usuarioResponsable || 'Usuario Autenticado',
-                            usuarioResponsable: f.usuarioResponsable,
+                            pages: 1,
+                            nombreResponsable: f.nombreResponsable || 'Usuario Autenticado',
                             filename: f.archivo_url.split('/').pop(),
                             status: 'APROBADO'
                         };
@@ -511,8 +509,7 @@ export const useNnaStore = create<NnaState>((set, get) => ({
             type: docType,
             code: file.name.substring(0, 20).toUpperCase(),
             pages: metadata.pages,
-            user: userPayload?.nombreCompleto || 'Usuario Autenticado',
-            usuarioResponsable: userPayload?.nombreCompleto,
+            nombreResponsable: userPayload?.nombreCompleto || userPayload?.nombre || 'Usuario Autenticado',
             filename: metadata.filename,
             status: 'APROBADO'
         };
