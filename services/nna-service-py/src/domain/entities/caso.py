@@ -24,6 +24,7 @@ class Caso:
     nivel_riesgo: Optional[str] = None
     situacion_calle: Optional[str] = None
     antecedente_institucional: Optional[str] = None
+    victima_explotacion: Optional[str] = "NO"
     # Horarios / días
     horario_inicio: Optional[str] = None
     horario_fin: Optional[str] = None

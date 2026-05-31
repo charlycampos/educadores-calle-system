@@ -1,4 +1,4 @@
-import { NNA_API_URL, DERIVACION_API_URL, EXPEDIENTE_API_URL } from '../config/api';
+import { NNA_API_URL, DERIVACION_API_URL, EXPEDIENTE_API_URL, INTERVENCION_API_URL } from '../config/api';
 import { create } from 'zustand';
 import { useAuthStore } from './auth.store';
 
@@ -395,7 +395,44 @@ export const useNnaStore = create<NnaState>((set, get) => ({
             });
         }
 
-        // 2. Cargar documentos físicos/subidos reales desde el microservicio expediente-service
+        // 2. Cargar diagnósticos F04 desde intervencion-service
+        try {
+            const token = useAuthStore.getState().token;
+            const diagResponse = await fetch(`${INTERVENCION_API_URL}/diagnostico/nna/${nnaId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (diagResponse.ok) {
+                const diags = await diagResponse.json();
+                for (const diag of diags) {
+                    let diagPages = 1;
+                    try {
+                        const pagesResp = await fetch(
+                            `${INTERVENCION_API_URL}/diagnostico/${diag.id}/pdf/pages?token=${token}`
+                        );
+                        if (pagesResp.ok) {
+                            const pagesData = await pagesResp.json();
+                            diagPages = pagesData.pages || 1;
+                        }
+                    } catch (_) { /* continuar si falla el conteo */ }
+
+                    baseDocs.push({
+                        id: `f04-${diag.id}`,
+                        nnaId,
+                        type: 'DIAGNÓSTICO SOCIAL (FORMATO 4)',
+                        code: diag.codigo_ficha_04 || `F04-ID-${diag.id}`,
+                        date: diag.created_at || new Date().toISOString(),
+                        pages: diagPages,
+                        nombreResponsable: nnaData.casos?.[0]?.responsableNombre || 'Trabajadora Social',
+                        pdfUrl: `${INTERVENCION_API_URL}/diagnostico/${diag.id}/pdf?token=${token}`,
+                        status: 'APROBADO',
+                    });
+                }
+            }
+        } catch (err) {
+            console.error("Error fetching F04 diagnostics for expediente:", err);
+        }
+
+        // 3. Cargar documentos físicos/subidos reales desde el microservicio expediente-service
         let backendDocs = [];
         const activeCase = nnaData?.casos?.find((c: any) => c.estado !== 'CERRADO') || nnaData?.casos?.[0];
         if (activeCase) {

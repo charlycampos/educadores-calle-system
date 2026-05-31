@@ -10,17 +10,19 @@ interface PdfViewerModalProps {
     nnaName: string;
     documentFilename?: string;
     title?: string;
+    pdfUrl?: string;
 }
 
-export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({ isOpen, onClose, nnaId, nnaName, documentFilename, title }) => {
+export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({ isOpen, onClose, nnaId, nnaName, documentFilename, title, pdfUrl: pdfUrlProp }) => {
     const token = useAuthStore.getState().token;
-    
+
     if (!isOpen) return null;
 
     // Direct stream URL using the query parameter token for authentication
-    const pdfUrl = documentFilename
-        ? `${EXPEDIENTE_API_URL}/expediente/documento/${documentFilename}?token=${token}`
-        : `${NNA_API_URL}/nna/${nnaId}/pdf?token=${token}`;
+    const pdfUrl = pdfUrlProp
+        ?? (documentFilename
+            ? `${EXPEDIENTE_API_URL}/expediente/documento/${documentFilename}?token=${token}`
+            : `${NNA_API_URL}/nna/${nnaId}/pdf?token=${token}`);
 
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">

@@ -50,6 +50,28 @@ class DiagnosticoSocialBase(BaseModel):
                     new_data["actividad_calle"] = det["actividad"]
                 if "consumo" in det and isinstance(det["consumo"], dict):
                     new_data["consumo_sustancias"] = bool(det["consumo"].get("si"))
+                
+                # Extract and map tiempo_en_calle from nested quantities
+                if "tiempo" in det and isinstance(det["tiempo"], dict):
+                    cant = det["tiempo"].get("cantidad") or ""
+                    uni = det["tiempo"].get("unidad") or ""
+                    if cant:
+                        new_data["tiempo_en_calle"] = f"{cant} {uni}".strip()
+                
+                # Auto-calculate situacion_calle from nested checkboxes if not present
+                if not new_data.get("situacion_calle") and "perfil" in det and isinstance(det["perfil"], dict):
+                    perf = det["perfil"]
+                    if perf.get("trabajoInfantil"):
+                        new_data["situacion_calle"] = "TRABAJO_EN_CALLE"
+                    elif perf.get("mendicidad"):
+                        new_data["situacion_calle"] = "MENDICIDAD"
+                    elif perf.get("vidaEnCalle"):
+                        if perf.get("transito"):
+                            new_data["situacion_calle"] = "TRANSITO_CALLE"
+                        elif perf.get("convivencia"):
+                            new_data["situacion_calle"] = "CONVIVENCIA_CALLE"
+                        else:
+                            new_data["situacion_calle"] = "VIDA_EN_CALLE"
             
             # Map address and contact details
             if "direccionActual" in data and not new_data.get("direccion_tutor"):
@@ -57,9 +79,16 @@ class DiagnosticoSocialBase(BaseModel):
             if "telefonoContacto" in data and not new_data.get("telefono_tutor"):
                 new_data["telefono_tutor"] = data["telefonoContacto"]
 
-            # Put original unmodified data as backing datos_extra JSON
-            if "datos_extra" not in new_data or not new_data["datos_extra"]:
-                new_data["datos_extra"] = data
+            # Concatenate tutor full name from split fields if possible
+            tutor_pri = data.get("tutorPrimerApellido") or ""
+            tutor_seg = data.get("tutorSegundoApellido") or ""
+            tutor_nom = data.get("tutorNombre") or ""
+            if tutor_pri or tutor_seg or tutor_nom:
+                new_data["nombre_tutor"] = f"{tutor_pri} {tutor_seg} {tutor_nom}".strip()
+
+            # Siempre reemplazar datos_extra con el payload actual completo,
+            # excluyendo el propio datos_extra para evitar anidamiento circular
+            new_data["datos_extra"] = {k: v for k, v in data.items() if k != "datos_extra"}
             
             return new_data
         return data

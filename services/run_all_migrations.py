@@ -23,6 +23,9 @@ ORACLE_DSN = os.getenv("ORACLE_DSN", "localhost:1521/XEPDB1")
 SQL_FILES = [
     "auth-service/src/infrastructure/db/migrations/001_create_tables.sql",
     "nna-service-py/src/infrastructure/db/migrations/001_create_tables.sql",
+    "nna-service-py/src/infrastructure/db/migrations/002_add_edad_nna.sql",
+    "nna-service-py/src/infrastructure/db/migrations/003_add_datos_f03_nna.sql",
+    "nna-service-py/src/infrastructure/db/migrations/004_add_victima_explotacion_caso.sql",
     "expediente-service-py/src/infrastructure/db/migrations/001_create_tables.sql",
     "intervencion-service-py/src/infrastructure/db/migrations/001_create_intervencion_tables.sql",
     "talleres-service-py/src/infrastructure/db/migrations/001_create_taller_tables.sql",

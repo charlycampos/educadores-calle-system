@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "Bash(npm run *)",
+      "Bash(D:\\\\Usuarios\\\\ccampos\\\\Documents\\\\Python Scripts\\\\Educadores_calle\\\\educadores-calle-system\\\\services\\\\intervencion-service-py\\\\venv\\\\Scripts\\\\pip.exe install *)"
+    ]
+  }
+}

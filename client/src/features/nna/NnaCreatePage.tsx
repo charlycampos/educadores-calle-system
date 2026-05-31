@@ -189,6 +189,7 @@ interface RegistrarNnaPayload {
     carpeta_id?: number;
     crear_nueva_carpeta?: boolean;
     familiares?: any[];
+    victima_explotacion?: string | null;
 }
 
 interface NnaFormData {
@@ -199,6 +200,7 @@ interface NnaFormData {
 
     perfil: string;
     situacionCalle: string;
+    victimaExplotacion?: string;
     fechaAbordaje: string;
     fechaIngreso: string;
     fechaReingreso: string;
@@ -882,6 +884,7 @@ export const NnaCreatePage = () => {
              }],
              situacionCalle: '',
              perfil: '',
+             victimaExplotacion: 'NO',
              condicion: '',
              diasTrabajo: '',
              tieneHermanos: 'false',
@@ -1434,6 +1437,7 @@ export const NnaCreatePage = () => {
                 zonaIntervencion: activeCase?.zonaIntervencion || '',
                 perfil: activeCase?.perfil || '',
                 situacionCalle: activeCase?.situacionCalle || '',
+                victimaExplotacion: activeCase?.victimaExplotacion || activeCase?.victima_explotacion || 'NO',
                 fechaAbordaje: toDateInput(activeCase?.fechaAbordaje),
                 fechaIngreso: toDateInput(activeCase?.fechaIngreso),
                 fechaReingreso: toDateInput(activeCase?.fechaReingreso),
@@ -1715,6 +1719,7 @@ export const NnaCreatePage = () => {
             actividad_realizada: actividadRealizada,
             tiempo_en_calle: data.tiempoEnCalle || null,
             condicion: data.condicion || null,
+            victima_explotacion: data.victimaExplotacion || 'NO',
             fecha_abordaje: parseDate(data.fechaAbordaje),
             fecha_ingreso: parseDate(data.fechaIngreso),
             fecha_reingreso: parseDate(data.fechaReingreso),
@@ -1887,9 +1892,9 @@ export const NnaCreatePage = () => {
                                 </div>
 
                                 <div className="border-t border-gray-100 pt-6 mt-2">
-                                    <label className="block text-sm font-bold text-gray-700 mb-3">Perfil del NNA (Situación Identificada)</label>
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                        {['TRABAJO_EN_CALLE', 'MENDICIDAD', 'VIDA_EN_CALLE', 'EXPLOTACION_SEXUAL'].map((perf) => (
+                                    <label className="block text-sm font-bold text-gray-700 mb-3">Perfil del NNA</label>
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                        {['TRABAJO_EN_CALLE', 'MENDICIDAD', 'VIDA_EN_CALLE'].map((perf) => (
                                             <label key={perf} className={clsx(
                                                 "cursor-pointer border rounded-xl p-4 flex flex-col items-center gap-2 transition-all hover:bg-gray-50",
                                                 watch('perfil') === perf ? "border-blue-500 bg-blue-50/50 ring-1 ring-blue-500" : "border-gray-200"
@@ -1905,19 +1910,35 @@ export const NnaCreatePage = () => {
                                 </div>
 
                                 <div className="border-t border-gray-100 pt-6 mt-2">
-                                    <label className="block text-sm font-bold text-gray-700 mb-2">Modalidad de Permanencia (Situación)</label>
+                                    <label className="block text-sm font-bold text-gray-700 mb-3">¿Víctima de Explotación Sexual?</label>
                                     <div className="flex gap-6">
-                                        <label className="flex items-center gap-2 cursor-pointer bg-white px-4 py-2 rounded-lg border border-yellow-200 shadow-sm transition-all hover:bg-yellow-50">
-                                            <input type="radio" value="TRANSITO_EN_CALLE" {...register('situacionCalle', { required: 'Debe marcar la situación' })} className="text-yellow-600 focus:ring-yellow-500" />
-                                            <span className="font-bold text-sm text-gray-800">Tránsito en Calle</span>
+                                        <label className="flex items-center gap-2 cursor-pointer bg-white px-4 py-2 rounded-lg border border-gray-200 shadow-sm transition-all hover:bg-gray-50">
+                                            <input type="radio" value="SI" {...register('victimaExplotacion')} className="text-blue-600 focus:ring-blue-500" />
+                                            <span className="font-bold text-sm text-gray-800">SÍ</span>
                                         </label>
-                                        <label className="flex items-center gap-2 cursor-pointer bg-white px-4 py-2 rounded-lg border border-yellow-200 shadow-sm transition-all hover:bg-yellow-50">
-                                            <input type="radio" value="CONVIVENCIA_EN_CALLE" {...register('situacionCalle', { required: 'Debe marcar la situación' })} className="text-yellow-600 focus:ring-yellow-500" />
-                                            <span className="font-bold text-sm text-gray-800">Convivencia en Calle (Pernocte)</span>
+                                        <label className="flex items-center gap-2 cursor-pointer bg-white px-4 py-2 rounded-lg border border-gray-200 shadow-sm transition-all hover:bg-gray-50">
+                                            <input type="radio" value="NO" {...register('victimaExplotacion')} className="text-blue-600 focus:ring-blue-500" />
+                                            <span className="font-bold text-sm text-gray-800">NO</span>
                                         </label>
                                     </div>
-                                    {errors.situacionCalle && <span className="text-red-500 text-xs font-bold mt-1">Este campo es requerido.</span>}
                                 </div>
+
+                                {watch('perfil') === 'VIDA_EN_CALLE' && (
+                                    <div className="border-t border-gray-100 pt-6 mt-2 animate-fadeIn">
+                                        <label className="block text-sm font-bold text-gray-700 mb-2">Modalidad de Permanencia (Situación)</label>
+                                        <div className="flex gap-6">
+                                            <label className="flex items-center gap-2 cursor-pointer bg-white px-4 py-2 rounded-lg border border-yellow-200 shadow-sm transition-all hover:bg-yellow-50">
+                                                <input type="radio" value="TRANSITO_EN_CALLE" {...register('situacionCalle', { required: watch('perfil') === 'VIDA_EN_CALLE' ? 'Debe marcar la situación' : false })} className="text-yellow-600 focus:ring-yellow-500" />
+                                                <span className="font-bold text-sm text-gray-800">Tránsito en Calle</span>
+                                            </label>
+                                            <label className="flex items-center gap-2 cursor-pointer bg-white px-4 py-2 rounded-lg border border-yellow-200 shadow-sm transition-all hover:bg-yellow-50">
+                                                <input type="radio" value="CONVIVENCIA_EN_CALLE" {...register('situacionCalle', { required: watch('perfil') === 'VIDA_EN_CALLE' ? 'Debe marcar la situación' : false })} className="text-yellow-600 focus:ring-yellow-500" />
+                                                <span className="font-bold text-sm text-gray-800">Convivencia en Calle (Pernocte)</span>
+                                            </label>
+                                        </div>
+                                        {errors.situacionCalle && <span className="text-red-500 text-xs font-bold mt-1">Este campo es requerido.</span>}
+                                    </div>
+                                )}
 
                                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6 border-t border-gray-100 pt-6">
                                     <InputField type="date" label="Fecha de Abordaje" register={register('fechaAbordaje')} />

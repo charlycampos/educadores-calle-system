@@ -146,6 +146,7 @@ class RegistrarNnaRequest(BaseModel):
     horario_inicio2: Optional[str] = None
     horario_fin2: Optional[str] = None
     dias_trabajo: Optional[str] = None
+    victima_explotacion: Optional[str] = "NO"
     crear_nueva_carpeta: Optional[bool] = True
     familiares: Optional[list[FamiliarItem]] = None
 
@@ -326,6 +327,7 @@ async def registrar_nna(body: RegistrarNnaRequest, background_tasks: BackgroundT
             horario_inicio2=body.horario_inicio2,
             horario_fin2=body.horario_fin2,
             dias_trabajo=body.dias_trabajo,
+            victima_explotacion=body.victima_explotacion or "NO",
         )
 
         resultado = await use_case.execute(
@@ -775,6 +777,7 @@ def _caso_to_dict(caso) -> dict:
         "nivelRiesgo": caso.nivel_riesgo,
         "responsableNombre": caso.responsable_nombre,
         "fechaApertura": iso(caso.fecha_apertura),
+        "victimaExplotacion": caso.victima_explotacion or "NO",
     }
 
 

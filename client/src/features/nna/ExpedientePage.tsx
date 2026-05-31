@@ -45,6 +45,7 @@ import { InformeEgresoList } from './components/InformeEgresoList';
 import { SeguimientoFamiliarList } from './components/SeguimientoFamiliarList';
 import { ResumenCaso } from './components/ResumenCaso';
 import { PdfViewerModal } from './components/PdfViewerModal';
+import { formatTipoDoc } from '../../data/ubigeo';
 
 export const ExpedientePage = () => {
     const { id } = useParams();
@@ -140,7 +141,20 @@ export const ExpedientePage = () => {
                         nnaFullName={`${mainNna.nombres} ${mainNna.apellidoPaterno} ${mainNna.apellidoMaterno}`}
                         onNuevoDiagnostico={() => {
                             setCurrentDiagnosticoId(null);
-                            setShowDiagnosticoForm(true);
+                            const token = localStorage.getItem('token');
+                            fetch(`${INTERVENCION_API_URL}/diagnostico/prefilled/nna/${mainNna.id}`, {
+                                headers: { 'Authorization': `Bearer ${token}` }
+                            })
+                                .then(res => res.json())
+                                .then(data => {
+                                    setCurrentDiagnosticoData(data);
+                                    setShowDiagnosticoForm(true);
+                                })
+                                .catch(err => {
+                                    console.error('Error fetching prefilled data:', err);
+                                    setCurrentDiagnosticoData(null);
+                                    setShowDiagnosticoForm(true);
+                                });
                         }}
                         onVerDiagnostico={(id) => {
                             setCurrentDiagnosticoId(id);
@@ -237,7 +251,7 @@ export const ExpedientePage = () => {
                             <div className="flex items-center gap-4 mt-2 text-[13px] text-fg-muted font-medium">
                                 <span className="flex items-center gap-1.5"><FolderOpen size={14} /> Expediente Digital</span>
                                 <span className="w-1 h-1 bg-border rounded-full"></span>
-                                <span>{mainNna.tipoDoc}: {mainNna.numeroDoc || 'S/D'}</span>
+                                <span>{formatTipoDoc(mainNna.tipoDoc)}: {mainNna.numeroDoc || 'S/D'}</span>
                                 <span className="w-1 h-1 bg-border rounded-full"></span>
                                 <span>{mainNna.fechaNacimiento ? new Date().getFullYear() - new Date(mainNna.fechaNacimiento).getFullYear() : '-'} años</span>
                             </div>
@@ -405,7 +419,7 @@ export const ExpedienteDigitalDocs = ({ nna, caso }: any) => {
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
     const { documents, uploadPhysicalDocument } = useNnaStore();
     const [isPdfOpen, setIsPdfOpen] = useState(false);
-    const [selectedPdfNna, setSelectedPdfNna] = useState<{ id: number, name: string, filename?: string, title?: string } | null>(null);
+    const [selectedPdfNna, setSelectedPdfNna] = useState<{ id: number, name: string, filename?: string, title?: string, pdfUrl?: string } | null>(null);
 
     // documents viene del store ahora
 
@@ -648,14 +662,15 @@ export const ExpedienteDigitalDocs = ({ nna, caso }: any) => {
                                     </div>
                                 </td>
                                 <td className="px-4 py-2.5 text-center">
-                                    {(doc.type.includes('FICHA') || doc.filename) ? (
+                                    {(doc.type.includes('FICHA') || doc.filename || doc.pdfUrl) ? (
                                         <button
                                             onClick={() => {
                                                 setSelectedPdfNna({
                                                     id: nna.id,
                                                     name: `${nna.nombres} ${nna.apellidoPaterno} ${nna.apellidoMaterno}`,
                                                     filename: doc.filename,
-                                                    title: doc.type
+                                                    title: doc.type,
+                                                    pdfUrl: doc.pdfUrl,
                                                 });
                                                 setIsPdfOpen(true);
                                             }}
@@ -700,6 +715,7 @@ export const ExpedienteDigitalDocs = ({ nna, caso }: any) => {
                     nnaName={selectedPdfNna.name}
                     documentFilename={selectedPdfNna.filename}
                     title={selectedPdfNna.title}
+                    pdfUrl={selectedPdfNna.pdfUrl}
                 />
             )}
         </div>

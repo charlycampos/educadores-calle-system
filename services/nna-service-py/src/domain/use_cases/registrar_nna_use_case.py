@@ -110,6 +110,7 @@ class CasoInput:
     horario_inicio2: Optional[str] = None
     horario_fin2: Optional[str] = None
     dias_trabajo: Optional[str] = None
+    victima_explotacion: Optional[str] = "NO"
 
 
 class ConflictError(Exception):

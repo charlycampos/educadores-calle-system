@@ -1,6 +1,8 @@
 import oracledb
 from src.config import settings
 
+oracledb.defaults.fetch_lobs = False
+
 _pool = None
 
 

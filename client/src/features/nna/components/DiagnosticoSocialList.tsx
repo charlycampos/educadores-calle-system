@@ -1,6 +1,8 @@
 import { INTERVENCION_API_URL } from '../../../config/api';
 import { useState, useEffect } from 'react';
 import { Plus, Eye, Edit, Trash2, FileText, AlertCircle, RefreshCw } from 'lucide-react';
+import { useAuthStore } from '../../../store/auth.store';
+import { PdfViewerModal } from './PdfViewerModal';
 
 interface DiagnosticoSocialListProps {
     nnaId: number;
@@ -20,6 +22,9 @@ export const DiagnosticoSocialList = ({
     const [diagnosticos, setDiagnosticos] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [pdfModalOpen, setPdfModalOpen] = useState(false);
+    const [pdfDiagId, setPdfDiagId] = useState<number | null>(null);
+    const token = useAuthStore.getState().token;
 
     const fetchDiagnosticos = async () => {
         setLoading(true);
@@ -37,6 +42,7 @@ export const DiagnosticoSocialList = ({
                 setDiagnosticos(
                     data.map((d: any) => ({
                         id: d.id,
+                        codigoFicha04: d.codigo_ficha_04,
                         fechaCreacion: d.created_at,
                         nnaNombre:
                             (d.nna
@@ -218,13 +224,20 @@ export const DiagnosticoSocialList = ({
                                             {estadoBadge(diag.estado)}
                                         </td>
                                         <td className="px-4 py-3">
-                                            <div className="flex items-center justify-end gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                                            <div className="flex items-center justify-end gap-1 opacity-100">
                                                 <button
                                                     onClick={() => onVerDiagnostico(diag.id)}
                                                     title="Ver Detalle"
                                                     className="p-1.5 text-fg-muted hover:text-primary hover:bg-primary-soft rounded-[5px] transition-all"
                                                 >
                                                     <Eye size={15} />
+                                                </button>
+                                                <button
+                                                    onClick={() => { setPdfDiagId(diag.id); setPdfModalOpen(true); }}
+                                                    title="Ver PDF"
+                                                    className="p-1.5 text-fg-muted hover:text-indigo-600 hover:bg-indigo-50 rounded-[5px] transition-all"
+                                                >
+                                                    <FileText size={15} />
                                                 </button>
                                                 <button
                                                     onClick={() => onEditarDiagnostico(diag.id)}
@@ -257,6 +270,18 @@ export const DiagnosticoSocialList = ({
                     <span className="font-semibold text-fg">{diagnosticos.length}</span>{' '}
                     diagnóstico(s) registrado(s)
                 </div>
+            )}
+
+            {/* Modal PDF F04 */}
+            {pdfModalOpen && pdfDiagId !== null && (
+                <PdfViewerModal
+                    isOpen={pdfModalOpen}
+                    onClose={() => { setPdfModalOpen(false); setPdfDiagId(null); }}
+                    nnaId={nnaId}
+                    nnaName={nnaFullName || '---'}
+                    title="Diagnóstico Social F04"
+                    pdfUrl={`${INTERVENCION_API_URL}/diagnostico/${pdfDiagId}/pdf?token=${token}`}
+                />
             )}
         </div>
     );

@@ -45,9 +45,31 @@ export const PROVINCIAS: Record<string, { id: string; name: string }[]> = {
     '07': [ // CALLAO
         { id: '0701', name: 'CALLAO' }
     ],
+    '17': [ // MADRE DE DIOS
+        { id: '1701', name: 'TAMBOPATA' },
+        { id: '1702', name: 'MANU' },
+        { id: '1703', name: 'TAHUAMANU' }
+    ],
 };
 
 export const DISTRITOS: Record<string, { id: string; name: string }[]> = {
+    '1701': [ // TAMBOPATA
+        { id: '170101', name: 'TAMBOPATA' },
+        { id: '170102', name: 'INAMBARI' },
+        { id: '170103', name: 'LAS PIEDRAS' },
+        { id: '170104', name: 'LABERINTO' }
+    ],
+    '1702': [ // MANU
+        { id: '170201', name: 'MANU' },
+        { id: '170202', name: 'FITZCARRALD' },
+        { id: '170203', name: 'MADRE DE DIOS' },
+        { id: '170204', name: 'HUEPETUHE' }
+    ],
+    '1703': [ // TAHUAMANU
+        { id: '170301', name: 'IÑAPARI' },
+        { id: '170302', name: 'IBERIA' },
+        { id: '170303', name: 'TAHUAMANU' }
+    ],
     '1501': [ // LIMA METROPOLITANA
         { id: '150101', name: 'LIMA' },
         { id: '150102', name: 'ANCON' },
@@ -204,6 +226,31 @@ export const OPCIONES_TIP_DOC_APO_2026 = [
     { value: "6: Certificado de Nacido Vivo - CNV", label: "6: Certificado de Nacido Vivo - CNV" },
     { value: "7: No tiene", label: "7: No tiene" }
 ];
+
+// Mapeo global de Tipos de Documento para Front-End
+export const TIPO_DOC_GLOBAL_MAP: Record<string, string> = {
+    '1': 'DNI',
+    '2': 'Carné de Extranjería',
+    '3': 'Pasaporte',
+    '4': 'Doc. Extranjero',
+    '5': 'CUI / Acta de Nac.',
+    '6': 'CNV',
+    '7': 'Sin Documento',
+    'DNI': 'DNI',
+    'CE': 'Carné de Extranjería',
+    'SIN_DOC': 'Sin Documento',
+    'PARTIDA_NACIMIENTO': 'Partida de Nacimiento',
+};
+
+/**
+ * Helper para formatear y traducir el tipo de documento de forma segura.
+ * Si no existe o es nulo, retorna 'Documento'.
+ */
+export const formatTipoDoc = (tipoDoc: any): string => {
+    if (!tipoDoc) return 'Documento';
+    const cleaned = String(tipoDoc).trim().toUpperCase().split(':')[0].trim();
+    return TIPO_DOC_GLOBAL_MAP[cleaned] || TIPO_DOC_GLOBAL_MAP[tipoDoc] || 'Documento';
+};
 
 export const OPCIONES_LENGUA_APO_2026 = [
     { value: "10: Castellano", label: "10: Castellano" },

@@ -132,28 +132,41 @@ export const NnaFichaPage = ({ embed = false }: NnaFichaPageProps) => {
 
                         {/* Perfil */}
                         <div className="bg-surface-muted border border-border rounded-[8px] p-4 space-y-4">
-                            <div>
-                                <span className="text-[11px] font-semibold text-fg-muted uppercase tracking-wider block mb-2">
-                                    Perfil Identificado:
-                                </span>
-                                <div className="flex gap-2 flex-wrap">
-                                    {[
-                                        { key: 'TRABAJO_EN_CALLE', label: 'Trabajo en Calle' },
-                                        { key: 'MENDICIDAD', label: 'Mendicidad' },
-                                        { key: 'VIDA_EN_CALLE', label: 'Vida en Calle' },
-                                        { key: 'EXPLOTACION_SEXUAL', label: 'Explotación Sexual' },
-                                    ].map(p => (
-                                        <span
-                                            key={p.key}
-                                            className={`px-3 py-1 rounded-[5px] text-[11px] font-bold border ${
-                                                activeCase?.perfil === p.key
-                                                    ? 'bg-primary-soft text-primary border-primary/30'
-                                                    : 'bg-surface text-fg-muted border-border'
-                                            }`}
-                                        >
-                                            {p.label}
-                                        </span>
-                                    ))}
+                            <div className="flex justify-between items-start flex-wrap gap-4">
+                                <div>
+                                    <span className="text-[11px] font-semibold text-fg-muted uppercase tracking-wider block mb-2">
+                                        Perfil del NNA:
+                                    </span>
+                                    <div className="flex gap-2 flex-wrap">
+                                        {[
+                                            { key: 'TRABAJO_EN_CALLE', label: 'Trabajo en Calle' },
+                                            { key: 'MENDICIDAD', label: 'Mendicidad' },
+                                            { key: 'VIDA_EN_CALLE', label: 'Vida en Calle' },
+                                        ].map(p => (
+                                            <span
+                                                key={p.key}
+                                                className={`px-3 py-1 rounded-[5px] text-[11px] font-bold border ${
+                                                    activeCase?.perfil === p.key
+                                                        ? 'bg-primary-soft text-primary border-primary/30'
+                                                        : 'bg-surface text-fg-muted border-border'
+                                                }`}
+                                            >
+                                                {p.label}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div>
+                                    <span className="text-[11px] font-semibold text-fg-muted uppercase tracking-wider block mb-2">
+                                        ¿Víctima de Explotación Sexual?:
+                                    </span>
+                                    <span className={`px-3 py-1 rounded-[5px] text-[11px] font-bold border ${
+                                        activeCase?.victimaExplotacion === 'SI' || activeCase?.victima_explotacion === 'SI'
+                                            ? 'bg-red-50 text-red-600 border-red-200'
+                                            : 'bg-green-50 text-green-600 border-green-200'
+                                    }`}>
+                                        {activeCase?.victimaExplotacion || activeCase?.victima_explotacion || 'NO'}
+                                    </span>
                                 </div>
                             </div>
 

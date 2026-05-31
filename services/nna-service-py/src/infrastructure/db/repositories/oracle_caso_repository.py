@@ -37,7 +37,8 @@ _SELECT_CASO = """
         n.NOMBRES || ' ' || n.APELLIDO_PATERNO AS NNA_NOMBRE,  -- 24
         n.APELLIDO_MATERNO AS NNA_APELLIDO_M,                  -- 25
         c.FASE,                                                -- 26
-        u.NOMBRE_COMPLETO AS RESP_NOMBRE                       -- 27
+        u.NOMBRE_COMPLETO AS RESP_NOMBRE,                      -- 27
+        c.VICTIMA_EXPLOTACION                                  -- 28
     FROM NNA_CASO c
     JOIN NNA n ON n.ID = c.NNA_ID
     LEFT JOIN SEC_USUARIO u ON u.ID = c.RESPONSABLE_ID
@@ -60,6 +61,7 @@ def _row_to_caso(row) -> Caso:
         nna_nombres=row[24], nna_apellidos=row[25],
         fase=row[26],
         responsable_nombre=row[27],
+        victima_explotacion=row[28] if len(row) > 28 else "NO",
     )
 
 
@@ -161,6 +163,7 @@ class OracleCasoRepository:
                     "fecha_ingreso":   caso_input.fecha_ingreso,
                     "fecha_reingreso": caso_input.fecha_reingreso,
                     "fecha_cambio_p":  caso_input.fecha_cambio_perfil,
+                    "victima_explotacion": caso_input.victima_explotacion or "NO",
                     "out_id":          out_id,
                 }
                 print("=" * 60)
@@ -179,7 +182,8 @@ class OracleCasoRepository:
                             ACTIVIDAD_REALIZADA, TIEMPO_EN_CALLE, CONDICION,
                             HORARIO_INICIO, HORARIO_FIN, HORARIO_INICIO2, HORARIO_FIN2,
                             DIAS_TRABAJO,
-                            FECHA_ABORDAJE, FECHA_INGRESO, FECHA_REINGRESO, FECHA_CAMBIO_PERFIL
+                            FECHA_ABORDAJE, FECHA_INGRESO, FECHA_REINGRESO, FECHA_CAMBIO_PERFIL,
+                            VICTIMA_EXPLOTACION
                         ) VALUES (
                             :codigo, :nna_id, :sede_id, :resp_id,
                             :perfil, 'EN_EVALUACION', 'CONTACTO_INICIAL',
@@ -188,8 +192,10 @@ class OracleCasoRepository:
                             :actividad, :tiempo, :condicion,
                             :horario_inicio, :horario_fin, :horario_inicio2, :horario_fin2,
                             :dias_trabajo,
-                            :abordaje, :fecha_ingreso, :fecha_reingreso, :fecha_cambio_p
+                            :abordaje, :fecha_ingreso, :fecha_reingreso, :fecha_cambio_p,
+                            :victima_explotacion
                         ) RETURNING ID INTO :out_id""",
+
                         params,
                     )
                     await conn.commit()
@@ -280,6 +286,7 @@ class OracleCasoRepository:
             "fecha_ingreso":       "FECHA_INGRESO",
             "fecha_reingreso":     "FECHA_REINGRESO",
             "fecha_cambio_perfil": "FECHA_CAMBIO_PERFIL",
+            "victima_explotacion": "VICTIMA_EXPLOTACION",
         }
 
         bind = {}

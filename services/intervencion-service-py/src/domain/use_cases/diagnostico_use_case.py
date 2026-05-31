@@ -19,3 +19,6 @@ class DiagnosticoUseCase:
 
     async def eliminar_diagnostico(self, diag_id: int) -> bool:
         return await self.repository.delete_diagnostico(diag_id)
+
+    async def obtener_diagnostico_prellenado(self, nna_id: int) -> dict:
+        return await self.repository.get_prefilled_by_nna(nna_id)

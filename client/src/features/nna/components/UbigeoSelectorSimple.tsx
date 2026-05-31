@@ -25,12 +25,22 @@ export const UbigeoSelectorSimple = ({
     // Encontrar ID del departamento seleccionado para filtrar provincias
     const selectedDepObj = DEPARTAMENTOS.find(d => d.name === departamento);
     const depId = selectedDepObj?.id;
-    const provincesList = depId && PROVINCIAS[depId] ? PROVINCIAS[depId] : [];
+    const provincesList = depId && PROVINCIAS[depId] ? [...PROVINCIAS[depId]] : [];
+
+    // Si la provincia viene de la base de datos (F03) pero no está en el listado mock local, inyectarla
+    if (provincia && !provincesList.some(p => p.name === provincia)) {
+        provincesList.push({ id: `TEMP_PROV_${provincia}`, name: provincia });
+    }
 
     // Encontrar ID de la provincia seleccionada para filtrar distritos
     const selectedProvObj = provincesList.find(p => p.name === provincia);
     const provId = selectedProvObj?.id;
-    const districtsList = provId && DISTRITOS[provId] ? DISTRITOS[provId] : [];
+    const districtsList = provId && DISTRITOS[provId] ? [...DISTRITOS[provId]] : [];
+
+    // Si el distrito viene de la base de datos (F03) pero no está en el listado mock local, inyectarlo
+    if (distrito && !districtsList.some(d => d.name === distrito)) {
+        districtsList.push({ id: `TEMP_DIST_${distrito}`, name: distrito });
+    }
 
     // Manejadores de cambio con cascada
     const handleDepChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
