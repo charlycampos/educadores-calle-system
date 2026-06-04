@@ -19,8 +19,6 @@ import {
     Clock, // Forced recompile for HMR
     FolderOpen,
 } from 'lucide-react';
-import { ExpedienteDigitalDocs } from '../ExpedientePage';
-
 interface ResumenCasoProps {
     nna: any;
     caso: any;
@@ -32,7 +30,6 @@ const TABS = [
     { id: 'perfil', label: 'Perfil Personal', icon: User },
     { id: 'familiar', label: 'Entorno y Familia', icon: Home },
     { id: 'intervencion', label: 'Situación de Calle', icon: Activity },
-    { id: 'expediente', label: 'Expediente Digital', icon: FolderOpen },
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -833,9 +830,6 @@ export const ResumenCaso = ({ nna, caso, familia }: ResumenCasoProps) => {
                 )}
                 {activeTab === 'intervencion' && (
                     <TabIntervencion nna={nna} caso={caso} />
-                )}
-                {activeTab === 'expediente' && (
-                    <ExpedienteDigitalDocs nna={nna} caso={caso} />
                 )}
             </div>
         </div>

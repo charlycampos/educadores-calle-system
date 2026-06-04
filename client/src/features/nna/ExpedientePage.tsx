@@ -28,7 +28,8 @@ import {
     Presentation,
     Activity,
     BookOpen,
-    Users
+    Users,
+    Files
 } from 'lucide-react';
 import { NnaFichaPage } from './NnaFichaPage';
 import { Formato4Social } from './components/Formato4Social';
@@ -62,6 +63,7 @@ export const ExpedientePage = () => {
     const [currentLogrosId, setCurrentLogrosId] = useState<number | null>(null);
     const [currentLogrosData, setCurrentLogrosData] = useState<any>(null);
     const [expedienteGenerado, setExpedienteGenerado] = useState<string | null>(null);
+    const [isExpedienteModalOpen, setIsExpedienteModalOpen] = useState(false);
 
     useEffect(() => {
         if (id) {
@@ -490,6 +492,57 @@ export const ExpedientePage = () => {
             </div>
         </div>
 
+        {/* FAB (Floating Action Button) para abrir Expediente Digital */}
+        <button
+            onClick={() => setIsExpedienteModalOpen(true)}
+            className="fixed bottom-6 right-6 z-30 flex items-center justify-center bg-primary hover:bg-primary/95 text-white w-14 h-14 rounded-full shadow-lg hover:shadow-2xl hover:scale-110 active:scale-95 transition-all duration-200 border border-primary/10"
+            title="Ver Expediente Digital"
+        >
+            <Files size={24} />
+        </button>
+
+        {/* Drawer Lateral del Expediente Digital */}
+        {isExpedienteModalOpen && (
+            <>
+                {/* Backdrop con blur */}
+                <div 
+                    className="fixed inset-0 bg-black/50 backdrop-blur-xs z-40 transition-opacity animate-in fade-in duration-200"
+                    onClick={() => setIsExpedienteModalOpen(false)}
+                />
+                
+                {/* Drawer Panel */}
+                <div className="fixed inset-y-0 right-0 w-full md:w-[700px] lg:w-[850px] bg-bg shadow-2xl z-40 border-l border-border flex flex-col animate-in slide-in-from-right duration-250">
+                    {/* Header */}
+                    <div className="px-6 py-4 border-b border-border bg-surface flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-primary-soft flex items-center justify-center text-primary">
+                                <FolderOpen size={20} />
+                            </div>
+                            <div>
+                                <h3 className="font-black text-fg text-[15px] uppercase tracking-wider">
+                                    Expediente Digital
+                                </h3>
+                                <p className="text-[12px] text-fg-muted font-bold">
+                                    NNA: {mainNna.nombres} {mainNna.apellidoPaterno} {mainNna.apellidoMaterno}
+                                </p>
+                            </div>
+                        </div>
+                        <button 
+                            onClick={() => setIsExpedienteModalOpen(false)}
+                            className="p-1.5 hover:bg-surface-muted rounded-lg text-fg-muted hover:text-fg transition-colors"
+                        >
+                            <X size={20} />
+                        </button>
+                    </div>
+
+                    {/* Content */}
+                    <div className="flex-1 overflow-y-auto p-6">
+                        <ExpedienteDigitalDocs nna={mainNna} caso={activeCase} />
+                    </div>
+                </div>
+            </>
+        )}
+
         {/* Modal: Expediente generado */}
         {expedienteGenerado && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
@@ -545,6 +598,12 @@ export const ExpedienteDigitalDocs = ({ nna, caso }: any) => {
     const { documents, uploadPhysicalDocument } = useNnaStore();
     const [isPdfOpen, setIsPdfOpen] = useState(false);
     const [selectedPdfNna, setSelectedPdfNna] = useState<{ id: number, name: string, filename?: string, title?: string, pdfUrl?: string, codigoFicha03?: string | null } | null>(null);
+
+    useEffect(() => {
+        if (nna?.id) {
+            useNnaStore.getState().loadDocuments(nna.id, nna);
+        }
+    }, [nna?.id]);
 
     // documents viene del store ahora
 
