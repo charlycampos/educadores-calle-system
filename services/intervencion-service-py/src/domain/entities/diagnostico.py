@@ -9,7 +9,7 @@ class DiagnosticoSocialBase(BaseModel):
     motivo_ingreso: Optional[str] = None
     lugar_pernota: Optional[str] = None
     actividad_calle: Optional[str] = None
-    consumo_sustancias: bool = False
+    consumo_sustancias: Optional[bool] = None
     nombre_tutor: Optional[str] = None
     dni_tutor: Optional[str] = None
     direccion_tutor: Optional[str] = None

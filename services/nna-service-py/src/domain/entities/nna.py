@@ -58,7 +58,7 @@ class Nna:
     detalle_discapacidad: Optional[str] = None
 
     # Educación
-    estudia_actualmente: bool = False
+    estudia_actualmente: int = 0
     nivel_educativo: Optional[str] = None
     grado_estudio: Optional[str] = None
     institucion_educativa: Optional[str] = None

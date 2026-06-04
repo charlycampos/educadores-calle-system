@@ -36,6 +36,7 @@ import { DiagnosticoSocialList } from './components/DiagnosticoSocialList';
 import { Formato5Logros } from './components/Formato5Logros';
 import { LogrosList } from './components/LogrosList';
 import { InformeSituacional } from './components/InformeSituacional';
+import { InformeSituacionalList } from './components/InformeSituacionalList';
 import { PlanIntervencion } from './components/PlanIntervencion';
 import { FichaDerivacion } from './components/FichaDerivacion';
 import { FichaTalleres } from './components/FichaTalleres';
@@ -56,6 +57,7 @@ export const ExpedientePage = () => {
     const [currentDiagnosticoId, setCurrentDiagnosticoId] = useState<number | null>(null);
     const [currentDiagnosticoData, setCurrentDiagnosticoData] = useState<any>(null);
     const [showLogrosForm, setShowLogrosForm] = useState(false);
+    const [showInformeForm, setShowInformeForm] = useState(false);
     const [logrosRefreshKey, setLogrosRefreshKey] = useState(0);
     const [currentLogrosId, setCurrentLogrosId] = useState<number | null>(null);
     const [currentLogrosData, setCurrentLogrosData] = useState<any>(null);
@@ -243,7 +245,28 @@ export const ExpedientePage = () => {
                     />
                 );
             case 'informe':
-                return <InformeSituacional nna={mainNna} onClose={() => setActiveTab('dashboard')} />;
+                if (showInformeForm) {
+                    return (
+                        <div className="space-y-4">
+                            <button
+                                onClick={() => setShowInformeForm(false)}
+                                className="flex items-center gap-2 text-gray-600 hover:text-gray-900 font-bold transition-colors bg-white px-4 py-2 rounded-lg shadow-sm border border-gray-200 hover:border-gray-300"
+                            >
+                                <ArrowLeft size={18} />
+                                Volver a la Lista
+                            </button>
+                            <InformeSituacional nna={mainNna} caso={activeCase} onClose={() => setShowInformeForm(false)} />
+                        </div>
+                    );
+                }
+                return (
+                    <InformeSituacionalList
+                        casoId={activeCase?.id}
+                        nnaFullName={`${mainNna.nombres} ${mainNna.apellidoPaterno} ${mainNna.apellidoMaterno}`}
+                        onNuevoInforme={() => setShowInformeForm(true)}
+                        onEditarInforme={() => setShowInformeForm(true)}
+                    />
+                );
             case 'seguimiento_familiar':
                 return <SeguimientoFamiliarList nna={mainNna} caso={activeCase} />;
             case 'pti':

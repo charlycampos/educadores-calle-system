@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useForm, useFieldArray, useWatch } from 'react-hook-form';
+import { useForm, useFieldArray, useWatch, FormProvider } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useNnaStore } from '../../store/nna.store';
 import { MapPin, Users, Briefcase, School, HeartPulse, Home, Plus, Trash2, AlertCircle, Zap, Calendar, X, Edit2, Search, AlertTriangle, CheckCircle, XCircle, Info } from 'lucide-react';
@@ -8,290 +8,35 @@ import { InputField, SelectField, SectionHeader, FooterButtons } from '../../com
 import { UbigeoFields } from '../../components/forms/UbigeoFields';
 import { DISCAPACIDADES_CONADIS } from '../../data/ubigeo';
 import { ActividadesCalleSection } from './components/ActividadesCalleSection';
+import { DuplicateDrawer } from './components/DuplicateDrawer';
+import { FamiliarModal } from './components/FamiliarModal';
+import { DatosGeneralesSection } from './components/DatosGeneralesSection';
+import { DatosPersonalesSection } from './components/DatosPersonalesSection';
+import { DatosPerfilSection } from './components/DatosPerfilSection';
+import { EducacionSection } from './components/EducacionSection';
+import { SaludSection } from './components/SaludSection';
+import { FamiliaSection } from './components/FamiliaSection';
 import { defaultAgenda } from './components/actividades.types';
 import type { ActividadPerfil, AgendaSemanal } from './components/actividades.types';
 
-// TIPOS DE DATOS
-interface UsoTiempoDia {
-    estudiar: number;
-    trabajar: number;
-    dormir: number;
-    jugar: number;
-}
-
-interface ActividadTiempoLibre {
-    id: string;
-    nombre: string;
-    categoria: 'ESTUDIAR' | 'DORMIR' | 'JUGAR' | 'DEPORTES' | 'ARTE' | 'TAREAS';
-    horarios: {
-        [dia: string]: {
-            turno1: { inicio: string; fin: string };
-            turno2?: { inicio: string; fin: string };
-        };
-    };
-    horasSemana: number;
-    horasMes: number;
-}
-
-interface NnaPersonalData {
-    nombres: string;
-    apellidoPaterno: string;
-    apellidoMaterno: string;
-    sexo: string;
-    fechaNacimiento: string;
-
-    departamentoNac: string;
-    provinciaNac: string;
-    distritoNac: string;
-
-    tipoDoc: string;
-    numeroDoc: string;
-    tienePartidaNacimiento: string;
-    detalleSinDoc: string;
-
-    estudiaActualmente: string | boolean;
-    nivelEducativo: string;
-    gradoEstudio: string;
-    institucionEducativa: string;
-    modalidadEstudio: string;
-    detalleNoEstudia: string;
-    afiliadoSIS: string;
-    afiliadoOtroSeguro: string;
-    detalleOtroSeguro: string;
-    sufreEnfermedad: string;
-    detalleEnfermedad: string;
-    observacionesSalud: string;
-    tieneDiscapacidad: boolean;
-    tipoDiscapacidad: string;
-
-    actividadesTiempoLibre: string;
-    caracteristicas: string;
-    tieneAntecedenteAlbergue: boolean;
-    detalleAntecedenteAlbergue: string;
-    edad?: number | string;
-    unidadEdad?: string;
-    nacionalidad: string;
-    lenMatNna?: string;
-    lenMatEspNna?: string;
-    autIdeEtNna?: string;
-    autIdeEtEspNna?: string;
-    certDiscapNna?: string;
-    detalleDiscapacidad?: string;
-    usoTiempo?: Record<string, UsoTiempoDia>;
-    actividadesTiempoLibreLista?: ActividadTiempoLibre[];
-}
-
-interface CasoExpedienteData {
-    estado?: string;
-    zonaIntervencion?: string;
-    perfil?: string;
-    situacionCalle?: string;
-    fechaAbordaje?: string;
-    fechaIngreso?: string;
-    fechaReingreso?: string;
-    fechaCambioPerfil?: string;
-    actividadRealizada?: string;
-    tiempoEnCalle?: string;
-    condicion?: string;
-    horarioInicio?: string;
-    horarioFin?: string;
-    horarioInicio2?: string;
-    horarioFin2?: string;
-    diasTrabajo?: string;
-    victimaExplotacion?: string;
-    victima_explotacion?: string;
-}
-
-interface LegacyJornadaDia {
-    activo?: boolean;
-    inicio?: string;
-    fin?: string;
-    inicio2?: string;
-    fin2?: string;
-    tieneTurno2?: boolean;
-}
-
-interface LegacyActividadJornada {
-    dia?: string;
-    inicio?: string;
-    fin?: string;
-    inicio2?: string;
-    fin2?: string;
-    tieneTurno2?: boolean;
-}
-
-interface LegacyActividadPerfil {
-    actividad?: string;
-    tiempoValor?: string | number;
-    tiempoUnidad?: string;
-    tiempoDetalle?: string;
-    jornada?: LegacyActividadJornada[];
-    condicion?: string;
-}
-
-interface DatosF03 {
-    usoTiempo?: Record<string, UsoTiempoDia>;
-    grid?: Record<string, UsoTiempoDia>;
-    actividadesTiempoLibreLista?: ActividadTiempoLibre[];
-    actividadesCalle?: ActividadPerfil[];
-    actividadesPerfil?: LegacyActividadPerfil[];
-    jornadaSemanal?: Record<string, LegacyJornadaDia>;
-    jornada_semanal?: Record<string, LegacyJornadaDia>;
-}
-
-type HorariosActividad = ActividadTiempoLibre['horarios'];
-
-type ExpedienteNna = Omit<Partial<NnaConDatos>, 'tienePartidaNacimiento' | 'sufreEnfermedad'> & {
-    datosF03?: string | DatosF03 | null;
-    actividadesTiempoLibre?: string | null;
-    casos?: CasoExpedienteData[];
-    carpetaId?: number;
-    domicilioActual?: string | null;
-    referenciaDomicilio?: string | null;
-    departamentoDom?: string | null;
-    provinciaDom?: string | null;
-    distritoDom?: string | null;
-    telefonoContacto?: string | null;
-    viveCon?: string | null;
-    detalleViveCon?: string | null;
-    lugarPernocte?: string | null;
-    detalleLugarPernocte?: string | null;
-    nombreTutor?: string | null;
-    tienePartidaNacimiento?: boolean | string;
-    sufreEnfermedad?: boolean | string;
-};
-
-interface NnaConDatos extends NnaPersonalData {
-    id?: number;
-    datosF03Backup?: string;
-}
-
-interface NnaPayloadItem extends Record<string, unknown> {
-    id?: number;
-}
-
-interface RegistrarNnaPayload {
-    nnas: NnaPayloadItem[];
-    perfil: string;
-    zona_intervencion: string | null;
-    distrito_intervencion: string | null;
-    situacion_calle: string | null;
-    actividad_realizada: string | null;
-    tiempo_en_calle: string | null;
-    condicion: string | null;
-    fecha_abordaje: string | null;
-    fecha_ingreso: string | null;
-    fecha_reingreso: string | null;
-    fecha_cambio_perfil: string | null;
-    horario_inicio: string | null;
-    horario_fin: string | null;
-    horario_inicio2: string | null;
-    horario_fin2: string | null;
-    dias_trabajo: string | null;
-    carpeta_id?: number;
-    crear_nueva_carpeta?: boolean;
-    familiares?: any[];
-    victima_explotacion?: string | null;
-    es_borrador?: boolean;
-}
-
-interface NnaFormData {
-    zonaIntervencion: string;
-    departamentoDom: string;
-    provinciaDom: string;
-    distritoDom: string;
-
-    perfil: string;
-    situacionCalle: string;
-    victimaExplotacion?: string;
-    fechaAbordaje: string;
-    fechaIngreso: string;
-    fechaReingreso: string;
-    fechaCambioPerfil: string;
-
-    domicilioActual: string;
-    referenciaDomicilio: string;
-    telefonoContacto: string;
-
-    nnas: NnaPersonalData[];
-
-    actividadRealizada: string;
-    tiempoEnCalle: string;
-    horarioInicio: string;
-    horarioFin: string;
-    horarioInicio2: string;
-    horarioFin2: string;
-    diasTrabajo: string;
-    condicion: string;
-
-    viveCon: string;
-    detalleViveCon: string;
-    lugarPernocte: string;
-    detalleLugarPernocte: string;
-    nombreTutor: string;
-    
-    // Hermanos (SEC 2026)
-    tieneHermanos?: string | boolean;
-    cantHermanos?: number | string;
-    detallesHermanos?: string;
-
-    // Tutor / Apoderado (SEC 2026)
-    tieneTutorApo?: string | number | boolean;
-    priApeTutApo?: string;
-    segApeTutApo?: string;
-    nomApeTutApo?: string;
-    sexoApo?: string;
-    fechaNacApo?: string;
-    nacionalidadApo?: string;
-    tipDocTutApo?: string;
-    nroDocTutApo?: string;
-    vinTutUsu?: string;
-    lenMatApo?: string;
-    lenMatEspApo?: string;
-    autIdeEtApo?: string;
-    autIdeEtEspApo?: string;
-    tipoDiscapApo?: string;
-    certDiscapApo?: string;
-
-    familiares?: FamiliarFormDataItem[];
-    actividadesCalle?: ActividadPerfil[];
-}
-
-interface FamiliarFormDataItem {
-    id?: string;
-    nombres?: string;
-    parentesco?: string;
-    dni?: string;
-    telefono?: string;
-    ocupacion?: string;
-    viveCon?: string; // "SI" / "NO"
-    tipoDoc?: string;
-    
-    // Datos detallados SEC 2026 si aplica
-    priApeTutApo?: string;
-    segApeTutApo?: string;
-    nomApeTutApo?: string;
-    sexoApo?: string;
-    fechaNacApo?: string;
-    nacionalidadApo?: string;
-    tipDocTutApo?: string;
-    nroDocTutApo?: string;
-    vinTutUsu?: string;
-    lenMatApo?: string;
-    lenMatEspApo?: string;
-    autIdeEtApo?: string;
-    autIdeEtEspApo?: string;
-    tipoDiscapApo?: string;
-    certDiscapApo?: string;
-
-    esTutorPrincipal?: boolean | string;
-}
-
-interface DuplicateCheckResult {
-    status: 'unique' | 'homonym' | 'duplicate';
-    message: string;
-    matches?: NnaPersonalData[];
-}
+import type {
+    UsoTiempoDia,
+    ActividadTiempoLibre,
+    NnaPersonalData,
+    CasoExpedienteData,
+    LegacyJornadaDia,
+    LegacyActividadJornada,
+    LegacyActividadPerfil,
+    DatosF03,
+    HorariosActividad,
+    NnaConDatos,
+    ExpedienteNna,
+    NnaPayloadItem,
+    RegistrarNnaPayload,
+    FamiliarFormDataItem,
+    NnaFormData,
+    DuplicateCheckResult
+} from './types/nna-form.types';
 
 // COMPONENTES AUXILIARES
 
@@ -582,112 +327,7 @@ const TimeActivityModal = ({ isOpen, onClose, onSave, initialData }: {
     );
 };
 
-const RiskAssessmentPanel = ({ nnaData, actividadesList }: { nnaData: NnaPersonalData; actividadesList: ActividadTiempoLibre[] }) => {
-    const calcularTotales = () => {
-        let estudiar = 0, trabajar = 0, dormir = 0, jugar = 0;
-        
-        // Sumar desde actividades de tiempo libre
-        actividadesList.forEach(act => {
-            if (act.categoria === 'ESTUDIAR') estudiar += act.horasSemana;
-            if (act.categoria === 'DORMIR') dormir += act.horasSemana;
-            if (act.categoria === 'JUGAR') jugar += act.horasSemana;
-        });
 
-        // Sumar trabajo desde usoTiempo si existe
-        if (nnaData.usoTiempo) {
-            Object.values(nnaData.usoTiempo).forEach(dia => {
-                trabajar += dia.trabajar || 0;
-            });
-        }
-
-        return { estudiar, trabajar, dormir, jugar };
-    };
-
-    const totales = calcularTotales();
-    const promedioDiarioSueño = Math.round((totales.dormir / 7) * 10) / 10;
-
-    let nivelRiesgo: 'critico' | 'moderado' | 'leve' | 'sin_riesgo' = 'sin_riesgo';
-    const alertas: string[] = [];
-
-    if (totales.trabajar > 30 || promedioDiarioSueño < 6) {
-        nivelRiesgo = 'critico';
-        alertas.push('🔴 Riesgo CRÍTICO: Explotación laboral o privación grave de sueño');
-    } else if (totales.trabajar > 14 || promedioDiarioSueño < 8 || totales.trabajar > totales.estudiar) {
-        nivelRiesgo = 'moderado';
-        alertas.push('🟠 Riesgo MODERADO: Interferencia con educación o sueño insuficiente');
-    } else if (totales.trabajar > 0) {
-        nivelRiesgo = 'leve';
-        alertas.push('🟡 Riesgo LEVE: Trabajo infantil moderado');
-    }
-
-    if (promedioDiarioSueño < 8) {
-        alertas.push(`😴 Privación de sueño: ${promedioDiarioSueño}h/día (recomendado 8-10h)`);
-    }
-    if (totales.trabajar > totales.estudiar) {
-        alertas.push(`📚 Interferencia educativa: Trabajo ${totales.trabajar}h > Estudio ${totales.estudiar}h`);
-    }
-
-    const colores = {
-        critico: 'bg-red-100 border-red-300 text-red-900',
-        moderado: 'bg-orange-100 border-orange-300 text-orange-900',
-        leve: 'bg-yellow-100 border-yellow-300 text-yellow-900',
-        sin_riesgo: 'bg-green-100 border-green-300 text-green-900'
-    };
-
-    return (
-        <div className={`border rounded-lg p-4 ${colores[nivelRiesgo]}`}>
-            <h4 className="font-bold text-sm mb-3 flex items-center gap-2">
-                <AlertCircle size={16} />
-                Panel de Evaluación de Riesgo
-            </h4>
-            <div className="space-y-2 text-sm">
-                <p className="font-bold">
-                    Semanal: Estudiar {totales.estudiar}h | Trabajar {totales.trabajar}h | Dormir {totales.dormir}h | Jugar {totales.jugar}h
-                </p>
-                {alertas.map((alerta, i) => (
-                    <p key={i} className="text-xs">{alerta}</p>
-                ))}
-            </div>
-        </div>
-    );
-};
-
-const ActivityCard = ({ activity, onEdit, onDelete }: { activity: ActividadTiempoLibre; onEdit: () => void; onDelete: () => void }) => {
-    const diasActivos = Object.entries(activity.horarios)
-        .filter(([, v]) => v.turno1.inicio && v.turno1.fin)
-        .map(([k]) => k.substring(0, 3))
-        .join(', ');
-
-    return (
-        <div className="border border-gray-200 rounded-lg p-4 bg-white hover:shadow-md transition-all">
-            <div className="flex items-start justify-between mb-2">
-                <div>
-                    <h4 className="font-bold text-gray-800">{activity.nombre}</h4>
-                    <p className="text-xs text-gray-600">{activity.categoria}</p>
-                </div>
-                <div className="flex gap-1">
-                    <button onClick={onEdit} className="p-1.5 hover:bg-blue-100 rounded text-blue-600">
-                        <Edit2 size={16} />
-                    </button>
-                    <button onClick={onDelete} className="p-1.5 hover:bg-red-100 rounded text-red-600">
-                        <Trash2 size={16} />
-                    </button>
-                </div>
-            </div>
-            <div className="flex justify-between mb-2">
-                <span className="text-xs font-bold text-blue-600">{activity.horasSemana}h/sem</span>
-                <span className="text-xs font-bold text-green-600">{activity.horasMes}h/mes</span>
-            </div>
-            <div className="flex gap-1 flex-wrap">
-                {diasActivos ? diasActivos.split(', ').map((d, i) => (
-                    <span key={i} className="px-2 py-0.5 bg-gray-100 text-gray-700 text-xs font-bold rounded">
-                        {d}
-                    </span>
-                )) : <span className="text-xs text-gray-400">Sin horarios</span>}
-            </div>
-        </div>
-    );
-};
 
 const VIVE_CON_OPTIONS = ['Madre', 'Padre', 'Abuelos', 'Tíos', 'Hermanos', 'Pareja', 'Hijos', 'Amigos', 'Solo en Calle', 'Albergue', 'Institución', 'Otro'] as const;
 const LUGAR_PERNOCTE_OPTIONS = ['Casa Propia', 'Casa Familiar', 'Calle', 'Albergue', 'Refugio Temporal', 'Obra', 'Otro'] as const;
@@ -858,31 +498,76 @@ export const NnaCreatePage = () => {
     const showAlert = (title: string, message: string, type: 'success' | 'warning' | 'error' | 'info' = 'info', onConfirm?: () => void) => {
         setAlertModal({ isOpen: true, title, message, type, onConfirm });
     };
-    const [tutorError, setTutorError] = useState('');
-    const [familiarModalData, setFamiliarModalData] = useState<FamiliarFormDataItem>({
-        priApeTutApo: '',
-        segApeTutApo: '',
-        nomApeTutApo: '',
-        nombres: '',
-        parentesco: '1',
-        dni: '',
-        telefono: '',
-        ocupacion: '',
-        viveCon: 'SI',
-        sexoApo: '2',
-        fechaNacApo: '',
-        nacionalidadApo: 'PERUANA',
-        tipDocTutApo: '1',
-        nroDocTutApo: '',
-        vinTutUsu: '1',
-        lenMatApo: '10',
-        lenMatEspApo: '',
-        autIdeEtApo: '7',
-        autIdeEtEspApo: '',
-        tipoDiscapApo: '6',
-        certDiscapApo: '99',
-        esTutorPrincipal: 'false'
-    });
+    const handleSaveFamiliar = (finalFamiliar: FamiliarFormDataItem) => {
+        let updatedList = [...(watch('familiares') || [])];
+
+        if (editingFamiliarIndex !== null) {
+            updatedList[editingFamiliarIndex] = finalFamiliar;
+        } else {
+            updatedList.push(finalFamiliar);
+        }
+
+        const isTutor = finalFamiliar.esTutorPrincipal === 'true' || finalFamiliar.esTutorPrincipal === true;
+        if (isTutor) {
+            // Mark all others as non-tutor principal
+            updatedList = updatedList.map((fam, idx) => {
+                if (editingFamiliarIndex !== null && idx === editingFamiliarIndex) return fam;
+                if (editingFamiliarIndex === null && idx === updatedList.length - 1) return fam;
+                return { ...fam, esTutorPrincipal: 'false' };
+            });
+
+            const parts = [
+                finalFamiliar.priApeTutApo || '',
+                finalFamiliar.segApeTutApo || '',
+                finalFamiliar.nomApeTutApo || finalFamiliar.nombres || ''
+            ];
+            const fullName = parts.map(p => p.trim()).filter(Boolean).join(' ');
+            setValue('tieneTutorApo', 'true');
+            setValue('priApeTutApo', finalFamiliar.priApeTutApo || '');
+            setValue('segApeTutApo', finalFamiliar.segApeTutApo || '');
+            setValue('nomApeTutApo', finalFamiliar.nomApeTutApo || '');
+            setValue('sexoApo', finalFamiliar.sexoApo || '');
+            setValue('fechaNacApo', finalFamiliar.fechaNacApo || '');
+            setValue('nacionalidadApo', finalFamiliar.nacionalidadApo || 'PERUANA');
+            setValue('tipDocTutApo', finalFamiliar.tipDocTutApo || 'DNI');
+            setValue('nroDocTutApo', finalFamiliar.nroDocTutApo || '');
+            setValue('vinTutUsu', finalFamiliar.vinTutUsu || '');
+            setValue('lenMatApo', finalFamiliar.lenMatApo || 'CASTELLANO');
+            setValue('lenMatEspApo', finalFamiliar.lenMatEspApo || '');
+            setValue('autIdeEtApo', finalFamiliar.autIdeEtApo || 'MESTIZO');
+            setValue('autIdeEtEspApo', finalFamiliar.autIdeEtEspApo || '');
+            setValue('tipoDiscapApo', finalFamiliar.tipoDiscapApo || '');
+            setValue('certDiscapApo', finalFamiliar.certDiscapApo || 'NO');
+            setValue('nombreTutor', fullName);
+        } else {
+            // Check if there is any other tutor left
+            const anyTutorLeft = updatedList.some(f => f.esTutorPrincipal === 'true' || f.esTutorPrincipal === true);
+            if (!anyTutorLeft) {
+                setValue('tieneTutorApo', 'false');
+                setValue('priApeTutApo', '');
+                setValue('segApeTutApo', '');
+                setValue('nomApeTutApo', '');
+                setValue('sexoApo', '');
+                setValue('fechaNacApo', '');
+                setValue('nacionalidadApo', 'PERUANA');
+                setValue('tipDocTutApo', 'DNI');
+                setValue('nroDocTutApo', '');
+                setValue('vinTutUsu', '');
+                setValue('lenMatApo', 'CASTELLANO');
+                setValue('lenMatEspApo', '');
+                setValue('autIdeEtApo', 'MESTIZO');
+                setValue('autIdeEtEspApo', '');
+                setValue('tipoDiscapApo', '');
+                setValue('certDiscapApo', 'NO');
+                setValue('nombreTutor', '');
+            }
+        }
+
+        setValue('familiares', updatedList);
+        replaceFamiliares(updatedList);
+        setShowTutorModal(false);
+        setEditingFamiliarIndex(null);
+    };
 
     const sections = [
         { id: 'paso1_generales', label: 'I. Datos Generales', icon: MapPin, description: 'Intervención y Fechas' },
@@ -893,7 +578,7 @@ export const NnaCreatePage = () => {
         { id: 'paso6_familia', label: 'VI. Familia / Otros', icon: Home, description: 'Vivienda y Observaciones' },
     ];
 
-    const { register, control, handleSubmit, watch, setValue, reset, getValues, formState: { errors } } = useForm<NnaFormData>({
+    const methods = useForm<NnaFormData>({
         defaultValues: {
              nnas: [{
                  nombres: '', apellidoPaterno: '', apellidoMaterno: '', numeroDoc: '', fechaNacimiento: '',
@@ -939,6 +624,7 @@ export const NnaCreatePage = () => {
              actividadesCalle: []
         }
     });
+    const { register, control, handleSubmit, watch, setValue, reset, getValues, formState: { errors } } = methods;
 
     const { fields, append, remove } = useFieldArray({ control, name: "nnas" });
     const { replace: replaceActividadesCalle } = useFieldArray({ control, name: "actividadesCalle" });
@@ -1642,10 +1328,47 @@ export const NnaCreatePage = () => {
                     setSubmitting(false);
                     return;
                 }
+                if (nna.tipoDoc === "DNI" && nna.numeroDoc?.trim()) {
+                    const cleanDoc = nna.numeroDoc.trim();
+                    if (!/^\d{8}$/.test(cleanDoc)) {
+                        showAlert("Documento Inválido", `El número de DNI${label} debe contener exactamente 8 dígitos numéricos.`, "warning");
+                        setSubmitting(false);
+                        return;
+                    }
+                }
+                if (nna.tipoDoc === "CEX" && nna.numeroDoc?.trim()) {
+                    const cleanDoc = nna.numeroDoc.trim();
+                    if (!/^[a-zA-Z0-9]{9,12}$/.test(cleanDoc)) {
+                        showAlert("Documento Inválido", `El Carnet de Extranjería (CEX)${label} debe ser alfanumérico y tener entre 9 y 12 caracteres.`, "warning");
+                        setSubmitting(false);
+                        return;
+                    }
+                }
                 if (nna.tipoDoc === "SIN_DOC" && !nna.detalleSinDoc?.trim()) {
                     showAlert("Campo Requerido", `Debe especificar el detalle o motivo de la falta de documento${label}.`, "warning");
                     setSubmitting(false);
                     return;
+                }
+            }
+
+            // Tutor Document verification validation
+            const tieneTutor = data.tieneTutorApo === "true" || data.tieneTutorApo === true;
+            if (tieneTutor) {
+                const tipoDocTutor = data.tipDocTutApo?.trim();
+                const nroDocTutor = data.nroDocTutApo?.trim();
+                if (tipoDocTutor === "DNI" && nroDocTutor) {
+                    if (!/^\d{8}$/.test(nroDocTutor)) {
+                        showAlert("Documento Inválido (Tutor)", "El número de DNI del tutor/apoderado debe contener exactamente 8 dígitos numéricos.", "warning");
+                        setSubmitting(false);
+                        return;
+                    }
+                }
+                if (tipoDocTutor === "CEX" && nroDocTutor) {
+                    if (!/^[a-zA-Z0-9]{9,12}$/.test(nroDocTutor)) {
+                        showAlert("Documento Inválido (Tutor)", "El Carnet de Extranjería (CEX) del tutor/apoderado debe ser alfanumérico y tener entre 9 y 12 caracteres.", "warning");
+                        setSubmitting(false);
+                        return;
+                    }
                 }
             }
         }
@@ -2011,7 +1734,8 @@ export const NnaCreatePage = () => {
 
             {/* MAIN CONTENT */}
             <main className="flex-1 bg-white flex flex-col overflow-hidden relative">
-                <form onSubmit={handleSubmit((d) => onSubmit(d, false))} className="flex-1 flex flex-col min-h-0">
+                <FormProvider {...methods}>
+                    <form onSubmit={handleSubmit((d) => onSubmit(d, false))} className="flex-1 flex flex-col min-h-0">
                     <div className="flex-1 overflow-y-auto p-8">
                         {storeError && (
                             <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
@@ -2020,816 +1744,37 @@ export const NnaCreatePage = () => {
                         )}
 
                         {/* PASO 1: I. DATOS GENERALES */}
-                        {activeSection === 'paso1_generales' && (
-                            <div className="space-y-6 animate-fadeIn">
-                                <SectionHeader title="I. Datos Generales" subtitle="Ubicación de la intervención y marco temporal." />
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="md:col-span-2">
-                                        <InputField
-                                            label="Zona de Intervención (Lugar específico)"
-                                            register={register('zonaIntervencion', { required: 'La zona es obligatoria' })}
-                                            placeholder="Ej: Plaza de Armas, Jr. Comercio..."
-                                            error={errors.zonaIntervencion}
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="border-t border-gray-100 pt-6 mt-2">
-                                    <label className="block text-sm font-bold text-gray-700 mb-3">Perfil del NNA</label>
-                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                        {['TRABAJO_EN_CALLE', 'MENDICIDAD', 'VIDA_EN_CALLE'].map((perf) => (
-                                            <label key={perf} className={clsx(
-                                                "cursor-pointer border rounded-xl p-4 flex flex-col items-center gap-2 transition-all hover:bg-gray-50",
-                                                watch('perfil') === perf ? "border-blue-500 bg-blue-50/50 ring-1 ring-blue-500" : "border-gray-200"
-                                            )}>
-                                                <input type="radio" value={perf} {...register('perfil', { required: true })} className="sr-only" />
-                                                <span className="font-bold text-xs text-gray-600 block text-center uppercase">{perf.replace(/_/g, ' ')}</span>
-                                                <div className={clsx("w-4 h-4 rounded-full border flex items-center justify-center", watch('perfil') === perf ? "border-blue-600 bg-blue-600" : "border-gray-300")}>
-                                                    {watch('perfil') === perf && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
-                                                </div>
-                                            </label>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <div className="border-t border-gray-100 pt-6 mt-2">
-                                    <label className="block text-sm font-bold text-gray-700 mb-3">¿Víctima de Explotación Sexual?</label>
-                                    <div className="flex gap-6">
-                                        <label className="flex items-center gap-2 cursor-pointer bg-white px-4 py-2 rounded-lg border border-gray-200 shadow-sm transition-all hover:bg-gray-50">
-                                            <input type="radio" value="SI" {...register('victimaExplotacion')} className="text-blue-600 focus:ring-blue-500" />
-                                            <span className="font-bold text-sm text-gray-800">SÍ</span>
-                                        </label>
-                                        <label className="flex items-center gap-2 cursor-pointer bg-white px-4 py-2 rounded-lg border border-gray-200 shadow-sm transition-all hover:bg-gray-50">
-                                            <input type="radio" value="NO" {...register('victimaExplotacion')} className="text-blue-600 focus:ring-blue-500" />
-                                            <span className="font-bold text-sm text-gray-800">NO</span>
-                                        </label>
-                                    </div>
-                                </div>
-
-                                {watch('perfil') === 'VIDA_EN_CALLE' && (
-                                    <div className="border-t border-gray-100 pt-6 mt-2 animate-fadeIn">
-                                        <label className="block text-sm font-bold text-gray-700 mb-2">Modalidad de Permanencia (Situación)</label>
-                                        <div className="flex gap-6">
-                                            <label className="flex items-center gap-2 cursor-pointer bg-white px-4 py-2 rounded-lg border border-yellow-200 shadow-sm transition-all hover:bg-yellow-50">
-                                                <input type="radio" value="TRANSITO_EN_CALLE" {...register('situacionCalle', { required: watch('perfil') === 'VIDA_EN_CALLE' ? 'Debe marcar la situación' : false })} className="text-yellow-600 focus:ring-yellow-500" />
-                                                <span className="font-bold text-sm text-gray-800">Tránsito en Calle</span>
-                                            </label>
-                                            <label className="flex items-center gap-2 cursor-pointer bg-white px-4 py-2 rounded-lg border border-yellow-200 shadow-sm transition-all hover:bg-yellow-50">
-                                                <input type="radio" value="CONVIVENCIA_EN_CALLE" {...register('situacionCalle', { required: watch('perfil') === 'VIDA_EN_CALLE' ? 'Debe marcar la situación' : false })} className="text-yellow-600 focus:ring-yellow-500" />
-                                                <span className="font-bold text-sm text-gray-800">Convivencia en Calle (Pernocte)</span>
-                                            </label>
-                                        </div>
-                                        {errors.situacionCalle && <span className="text-red-500 text-xs font-bold mt-1">Este campo es requerido.</span>}
-                                    </div>
-                                )}
-
-                                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 border-t border-gray-100 pt-6">
-                                    <InputField type="date" label="Fecha de Abordaje" register={register('fechaAbordaje')} />
-                                    <InputField type="date" label="Fecha de Ingreso" register={register('fechaIngreso')} />
-                                    <InputField type="date" label="Fecha Reingreso" register={register('fechaReingreso')} />
-                                    <InputField type="date" label="Fecha Cambio Perfil" register={register('fechaCambioPerfil')} />
-                                </div>
-                            </div>
-                        )}
+                        {activeSection === 'paso1_generales' && <DatosGeneralesSection />}
 
                         {/* PASO 2: II. DATOS PERSONALES */}
                         {activeSection === 'paso2_personales' && (
-                            <div className="space-y-8 animate-fadeIn">
-                                <SectionHeader title="II. Datos Personales del NNA" subtitle="Información de identidad y ubicación." />
-
-                                <div className="bg-blue-50/50 p-5 rounded-xl border border-blue-100 mb-6 group hover:border-blue-300 transition-all">
-                                    <h3 className="text-sm font-black text-blue-900 uppercase mb-4 flex items-center gap-2">
-                                        <MapPin size={16} /> Domicilio Actual y Contacto
-                                    </h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                        <div className="md:col-span-2">
-                                            <InputField label="Domicilio Actual" register={register('domicilioActual')} placeholder="Dirección exacta" />
-                                        </div>
-                                        <div className="md:col-span-2">
-                                            <InputField label="Referencia" register={register('referenciaDomicilio')} placeholder="Referencia de ubicación" />
-                                        </div>
-                                        <div className="md:col-span-2">
-                                            <label className="label"><span className="label-text font-bold text-gray-700">Ubicación Geográfica</span></label>
-                                            <UbigeoFields
-                                                departamento={watch('departamentoDom')}
-                                                provincia={watch('provinciaDom')}
-                                                distrito={watch('distritoDom')}
-                                                onChange={({ departamento, provincia, distrito }) => {
-                                                    setValue('departamentoDom', departamento);
-                                                    setValue('provinciaDom', provincia);
-                                                    setValue('distritoDom', distrito);
-                                                }}
-                                            />
-                                        </div>
-                                        <div className="md:col-span-2">
-                                            <InputField label="Teléfono de Referencia" register={register('telefonoContacto')} placeholder="999..." />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {fields.map((field, index) => (
-                                    <div key={field.id} className="bg-gray-50 rounded-xl border border-gray-200 p-5 relative mt-6">
-                                        <div className="flex items-center justify-between mb-4 border-b border-gray-200 pb-2">
-                                            <h3 className="font-bold text-gray-800 flex items-center gap-2">
-                                                <span className="bg-gray-800 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">{index + 1}</span>
-                                                Datos del NNA {index > 0 ? '(Hermano)' : ''}
-                                            </h3>
-                                            {index > 0 && (
-                                                <button type="button" onClick={() => remove(index)} className="text-red-500 hover:text-red-700 text-xs font-bold flex items-center gap-1">
-                                                    <Trash2 size={14} /> Eliminar
-                                                </button>
-                                            )}
-                                        </div>
-
-                                        {/* Duplicate Check Semaphore */}
-                                        <div className="mb-3 flex items-center justify-between">
-                                            <DuplicateSemaphore
-                                                status={duplicateCheckResults?.status || 'unique'}
-                                                onClick={() => checkDuplicates(index, true)}
-                                            />
-                                            <button
-                                                type="button"
-                                                onClick={() => checkDuplicates(index, true)}
-                                                disabled={isCheckingDuplicates}
-                                                className="text-xs font-bold text-blue-600 hover:text-blue-800 disabled:text-gray-400 flex items-center gap-1"
-                                            >
-                                                {isCheckingDuplicates ? 'Validando...' : 'Verificar Nacional'}
-                                            </button>
-                                        </div>
-
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                            <InputField label="Apellido Paterno" register={register(`nnas.${index}.apellidoPaterno` as const, { required: true, onBlur: () => checkDuplicates(index, false) })} placeholder="Ap. Paterno" />
-                                            <InputField label="Apellido Materno" register={register(`nnas.${index}.apellidoMaterno` as const, { onBlur: () => checkDuplicates(index, false) })} placeholder="Ap. Materno" />
-                                            <InputField label="Nombres" register={register(`nnas.${index}.nombres` as const, { required: true, onBlur: () => checkDuplicates(index, false) })} placeholder="Nombres" />
-
-                                            <div className="md:col-span-1">
-                                                <SelectField label="Sexo" register={register(`nnas.${index}.sexo` as const)} options={parametros?.OPCIONES_SEXO_2026 || [
-                                                    { value: '1', label: '1: Masculino' },
-                                                    { value: '2', label: '2: Femenino' }
-                                                ]} />
-                                            </div>
-
-                                            <div className="md:col-span-2 grid grid-cols-3 gap-2">
-                                                <div className="col-span-1">
-                                                    <InputField type="date" label="Fecha Nacimiento" register={register(`nnas.${index}.fechaNacimiento` as const)} />
-                                                </div>
-                                                <div className="col-span-1">
-                                                    <InputField type="number" label="Edad" register={register(`nnas.${index}.edad` as const)} placeholder="Edad" />
-                                                </div>
-                                                <div className="col-span-1">
-                                                    <SelectField label="Unidad" register={register(`nnas.${index}.unidadEdad` as const)} options={[
-                                                        { value: 'ANIOS', label: 'Años' },
-                                                        { value: 'MESES', label: 'Meses' },
-                                                        { value: 'DIAS', label: 'Días' }
-                                                    ]} />
-                                                </div>
-                                            </div>
-
-                                            <div className="md:col-span-3 grid grid-cols-3 gap-2 bg-white p-3 rounded border border-gray-200">
-                                                <label className="col-span-3 text-[10px] font-bold text-gray-500 uppercase">Lugar de Nacimiento</label>
-                                                <div className="col-span-3">
-                                                    <UbigeoFields
-                                                        departamento={watch(`nnas.${index}.departamentoNac`)}
-                                                        provincia={watch(`nnas.${index}.provinciaNac`)}
-                                                        distrito={watch(`nnas.${index}.distritoNac`)}
-                                                        onChange={({ departamento, provincia, distrito }) => {
-                                                            setValue(`nnas.${index}.departamentoNac` as const, departamento);
-                                                            setValue(`nnas.${index}.provinciaNac` as const, provincia);
-                                                            setValue(`nnas.${index}.distritoNac` as const, distrito);
-                                                        }}
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            {/* Identidad Cultural (SEC 2026) */}
-                                            <div className="md:col-span-3 bg-white p-3 rounded border border-gray-200 grid grid-cols-1 md:grid-cols-3 gap-4">
-                                                <label className="col-span-3 text-[10px] font-bold text-gray-500 uppercase">Nacionalidad e Identidad Cultural (SEC 2026)</label>
-                                                <InputField label="Nacionalidad" register={register(`nnas.${index}.nacionalidad` as const)} placeholder="Ej. PERUANA" />
-                                                
-                                                <div>
-                                                    <SelectField label="Lengua Materna" register={register(`nnas.${index}.lenMatNna` as const)} options={parametros?.OPCIONES_LENGUA_APO_2026 || [
-                                                        { value: '10', label: 'Castellano' },
-                                                        { value: '1', label: 'Quechua' },
-                                                        { value: '2', label: 'Aimara' },
-                                                        { value: '3', label: 'Asháninka' },
-                                                        { value: '9', label: 'Otra lengua indígena u originaria' }
-                                                    ]} />
-                                                    {['9', '12', 'OTRO'].includes(watch(`nnas.${index}.lenMatNna`) || '') && (
-                                                        <div className="mt-2">
-                                                            <InputField label="Especificar Lengua" register={register(`nnas.${index}.lenMatEspNna` as const)} placeholder="Escriba la lengua..." />
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                <div>
-                                                    <SelectField label="Autoidentificación Étnica" register={register(`nnas.${index}.autIdeEtNna` as const)} options={parametros?.OPCIONES_ETNIA_APO_2026 || [
-                                                        { value: '7', label: 'Mestizo' },
-                                                        { value: '1', label: 'Quechua' },
-                                                        { value: '2', label: 'Aimara' },
-                                                        { value: '8', label: 'Otro' }
-                                                    ]} />
-                                                    {['8', 'OTRO'].includes(watch(`nnas.${index}.autIdeEtNna`) || '') && (
-                                                        <div className="mt-2">
-                                                            <InputField label="Especificar Etnia" register={register(`nnas.${index}.autIdeEtEspNna` as const)} placeholder="Escriba la etnia..." />
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-
-                                            <div className="md:col-span-3 bg-white p-4 rounded border border-gray-200 mt-2">
-                                                <h4 className="text-xs font-bold text-gray-700 uppercase mb-3 border-b pb-1">Documento de Identidad</h4>
-
-                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                                    <SelectField label="Tipo Documento" register={register(`nnas.${index}.tipoDoc` as const)} options={parametros?.OPCIONES_TIP_DOC_APO_2026 || [
-                                                        { value: '1', label: '1: DNI' },
-                                                        { value: '2', label: '2: Carné de extranjería' },
-                                                        { value: '3', label: '3: Pasaporte' },
-                                                        { value: '4', label: '4: Documento de Identidad Extranjero' },
-                                                        { value: '5', label: '5: CUI o Acta de Nacimiento' },
-                                                        { value: '6', label: '6: Certificado de Nacido Vivo - CNV' },
-                                                        { value: '7', label: '7: No tiene' },
-                                                    ]} />
-
-                                                    <div className="md:col-span-2">
-                                                        <InputField label="Nº de Documento / DNI" register={register(`nnas.${index}.numeroDoc` as const, { onBlur: () => checkDuplicates(index, false) })} placeholder="Ingrese número si tiene" />
-                                                    </div>
-
-                                                    <div className="flex flex-col justify-end pb-2">
-                                                        <label className="text-xs font-bold text-gray-500 mb-1 block">¿Tiene Partida Nac.?</label>
-                                                        <div className="flex gap-4">
-                                                            <label className="flex items-center gap-2 cursor-pointer">
-                                                                <input type="radio" value="true" {...register(`nnas.${index}.tienePartidaNacimiento` as const)} className="text-blue-600" />
-                                                                <span className="text-sm">Sí</span>
-                                                            </label>
-                                                            <label className="flex items-center gap-2 cursor-pointer">
-                                                                <input type="radio" value="false" {...register(`nnas.${index}.tienePartidaNacimiento` as const)} className="text-blue-600" />
-                                                                <span className="text-sm">NO</span>
-                                                            </label>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="md:col-span-2">
-                                                        <InputField label="¿Por qué? (En caso no tenga documento)" register={register(`nnas.${index}.detalleSinDoc` as const)} placeholder="Especifique motivo..." />
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-
-                            </div>
+                            <DatosPersonalesSection 
+                                duplicateCheckResults={duplicateCheckResults}
+                                isCheckingDuplicates={isCheckingDuplicates}
+                                checkDuplicates={checkDuplicates}
+                            />
                         )}
 
                         {/* PASO 3: III. DATOS SEGÚN PERFIL */}
-                        {activeSection === 'paso3_perfil' && (
-                            <div className="space-y-6 animate-fadeIn">
-                                <SectionHeader title="III. Datos Según Perfil" subtitle="Características de la situación en calle (Entrevista)." />
-
-                                <ActividadesCalleSection control={control} />
-                            </div>
-                        )}
+                        {activeSection === 'paso3_perfil' && <DatosPerfilSection />}
 
                         {/* PASO 4: IV. EDUCACIÓN */}
-                        {activeSection === 'paso4_educacion' && (
-                            <div className="space-y-8 animate-fadeIn">
-                                <SectionHeader title="IV. Educación" subtitle="Situación educativa de cada NNA." />
-
-                                {fields.map((field, index) => (
-                                    <div key={field.id} className="border border-gray-200 rounded-xl p-5 bg-white shadow-sm">
-                                        <h3 className="font-bold text-gray-800 text-sm mb-4 bg-gray-100 px-3 py-1 rounded inline-block">
-                                            {index + 1}. {watch(`nnas.${index}.nombres`) || 'NNA Sin Nombre'} {watch(`nnas.${index}.apellidoPaterno`)}
-                                        </h3>
-
-                                        <div className="mb-2">
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                                <SelectField
-                                                    label="¿Estudia Actualmente? / Situación de Matrícula"
-                                                    register={register(`nnas.${index}.estudiaActualmente` as const)}
-                                                    options={parametros?.OPCIONES_MATRICULA_2026 || [
-                                                        { value: 'SI', label: '1. Sí (cuenta con ficha de matrícula)' },
-                                                        { value: 'NO', label: '2. No (no se encuentra matriculado)' },
-                                                        { value: 'PROCESO', label: '3. En proceso de matrícula (trámite en gestión)' },
-                                                        { value: 'NO_APLICA', label: '99. No aplica (menores de 3 años o egresados de secundaria)' }
-                                                    ]}
-                                                />
-                                            </div>
-
-                                            {['SI', 'PROCESO'].includes(String(watch(`nnas.${index}.estudiaActualmente`))) ? (
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-slideDown">
-                                                    <SelectField label="Nivel Educativo" register={register(`nnas.${index}.nivelEducativo` as const)} options={parametros?.NIVELES_EDUCATIVOS_2026 || [
-                                                        { value: '1', label: '1: Sin nivel' },
-                                                        { value: '2', label: '2: Inicial' },
-                                                        { value: '3', label: '3: Primaria Incompleta' },
-                                                        { value: '4', label: '4: Primaria Completa' },
-                                                        { value: '5', label: '5: Secundaria Incompleta' },
-                                                        { value: '6', label: '6: Secundaria Completa' },
-                                                        { value: '7', label: '7: Superior No Universitaria Incompleta' },
-                                                        { value: '8', label: '8: Superior No Universitaria Completa' },
-                                                        { value: '9', label: '9: Superior Universitario Incompleto' },
-                                                        { value: '10', label: '10: Superior Universitario Completo' },
-                                                        { value: '11', label: '11: Básica Especial' }
-                                                    ]} />
-                                                    <SelectField label="Grado / Año" register={register(`nnas.${index}.gradoEstudio` as const)} options={parametros?.GRADOS_ESTUDIO_2026 || [
-                                                        { value: '1', label: '1: Inicial' },
-                                                        { value: '2', label: '2: 1ro primaria' },
-                                                        { value: '3', label: '3: 2do primaria' },
-                                                        { value: '4', label: '4: 3ro primaria' },
-                                                        { value: '5', label: '5: 4to primaria' },
-                                                        { value: '6', label: '6: 5to primaria' },
-                                                        { value: '7', label: '7: 6to primaria' },
-                                                        { value: '8', label: '8: 1ro secundaria' },
-                                                        { value: '9', label: '9: 2do secundaria' },
-                                                        { value: '10', label: '10: 3ro secundaria' },
-                                                        { value: '11', label: '11: 4to secundaria' },
-                                                        { value: '12', label: '12: 5to secundaria' },
-                                                        { value: '13', label: '13: Ciclo I (EBA)' },
-                                                        { value: '14', label: '14: Ciclo II (EBA)' },
-                                                        { value: '15', label: '15: Ciclo III (EBA)' },
-                                                        { value: '16', label: '16: Ciclo IV (EBA)' },
-                                                        { value: '17', label: '17: Ciclo V (EBA)' },
-                                                        { value: '18', label: '18: Ciclo VI (EBA)' },
-                                                        { value: '19', label: '19: Ciclo VII (EBA)' },
-                                                        { value: '20', label: '20: Ciclo VIII (EBA)' },
-                                                        { value: '21', label: '21: Ciclo IX (EBA)' },
-                                                        { value: '22', label: '22: Ciclo X (EBA)' },
-                                                        { value: '99', label: '99: No aplica / No sabe' }
-                                                    ]} />
-                                                    <InputField label="Institución Educativa" register={register(`nnas.${index}.institucionEducativa` as const)} placeholder="Nombre del Colegio" />
-                                                    <SelectField label="Modalidad" register={register(`nnas.${index}.modalidadEstudio` as const)} options={parametros?.MODALIDADES_ESTUDIO_2026 || [
-                                                        { value: '1', label: '1: Básica / regular (EBR)' },
-                                                        { value: '2', label: '2: Alternativa (EBA)' },
-                                                        { value: '3', label: '3: Especial (EBE)' },
-                                                        { value: '4', label: '4: Superior Técnica' },
-                                                        { value: '5', label: '5: Superior Universitaria' },
-                                                        { value: '6', label: '6: CETPRO' }
-                                                    ]} />
-                                                </div>
-                                            ) : (
-                                                <div className="bg-red-50 p-4 rounded-lg border border-red-100 animate-fadeIn">
-                                                    <InputField label="¿Por qué no estudia?" register={register(`nnas.${index}.detalleNoEstudia` as const)} placeholder="Motivo de deserción..." />
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
+                        {activeSection === 'paso4_educacion' && <EducacionSection />}
 
                         {/* PASO 5: V. SALUD */}
-                        {activeSection === 'paso5_salud' && (
-                            <div className="space-y-8 animate-fadeIn">
-                                <SectionHeader title="V. Salud" subtitle="Aseguramiento y condición de salud." />
-
-                                {fields.map((field, index) => (
-                                    <div key={field.id} className="border border-gray-200 rounded-xl p-5 bg-white shadow-sm">
-                                        <h3 className="font-bold text-gray-800 text-sm mb-4 bg-gray-100 px-3 py-1 rounded inline-block">
-                                            {index + 1}. {watch(`nnas.${index}.nombres`) || 'NNA Sin Nombre'} {watch(`nnas.${index}.apellidoPaterno`)}
-                                        </h3>
-
-                                        <div className="space-y-6">
-                                            <div className="border rounded-lg overflow-hidden">
-                                                <div className="grid grid-cols-[2fr_1fr_1fr_1fr] border-b divide-x items-center bg-gray-50">
-                                                    <div className="p-3 text-sm font-bold text-gray-700">¿Estás afiliado al Seguro Universal de Salud (SIS)?</div>
-                                                    {['SI', 'NO', 'NO_SABE'].map((opt) => (
-                                                        <label key={opt} className={`p-3 flex items-center justify-center cursor-pointer hover:bg-blue-50 transition-colors h-full ${watch(`nnas.${index}.afiliadoSIS` as const) === opt ? 'bg-blue-100 text-blue-900 font-bold' : ''}`}>
-                                                            <input
-                                                                type="radio"
-                                                                value={opt}
-                                                                {...register(`nnas.${index}.afiliadoSIS` as const)}
-                                                                onChange={(e) => {
-                                                                    const val = e.target.value;
-                                                                    setValue(`nnas.${index}.afiliadoSIS`, val);
-                                                                    if (val === 'SI') {
-                                                                        setValue(`nnas.${index}.afiliadoOtroSeguro`, 'NO');
-                                                                        setValue(`nnas.${index}.detalleOtroSeguro`, '');
-                                                                    }
-                                                                }}
-                                                                className="mr-2"
-                                                            />
-                                                            <span className="text-xs font-bold">{opt.replace('_', ' ')}</span>
-                                                        </label>
-                                                    ))}
-                                                </div>
-                                                <div className="grid grid-cols-[2fr_1fr_1fr_1fr] divide-x items-center bg-white">
-                                                    <div className="p-3 text-sm font-bold text-gray-700">¿Estás afiliado a algún otro tipo de seguro de salud?</div>
-                                                    {['SI', 'NO', 'NO_SABE'].map((opt) => (
-                                                        <label key={opt} className={`p-3 flex items-center justify-center cursor-pointer hover:bg-blue-50 transition-colors h-full ${watch(`nnas.${index}.afiliadoOtroSeguro` as const) === opt ? 'bg-blue-100 text-blue-900 font-bold' : ''}`}>
-                                                            <input
-                                                                type="radio"
-                                                                value={opt}
-                                                                {...register(`nnas.${index}.afiliadoOtroSeguro` as const)}
-                                                                onChange={(e) => {
-                                                                    const val = e.target.value;
-                                                                    setValue(`nnas.${index}.afiliadoOtroSeguro`, val);
-                                                                    if (val === 'SI') {
-                                                                        setValue(`nnas.${index}.afiliadoSIS`, 'NO');
-                                                                    } else {
-                                                                        setValue(`nnas.${index}.detalleOtroSeguro`, '');
-                                                                    }
-                                                                }}
-                                                                className="mr-2"
-                                                            />
-                                                            <span className="text-xs font-bold">{opt.replace('_', ' ')}</span>
-                                                        </label>
-                                                    ))}
-                                                </div>
-                                                {watch(`nnas.${index}.afiliadoOtroSeguro` as const) === 'SI' && (
-                                                    <div className="p-4 bg-blue-50 animate-slideDown border-t space-y-4">
-                                                        <SelectField
-                                                            label="Seleccione el seguro de salud"
-                                                            value={
-                                                                SEGUROS_PREDEFINIDOS.includes(watch(`nnas.${index}.detalleOtroSeguro` as const) || '')
-                                                                    ? watch(`nnas.${index}.detalleOtroSeguro` as const)
-                                                                    : (watch(`nnas.${index}.detalleOtroSeguro` as const) ? 'OTRO' : '')
-                                                            }
-                                                            onChange={(e) => {
-                                                                const val = e.target.value;
-                                                                if (val === 'OTRO') {
-                                                                    setValue(`nnas.${index}.detalleOtroSeguro`, '');
-                                                                } else {
-                                                                    setValue(`nnas.${index}.detalleOtroSeguro`, val);
-                                                                }
-                                                            }}
-                                                            options={[
-                                                                { value: '', label: 'Seleccione un seguro...' },
-                                                                ...SEGUROS_PREDEFINIDOS.map(s => ({ value: s, label: s })),
-                                                                { value: 'OTRO', label: 'Otro (Especificar)' }
-                                                            ]}
-                                                        />
-
-                                                        {(!SEGUROS_PREDEFINIDOS.includes(watch(`nnas.${index}.detalleOtroSeguro` as const) || '') || 
-                                                         watch(`nnas.${index}.detalleOtroSeguro` as const) === '') && 
-                                                         (watch(`nnas.${index}.detalleOtroSeguro` as const) !== undefined) && (
-                                                            <div className="animate-slideDown">
-                                                                <InputField
-                                                                    label="Especifique el seguro de salud alternativo"
-                                                                    register={register(`nnas.${index}.detalleOtroSeguro` as const)}
-                                                                    placeholder="Ej: Mapfre, Seguro universitario particular..."
-                                                                />
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            <div className="border rounded-lg overflow-hidden">
-                                                <div className="grid grid-cols-[2fr_1fr_1fr] border-b divide-x items-center bg-gray-50">
-                                                    <div className="p-3 text-sm font-bold text-gray-700">¿Sufres alguna enfermedad actualmente?</div>
-                                                    {['SI', 'NO'].map((opt) => (
-                                                        <label key={opt} className={`p-3 flex items-center justify-center cursor-pointer hover:bg-blue-50 transition-colors h-full ${watch(`nnas.${index}.sufreEnfermedad` as const) === opt ? 'bg-blue-100 text-blue-900 font-bold' : ''}`}>
-                                                            <input type="radio" value={opt} {...register(`nnas.${index}.sufreEnfermedad` as const)} className="mr-2" />
-                                                            <span className="text-xs font-bold">{opt}</span>
-                                                        </label>
-                                                    ))}
-                                                </div>
-                                                {watch(`nnas.${index}.sufreEnfermedad` as const) === 'SI' && (
-                                                    <div className="p-3 bg-red-50 animate-slideDown">
-                                                        <InputField label="De ser afirmativo especificar: ¿Cuál?" register={register(`nnas.${index}.detalleEnfermedad` as const)} placeholder="Especifique la enfermedad..." />
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            <div className="border rounded-lg overflow-hidden">
-                                                <div className="grid grid-cols-[2fr_1fr_1fr] border-b divide-x items-center bg-gray-50">
-                                                    <div className="p-3 text-sm font-bold text-gray-700">¿Presenta algún tipo de discapacidad?</div>
-                                                    <label className={`p-3 flex items-center justify-center cursor-pointer hover:bg-blue-50 transition-colors h-full ${watch(`nnas.${index}.tieneDiscapacidad` as const) === true ? 'bg-blue-100 text-blue-900 font-bold' : ''}`}>
-                                                        <input
-                                                            type="radio"
-                                                            value="true"
-                                                            {...register(`nnas.${index}.tieneDiscapacidad` as const)}
-                                                            className="mr-2"
-                                                            checked={String(watch(`nnas.${index}.tieneDiscapacidad`)) === 'true'}
-                                                            onChange={() => setValue(`nnas.${index}.tieneDiscapacidad`, true)}
-                                                        />
-                                                        <span className="text-xs font-bold">Sí</span>
-                                                    </label>
-                                                    <label className={`p-3 flex items-center justify-center cursor-pointer hover:bg-blue-50 transition-colors h-full ${watch(`nnas.${index}.tieneDiscapacidad` as const) === false ? 'bg-blue-100 text-blue-900 font-bold' : ''}`}>
-                                                        <input
-                                                            type="radio"
-                                                            value="false"
-                                                            {...register(`nnas.${index}.tieneDiscapacidad` as const)}
-                                                            className="mr-2"
-                                                            checked={String(watch(`nnas.${index}.tieneDiscapacidad`)) === 'false'}
-                                                            onChange={() => setValue(`nnas.${index}.tieneDiscapacidad`, false)}
-                                                        />
-                                                        <span className="text-xs font-bold">NO</span>
-                                                    </label>
-                                                </div>
-
-                                                {(String(watch(`nnas.${index}.tieneDiscapacidad`)) === 'true') && (
-                                                    <div className="p-4 bg-gray-50 animate-slideDown">
-                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                                            {DISCAPACIDADES_CONADIS.map((discap) => (
-                                                                <label key={discap} className={`flex items-center gap-3 p-3 rounded border cursor-pointer hover:bg-white transition-all ${watch(`nnas.${index}.tipoDiscapacidad` as const) === discap ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500' : 'border-gray-200 bg-white'}`}>
-                                                                    <input
-                                                                        type="radio"
-                                                                        value={discap}
-                                                                        {...register(`nnas.${index}.tipoDiscapacidad` as const)}
-                                                                        className="h-4 w-4 text-blue-600"
-                                                                    />
-                                                                    <span className="text-sm text-gray-700 font-medium">{discap}</span>
-                                                                </label>
-                                                            ))}
-                                                        </div>
-                                                        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 border-t pt-4">
-                                                            <SelectField label="¿Cuenta con Certificado CONADIS?" register={register(`nnas.${index}.certDiscapNna` as const)} options={parametros?.OPCIONES_CERT_DISCAP_APO_2026 || [
-                                                                { value: '99', label: 'No aplica' },
-                                                                { value: '1', label: 'Sí, tiene Certificado de Discapacidad' },
-                                                                { value: '2', label: 'Sí, tiene, pero no lo porta' },
-                                                                { value: '3', label: 'No, no cuenta con Certificado' },
-                                                                { value: '4', label: 'En trámite' }
-                                                            ]} />
-                                                            <InputField label="Detalle de Discapacidad" register={register(`nnas.${index}.detalleDiscapacidad` as const)} placeholder="Especifique detalles adicionales..." />
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            <div className="pt-2">
-                                                <InputField label="Observaciones Salud / Lugar de Atención" register={register(`nnas.${index}.observacionesSalud` as const)} />
-                                            </div>
-
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
+                        {activeSection === 'paso5_salud' && <SaludSection />}
 
                         {/* PASO 6: VI. FAMILIA y VII. TIEMPO LIBRE */}
                         {activeSection === 'paso6_familia' && (
-                            <div className="space-y-8 animate-fadeIn">
-                                <SectionHeader title="VI. Familia / VII. Tiempo Libre" subtitle="Datos de vivienda y actividades de tiempo libre." />
-
-                                {/* VI. FAMILIA */}
-                                <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm bg-white">
-                                    <h3 className="bg-purple-50 text-purple-900 font-bold px-4 py-3 border-b border-purple-100 flex items-center gap-2">
-                                        <Home size={18} /> VI. FAMILIA
-                                    </h3>
-                                    <div className="p-5 space-y-6">
-
-                                        <div className="space-y-3">
-                                            <div className="text-sm font-bold text-gray-800">¿Con quiénes vives?</div>
-                                            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-                                                {(parametros?.OPCIONES_CONVIVENCIA_2026 || [
-                                                    { value: '1', label: '1. Solo Padre' },
-                                                    { value: '2', label: '2. Solo Madre' },
-                                                    { value: '3', label: '3. Padre y madre' },
-                                                    { value: '4', label: '4. Adulto responsable (familia extensa)' },
-                                                    { value: '5', label: '5. Solo' },
-                                                    { value: '6', label: '6. Otro' }
-                                                ]).map((opt) => (
-                                                    <label key={opt.value} className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-all ${String(watch('viveCon')) === String(opt.value) ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
-                                                        <input type="radio" value={opt.value} {...register('viveCon')} className="text-blue-600" />
-                                                        <span className="text-xs font-bold text-gray-700">{opt.label}</span>
-                                                    </label>
-                                                ))}
-                                            </div>
-                                        </div>
-
-                                        {(watch('viveCon') === '6' || watch('viveCon') === 'Otro') && (
-                                            <div className="animate-slideDown">
-                                                <InputField label="Especifique" register={register('detalleViveCon')} placeholder="Detalle..." />
-                                            </div>
-                                        )}
-
-                                        <div className="space-y-3">
-                                            <div className="text-sm font-bold text-gray-800">¿Dónde pernocta generalmente?</div>
-                                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                                                {['Casa Propia', 'Casa Familiar', 'Calle', 'Albergue', 'Refugio Temporal', 'Obra'].map((opt) => (
-                                                    <label key={opt} className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-all ${watch('lugarPernocte') === opt ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
-                                                        <input type="radio" value={opt} {...register('lugarPernocte')} className="text-blue-600" />
-                                                        <span className="text-xs font-bold text-gray-700">{opt}</span>
-                                                    </label>
-                                                ))}
-                                            </div>
-                                        </div>
-
-                                        {watch('lugarPernocte') === 'Otro' && (
-                                            <div className="animate-slideDown">
-                                                <InputField label="Especifique" register={register('detalleLugarPernocte')} placeholder="Detalle..." />
-                                            </div>
-                                        )}
-
-
-
-                                          {/* Familiar / Adulto Responsable (SEC 2026) */}
-                                          <div className="border border-purple-100 rounded-xl bg-purple-50/30 p-5 mt-6 group hover:border-purple-200 transition-all">
-                                              <div className="flex justify-between items-center mb-4 pb-2 border-b border-purple-100/50">
-                                                  <h4 className="text-sm font-black text-purple-900 uppercase flex items-center gap-2">
-                                                      <Users size={16} className="text-purple-700" /> Familiar / Adulto Responsable (SEC 2026)
-                                                  </h4>
-                                                  <button
-                                                      type="button"
-                                                      onClick={() => {
-                                                          setFamiliarModalData({
-                                                              priApeTutApo: '',
-                                                              segApeTutApo: '',
-                                                              nomApeTutApo: '',
-                                                              nombres: '',
-                                                              parentesco: '',
-                                                              dni: '',
-                                                              telefono: '',
-                                                              ocupacion: '',
-                                                              tipoDoc: '',
-                                                              viveCon: '',
-                                                              sexoApo: '',
-                                                              fechaNacApo: '',
-                                                              nacionalidadApo: 'PERUANA',
-                                                              tipDocTutApo: '',
-                                                              nroDocTutApo: '',
-                                                              vinTutUsu: '',
-                                                              lenMatApo: '',
-                                                              lenMatEspApo: '',
-                                                              autIdeEtApo: '',
-                                                              autIdeEtEspApo: '',
-                                                              tipoDiscapApo: '',
-                                                              certDiscapApo: '',
-                                                              esTutorPrincipal: 'false'
-                                                          });
-                                                          setEditingFamiliarIndex(null);
-                                                          setShowTutorModal(true);
-                                                      }}
-                                                      className="px-3.5 py-1.5 bg-purple-700 text-white rounded-lg text-xs font-bold hover:bg-purple-800 transition-all flex items-center gap-1 shadow-md shadow-purple-200"
-                                                  >
-                                                      <Plus size={13} /> Agregar Familiar Responsable
-                                                  </button>
-                                              </div>
-
-                                              {familiaresFields.length > 0 ? (
-                                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                      {familiaresFields.map((field, idx) => {
-                                                          const isTutor = field.esTutorPrincipal === 'true' || field.esTutorPrincipal === true;
-                                                          return (
-                                                              <div key={field.id} className={clsx(
-                                                                  "bg-white p-4 rounded-xl border shadow-sm animate-fadeIn flex flex-col justify-between transition-all hover:shadow-md",
-                                                                  isTutor ? "border-purple-300 ring-1 ring-purple-300 bg-purple-50/5" : "border-gray-200"
-                                                              )}>
-                                                                  <div>
-                                                                      <div className="flex justify-between items-start">
-                                                                          <span className="text-[10px] font-black text-purple-600 uppercase bg-purple-50 px-2 py-0.5 rounded">
-                                                                              {field.parentesco || field.vinTutUsu || 'Familiar'}
-                                                                          </span>
-                                                                          {isTutor && (
-                                                                              <span className="px-2.5 py-0.5 bg-purple-600 text-white text-[9px] font-black rounded-full uppercase tracking-wider">
-                                                                                  Tutor Principal
-                                                                              </span>
-                                                                          )}
-                                                                      </div>
-                                                                      <div className="text-sm font-black text-gray-800 mt-2">
-                                                                          {field.nombres}
-                                                                      </div>
-                                                                      <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-gray-50 text-xs">
-                                                                          <div>
-                                                                              <span className="text-gray-400 font-bold text-[9px] uppercase block">DNI / Documento</span>
-                                                                              <span className="font-bold text-gray-700">{field.dni || field.nroDocTutApo || 'Sin Documento'}</span>
-                                                                          </div>
-                                                                          <div>
-                                                                              <span className="text-gray-400 font-bold text-[9px] uppercase block">Teléfono</span>
-                                                                              <span className="font-bold text-gray-700">{field.telefono || 'No registra'}</span>
-                                                                          </div>
-                                                                          <div>
-                                                                              <span className="text-gray-400 font-bold text-[9px] uppercase block">Vive con NNA</span>
-                                                                              <span className="font-bold text-gray-700">{field.viveCon || 'NO'}</span>
-                                                                          </div>
-                                                                          <div>
-                                                                              <span className="text-gray-400 font-bold text-[9px] uppercase block">Ocupación</span>
-                                                                              <span className="font-bold text-gray-700">{field.ocupacion || 'No registra'}</span>
-                                                                          </div>
-                                                                      </div>
-                                                                  </div>
-                                                                  <div className="flex gap-2 justify-end mt-4 pt-2 border-t border-gray-100">
-                                                                      <button
-                                                                          type="button"
-                                                                          onClick={() => {
-                                                                              setFamiliarModalData({
-                                                                                  ...field,
-                                                                                  esTutorPrincipal: field.esTutorPrincipal === 'true' || field.esTutorPrincipal === true ? 'true' : 'false'
-                                                                              });
-                                                                              setEditingFamiliarIndex(idx);
-                                                                              setShowTutorModal(true);
-                                                                          }}
-                                                                          className="px-2.5 py-1 hover:bg-purple-100 rounded text-purple-700 text-xs font-bold flex items-center gap-1 transition-all"
-                                                                      >
-                                                                          <Edit2 size={12} /> Editar
-                                                                      </button>
-                                                                      <button
-                                                                          type="button"
-                                                                          onClick={() => {
-                                                                              const updated = [...(watch('familiares') || [])].filter((_, i) => i !== idx);
-                                                                              setValue('familiares', updated);
-                                                                              replaceFamiliares(updated);
-                                                                              // Si el familiar eliminado era el tutor principal, limpiamos los datos raíz del formulario
-                                                                              if (isTutor) {
-                                                                                  setValue('tieneTutorApo', 'false');
-                                                                                  setValue('priApeTutApo', '');
-                                                                                  setValue('segApeTutApo', '');
-                                                                                  setValue('nomApeTutApo', '');
-                                                                                  setValue('sexoApo', '');
-                                                                                  setValue('fechaNacApo', '');
-                                                                                  setValue('nacionalidadApo', 'PERUANA');
-                                                                                  setValue('tipDocTutApo', '1');
-                                                                                  setValue('nroDocTutApo', '');
-                                                                                  setValue('vinTutUsu', '');
-                                                                                  setValue('lenMatApo', '10');
-                                                                                  setValue('lenMatEspApo', '');
-                                                                                  setValue('autIdeEtApo', '7');
-                                                                                  setValue('autIdeEtEspApo', '');
-                                                                                  setValue('tipoDiscapApo', '');
-                                                                                  setValue('certDiscapApo', '99');
-                                                                                  setValue('nombreTutor', '');
-                                                                              }
-                                                                          }}
-                                                                          className="px-2.5 py-1 hover:bg-red-50 rounded text-red-600 text-xs font-bold flex items-center gap-1 transition-all"
-                                                                      >
-                                                                          <Trash2 size={12} /> Eliminar
-                                                                      </button>
-                                                                  </div>
-                                                              </div>
-                                                          );
-                                                      })}
-                                                  </div>
-                                              ) : (
-                                                  <div className="flex flex-col items-center justify-center p-8 bg-white border border-dashed border-purple-200 rounded-xl text-center">
-                                                      <Users size={32} className="text-purple-300 mb-2" />
-                                                      <div className="text-xs font-bold text-gray-700">Sin familiares o adultos responsables registrados</div>
-                                                      <div className="text-[10px] text-gray-500 mt-0.5 max-w-xs">Agregue uno o más familiares presionando el botón superior.</div>
-                                                  </div>
-                                              )}
-                                          </div>
-
-                                        <div className="space-y-3">
-                                            <div className="text-sm font-bold text-gray-800">¿Tiene antecedente de albergue?</div>
-                                            <div className="flex gap-3">
-                                                {[true, false].map((val) => (
-                                                    <label key={String(val)} className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-all ${watch('nnas.0.tieneAntecedenteAlbergue') === val ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
-                                                        <input
-                                                            type="radio"
-                                                            value={String(val)}
-                                                            onChange={() => fields.forEach((_, i) => setValue(`nnas.${i}.tieneAntecedenteAlbergue`, val))}
-                                                            checked={watch('nnas.0.tieneAntecedenteAlbergue') === val}
-                                                            className="text-blue-600"
-                                                        />
-                                                        <span className="text-xs font-bold text-gray-700">{val ? 'Sí' : 'No'}</span>
-                                                    </label>
-                                                ))}
-                                            </div>
-                                        </div>
-
-                                        {watch('nnas.0.tieneAntecedenteAlbergue') && (
-                                            <div className="animate-slideDown">
-                                                <InputField label="Detalle" register={register('nnas.0.detalleAntecedenteAlbergue' as const)} placeholder="Mencione dónde y cuándo..." />
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* VII. ACTIVIDADES DE TIEMPO LIBRE */}
-                                {fields.map((field, nnaIndex) => (
-                                    <div key={field.id} className="border border-gray-200 rounded-xl overflow-hidden shadow-sm bg-white">
-                                        <h3 className="bg-blue-50 text-blue-900 font-bold px-4 py-3 border-b border-blue-100 flex items-center gap-2">
-                                            <Calendar size={18} /> VII. Actividades de Tiempo Libre - {watch(`nnas.${nnaIndex}.nombres`)} {watch(`nnas.${nnaIndex}.apellidoPaterno`)}
-                                        </h3>
-                                        <div className="p-5 space-y-4">
-
-                                            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
-                                                {(watch(`nnas.${nnaIndex}.actividadesTiempoLibreLista`) || []).map((activity, actIndex) => (
-                                                    <ActivityCard
-                                                        key={activity.id}
-                                                        activity={activity}
-                                                        onEdit={() => {
-                                                            setEditingActivityIndex(actIndex);
-                                                            setShowTimeActivityModal(true);
-                                                        }}
-                                                        onDelete={() => handleDeleteActivity(nnaIndex, actIndex)}
-                                                    />
-                                                ))}
-                                            </div>
-
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setEditingActivityIndex(null);
-                                                    setShowTimeActivityModal(true);
-                                                    setCurrentNnaIndexForDuplicate(nnaIndex);
-                                                }}
-                                                className="w-full py-2 border-2 border-dashed border-blue-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 text-blue-600 hover:text-blue-700 font-bold transition-all flex items-center justify-center gap-2"
-                                            >
-                                                <Plus size={18} /> Agregar Actividad de Tiempo Libre
-                                            </button>
-
-                                            <RiskAssessmentPanel
-                                                nnaData={watch(`nnas.${nnaIndex}`)}
-                                                actividadesList={watch(`nnas.${nnaIndex}.actividadesTiempoLibreLista`) || []}
-                                            />
-
-                                        </div>
-                                    </div>
-                                ))}
-
-                            </div>
+                            <FamiliaSection 
+                                setEditingFamiliarIndex={setEditingFamiliarIndex}
+                                setShowTutorModal={setShowTutorModal}
+                                setEditingActivityIndex={setEditingActivityIndex}
+                                setShowTimeActivityModal={setShowTimeActivityModal}
+                                setCurrentNnaIndexForDuplicate={setCurrentNnaIndexForDuplicate}
+                                handleDeleteActivity={handleDeleteActivity}
+                            />
                         )}
-
                     </div>
 
                     <FooterButtons 
@@ -2841,6 +1786,7 @@ export const NnaCreatePage = () => {
                         submitLabel="Finalizar"
                     />
                 </form>
+            </FormProvider>
             </main>
 
             {/* MODAL DE TIEMPO LIBRE */}
@@ -2855,374 +1801,24 @@ export const NnaCreatePage = () => {
             />
 
             {/* MODAL DETALLES DEL TUTOR / APODERADO */}
-            {showTutorModal && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 max-w-4xl w-full max-h-[90vh] flex flex-col animate-scaleUp">
-                        {/* Header */}
-                        <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-purple-50 rounded-t-2xl">
-                            <div>
-                                <h3 className="text-lg font-black text-purple-900 flex items-center gap-2">
-                                    <Users size={22} className="text-purple-700" /> {editingFamiliarIndex !== null ? 'Editar Familiar' : 'Registrar Familiar Responsable'} (SEC 2026)
-                                </h3>
-                                <p className="text-xs text-purple-700 font-medium">Complete todos los datos oficiales del familiar responsable del NNA.</p>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setShowTutorModal(false);
-                                    setEditingFamiliarIndex(null);
-                                    setTutorError('');
-                                }}
-                                className="p-2 hover:bg-purple-100 rounded-full transition-all text-purple-900"
-                            >
-                                <X size={20} />
-                            </button>
-                        </div>
-
-                        {/* Content */}
-                        <div className="p-6 overflow-y-auto space-y-6">
-                            {tutorError && (
-                                <div className="p-3 bg-red-50 text-red-600 rounded-xl border border-red-200 text-xs font-semibold animate-fadeIn">
-                                    {tutorError}
-                                </div>
-                            )}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <InputField
-                                    label="Primer Apellido"
-                                    value={familiarModalData.priApeTutApo || ''}
-                                    onChange={(e) => setFamiliarModalData({ ...familiarModalData, priApeTutApo: e.target.value })}
-                                    placeholder="Primer Apellido"
-                                />
-                                <InputField
-                                    label="Segundo Apellido"
-                                    value={familiarModalData.segApeTutApo || ''}
-                                    onChange={(e) => setFamiliarModalData({ ...familiarModalData, segApeTutApo: e.target.value })}
-                                    placeholder="Segundo Apellido"
-                                />
-                                <InputField
-                                    label="Nombres"
-                                    value={familiarModalData.nomApeTutApo || familiarModalData.nombres || ''}
-                                    onChange={(e) => setFamiliarModalData({ ...familiarModalData, nomApeTutApo: e.target.value, nombres: e.target.value })}
-                                    placeholder="Nombres del Familiar"
-                                    required
-                                />
-
-                                <SelectField
-                                    label="Sexo"
-                                    value={familiarModalData.sexoApo || ''}
-                                    onChange={(e) => setFamiliarModalData({ ...familiarModalData, sexoApo: e.target.value })}
-                                    options={parametros?.OPCIONES_SEXO_2026 || [
-                                        { value: '1', label: '1: Masculino' },
-                                        { value: '2', label: '2: Femenino' }
-                                    ]}
-                                />
-                                <InputField
-                                    type="date"
-                                    label="Fecha Nacimiento"
-                                    value={familiarModalData.fechaNacApo || ''}
-                                    onChange={(e) => setFamiliarModalData({ ...familiarModalData, fechaNacApo: e.target.value })}
-                                />
-                                <InputField
-                                    label="Nacionalidad"
-                                    value={familiarModalData.nacionalidadApo || ''}
-                                    onChange={(e) => setFamiliarModalData({ ...familiarModalData, nacionalidadApo: e.target.value })}
-                                    placeholder="PERUANA"
-                                />
-
-                                <SelectField
-                                    label="Tipo Documento"
-                                    value={familiarModalData.tipDocTutApo || ''}
-                                    onChange={(e) => setFamiliarModalData({ ...familiarModalData, tipDocTutApo: e.target.value })}
-                                    options={parametros?.OPCIONES_TIP_DOC_APO_2026 || [
-                                        { value: '1', label: '1: DNI' },
-                                        { value: '2', label: '2: Carné de extranjería' },
-                                        { value: '3', label: '3: Pasaporte' },
-                                        { value: '7', label: '7: No tiene' }
-                                    ]}
-                                />
-                                <InputField
-                                    label="Nº de Documento"
-                                    value={familiarModalData.nroDocTutApo || familiarModalData.dni || ''}
-                                    onChange={(e) => setFamiliarModalData({ ...familiarModalData, nroDocTutApo: e.target.value, dni: e.target.value })}
-                                    placeholder="Número de Documento"
-                                />
-                                <SelectField
-                                    label="Vínculo con el NNA"
-                                    value={familiarModalData.vinTutUsu || familiarModalData.parentesco || ''}
-                                    onChange={(e) => setFamiliarModalData({ ...familiarModalData, vinTutUsu: e.target.value, parentesco: e.target.value })}
-                                    options={parametros?.OPCIONES_VINCULO_TUTOR_2026 || [
-                                        { value: '1', label: '1: Padre o madre' },
-                                        { value: '2', label: '2: Tio/a' },
-                                        { value: '3', label: '3: Abuelo/a' },
-                                        { value: '4', label: '4: Hermano/a' },
-                                        { value: '5', label: '5: Otro familiar (ej. cuñado/a)' },
-                                        { value: '6', label: '6: Otro no familiar (no pariente)' }
-                                    ]}
-                                />
-
-                                <InputField
-                                    label="Teléfono de Contacto"
-                                    value={familiarModalData.telefono || ''}
-                                    onChange={(e) => setFamiliarModalData({ ...familiarModalData, telefono: e.target.value })}
-                                    placeholder="Ej. 999888777"
-                                />
-                                <InputField
-                                    label="Ocupación"
-                                    value={familiarModalData.ocupacion || ''}
-                                    onChange={(e) => setFamiliarModalData({ ...familiarModalData, ocupacion: e.target.value })}
-                                    placeholder="Ej. Independiente, Comerciante..."
-                                />
-                                <SelectField
-                                    label="¿Vive con el NNA?"
-                                    value={familiarModalData.viveCon || ''}
-                                    onChange={(e) => setFamiliarModalData({ ...familiarModalData, viveCon: e.target.value })}
-                                    options={[
-                                        { value: 'SI', label: 'Sí' },
-                                        { value: 'NO', label: 'No' }
-                                    ]}
-                                />
-
-                                <SelectField
-                                    label="Lengua Materna"
-                                    value={familiarModalData.lenMatApo || ''}
-                                    onChange={(e) => setFamiliarModalData({ ...familiarModalData, lenMatApo: e.target.value })}
-                                    options={parametros?.OPCIONES_LENGUA_APO_2026 || [
-                                        { value: '10', label: '10: Castellano' },
-                                        { value: '1', label: '1: Quechua' },
-                                        { value: '2', label: '2: Aimara' },
-                                        { value: '3', label: '3: Asháninka' },
-                                        { value: '4', label: '4: Awajún/Aguaruna' },
-                                        { value: '5', label: '5: Shipibo-Conibo' },
-                                        { value: '6', label: '6: Shawi/ Chayahuita' },
-                                        { value: '7', label: '7: Matsigenka/ Machiguenga' },
-                                        { value: '8', label: '8: Achuar' },
-                                        { value: '9', label: '9: Otra lengua indígena u originaria' },
-                                        { value: '11', label: '11: Portugués' },
-                                        { value: '12', label: '12: Otra lengua extranjera' },
-                                        { value: '13', label: '13: Lengua de señas peruana' },
-                                        { value: '14', label: '14: No escucha ni habla' },
-                                        { value: '16', label: '16: No responde / No sabe' },
-                                        { value: '99', label: '99: No aplica' }
-                                    ]}
-                                />
-                                {['9', '12', 'OTRO'].includes(familiarModalData.lenMatApo || '') && (
-                                    <InputField
-                                        label="Especificar Lengua"
-                                        value={familiarModalData.lenMatEspApo || ''}
-                                        onChange={(e) => setFamiliarModalData({ ...familiarModalData, lenMatEspApo: e.target.value })}
-                                        placeholder="Escriba la lengua..."
-                                    />
-                                )}
-                                
-                                <SelectField
-                                    label="Autoidentificación Étnica"
-                                    value={familiarModalData.autIdeEtApo || ''}
-                                    onChange={(e) => setFamiliarModalData({ ...familiarModalData, autIdeEtApo: e.target.value })}
-                                    options={parametros?.OPCIONES_ETNIA_APO_2026 || [
-                                        { value: '7', label: '7: Mestizo' },
-                                        { value: '1', label: '1: Quechua' },
-                                        { value: '2', label: '2: Aimara' },
-                                        { value: '3', label: '3: Indígena u originario de la Amazonía' },
-                                        { value: '4', label: '4: Perteneciente o parte de otro pueblo indígena' },
-                                        { value: '5', label: '5: Negro, moreno, zambo, mulato o afrodescendiente' },
-                                        { value: '6', label: '6: Blanco' },
-                                        { value: '8', label: '8: Otro' }
-                                    ]}
-                                />
-                                {['8', 'OTRO'].includes(familiarModalData.autIdeEtApo || '') && (
-                                    <InputField
-                                        label="Especificar Etnia"
-                                        value={familiarModalData.autIdeEtEspApo || ''}
-                                        onChange={(e) => setFamiliarModalData({ ...familiarModalData, autIdeEtEspApo: e.target.value })}
-                                        placeholder="Escriba la etnia..."
-                                    />
-                                )}
-
-                                <SelectField
-                                    label="Tipo de Discapacidad"
-                                    value={familiarModalData.tipoDiscapApo || ''}
-                                    onChange={(e) => setFamiliarModalData({ ...familiarModalData, tipoDiscapApo: e.target.value })}
-                                    options={parametros?.OPCIONES_DISCAPACIDAD_APO_2026 || [
-                                        { value: '6', label: 'Ninguna' },
-                                        { value: '1', label: 'Motriz o física' },
-                                        { value: '2', label: 'Sensorial' },
-                                        { value: '3', label: 'Cognitivo-intelectual' },
-                                        { value: '4', label: 'Psicosocial o psíquica' },
-                                        { value: '5', label: 'Más de una discapacidad' }
-                                    ]}
-                                />
-                                <SelectField
-                                    label="¿Certificado CONADIS?"
-                                    value={familiarModalData.certDiscapApo || ''}
-                                    onChange={(e) => setFamiliarModalData({ ...familiarModalData, certDiscapApo: e.target.value })}
-                                    options={parametros?.OPCIONES_CERT_DISCAP_APO_2026 || [
-                                        { value: '99', label: 'No aplica' },
-                                        { value: '1', label: 'Sí, tiene Certificado de Discapacidad' },
-                                        { value: '2', label: 'Sí, tiene, pero no lo porta' },
-                                        { value: '3', label: 'No, no cuenta con Certificado' },
-                                        { value: '4', label: 'En trámite' }
-                                    ]}
-                                />
-
-                                <div className="md:col-span-3 bg-purple-50/50 p-4 rounded-xl border border-purple-100 flex items-center justify-between mt-2">
-                                    <div className="flex flex-col">
-                                        <span className="text-xs font-black text-purple-900">¿Es el Tutor / Apoderado Principal del NNA?</span>
-                                        <span className="text-[10px] text-purple-700 font-medium">Solo un familiar puede ser el tutor principal para efectos de la ficha F03.</span>
-                                    </div>
-                                    <label className="relative inline-flex items-center cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            checked={familiarModalData.esTutorPrincipal === 'true' || familiarModalData.esTutorPrincipal === true}
-                                            onChange={(e) => setFamiliarModalData({ ...familiarModalData, esTutorPrincipal: e.target.checked ? 'true' : 'false' })}
-                                            className="sr-only peer"
-                                        />
-                                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-700"></div>
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Footer */}
-                        <div className="p-6 border-t border-gray-100 flex justify-end gap-3 bg-gray-50 rounded-b-2xl">
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setShowTutorModal(false);
-                                    setEditingFamiliarIndex(null);
-                                    setTutorError('');
-                                }}
-                                className="px-4 py-2 border border-gray-300 text-gray-700 text-xs font-bold rounded-lg hover:bg-gray-100 transition-all"
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    if (!familiarModalData.nomApeTutApo && !familiarModalData.nombres) {
-                                        setTutorError('Por favor ingrese al menos el nombre del familiar.');
-                                        return;
-                                    }
-                                    setTutorError('');
-
-                                    const pri = familiarModalData.priApeTutApo || '';
-                                    const seg = familiarModalData.segApeTutApo || '';
-                                    const nom = familiarModalData.nomApeTutApo || familiarModalData.nombres || '';
-                                    const fullName = `${pri} ${seg} ${nom}`.trim().replace(/\s+/g, ' ');
-
-                                    const finalFamiliar: FamiliarFormDataItem = {
-                                        ...familiarModalData,
-                                        nombres: fullName,
-                                        dni: familiarModalData.nroDocTutApo || familiarModalData.dni || '',
-                                        parentesco: familiarModalData.vinTutUsu || familiarModalData.parentesco || 'Otro',
-                                        viveCon: familiarModalData.viveCon || 'NO',
-                                    };
-
-                                    let updatedList = [...(watch('familiares') || [])];
-
-                                    if (editingFamiliarIndex !== null) {
-                                        updatedList[editingFamiliarIndex] = finalFamiliar;
-                                    } else {
-                                        updatedList.push(finalFamiliar);
-                                    }
-
-                                    const isTutor = finalFamiliar.esTutorPrincipal === 'true' || finalFamiliar.esTutorPrincipal === true;
-                                    if (isTutor) {
-                                        // Mark all others as non-tutor principal
-                                        updatedList = updatedList.map((fam, idx) => {
-                                            if (editingFamiliarIndex !== null && idx === editingFamiliarIndex) return fam;
-                                            if (editingFamiliarIndex === null && idx === updatedList.length - 1) return fam;
-                                            return { ...fam, esTutorPrincipal: 'false' };
-                                        });
-
-                                        setValue('tieneTutorApo', 'true');
-                                        setValue('priApeTutApo', finalFamiliar.priApeTutApo || '');
-                                        setValue('segApeTutApo', finalFamiliar.segApeTutApo || '');
-                                        setValue('nomApeTutApo', finalFamiliar.nomApeTutApo || '');
-                                        setValue('sexoApo', finalFamiliar.sexoApo || '');
-                                        setValue('fechaNacApo', finalFamiliar.fechaNacApo || '');
-                                        setValue('nacionalidadApo', finalFamiliar.nacionalidadApo || 'PERUANA');
-                                        setValue('tipDocTutApo', finalFamiliar.tipDocTutApo || 'DNI');
-                                        setValue('nroDocTutApo', finalFamiliar.nroDocTutApo || '');
-                                        setValue('vinTutUsu', finalFamiliar.vinTutUsu || '');
-                                        setValue('lenMatApo', finalFamiliar.lenMatApo || 'CASTELLANO');
-                                        setValue('lenMatEspApo', finalFamiliar.lenMatEspApo || '');
-                                        setValue('autIdeEtApo', finalFamiliar.autIdeEtApo || 'MESTIZO');
-                                        setValue('autIdeEtEspApo', finalFamiliar.autIdeEtEspApo || '');
-                                        setValue('tipoDiscapApo', finalFamiliar.tipoDiscapApo || '');
-                                        setValue('certDiscapApo', finalFamiliar.certDiscapApo || 'NO');
-                                        setValue('nombreTutor', fullName);
-                                    } else {
-                                        // Check if there is any other tutor left
-                                        const anyTutorLeft = updatedList.some(f => f.esTutorPrincipal === 'true' || f.esTutorPrincipal === true);
-                                        if (!anyTutorLeft) {
-                                            setValue('tieneTutorApo', 'false');
-                                            setValue('priApeTutApo', '');
-                                            setValue('segApeTutApo', '');
-                                            setValue('nomApeTutApo', '');
-                                            setValue('sexoApo', '');
-                                            setValue('fechaNacApo', '');
-                                            setValue('nacionalidadApo', 'PERUANA');
-                                            setValue('tipDocTutApo', 'DNI');
-                                            setValue('nroDocTutApo', '');
-                                            setValue('vinTutUsu', '');
-                                            setValue('lenMatApo', 'CASTELLANO');
-                                            setValue('lenMatEspApo', '');
-                                            setValue('autIdeEtApo', 'MESTIZO');
-                                            setValue('autIdeEtEspApo', '');
-                                            setValue('tipoDiscapApo', '');
-                                            setValue('certDiscapApo', 'NO');
-                                            setValue('nombreTutor', '');
-                                        }
-                                    }
-
-                                    setValue('familiares', updatedList);
-                                    replaceFamiliares(updatedList);
-                                    setShowTutorModal(false);
-                                    setEditingFamiliarIndex(null);
-                                }}
-                                className="px-5 py-2 bg-purple-700 text-white text-xs font-bold rounded-lg hover:bg-purple-800 transition-all flex items-center gap-1.5 shadow-md shadow-purple-200"
-                            >
-                                <Zap size={14} /> Guardar y Aplicar
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <FamiliarModal
+                isOpen={showTutorModal}
+                onClose={() => {
+                    setShowTutorModal(false);
+                    setEditingFamiliarIndex(null);
+                }}
+                onSave={handleSaveFamiliar}
+                initialData={editingFamiliarIndex !== null ? (watch('familiares') || [])[editingFamiliarIndex] : null}
+                parametros={parametros}
+                editingIndex={editingFamiliarIndex}
+            />
 
             {/* DUPLICATE CHECKER DRAWER */}
-            {showDuplicateDrawer && duplicateCheckResults && (
-                <div className="fixed inset-y-0 right-0 w-96 bg-white shadow-2xl z-40 overflow-y-auto animate-slideInRight border-l border-gray-200">
-                    <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
-                        <h2 className="font-bold text-gray-800 text-sm">Verificación Nacional de Duplicados</h2>
-                        <button onClick={() => setShowDuplicateDrawer(false)} className="text-gray-500 hover:text-gray-700">
-                            <X size={20} />
-                        </button>
-                    </div>
-                    <div className="p-4 space-y-4">
-                        <div className={`p-3 rounded-lg ${duplicateCheckResults.status === 'duplicate' ? 'bg-red-50 border border-red-200 text-red-800' : 'bg-yellow-50 border border-yellow-200 text-yellow-800'}`}>
-                            <p className="text-xs font-black uppercase tracking-wider mb-1">
-                                {duplicateCheckResults.status === 'duplicate' ? '¡Duplicado Crítico!' : 'Alerta de Homónimo'}
-                            </p>
-                            <p className="text-sm font-semibold">{duplicateCheckResults.message}</p>
-                        </div>
-                        {duplicateCheckResults.matches && duplicateCheckResults.matches.map((match: any, i) => (
-                            <div key={i} className="border border-gray-200 rounded-xl p-4 bg-white shadow-sm flex flex-col gap-2 hover:border-blue-200 transition-all">
-                                <p className="font-bold text-sm text-gray-800 uppercase">{match.nombres} {match.apellidoPaterno} {match.apellidoMaterno}</p>
-                                <div className="grid grid-cols-2 gap-2 border-t pt-2 text-xs text-gray-500">
-                                    <div>
-                                        <span className="font-bold text-[9px] uppercase text-gray-400 block">DNI / Doc</span>
-                                        <span className="font-semibold text-gray-700">{match.numeroDoc || 'Sin Doc'}</span>
-                                    </div>
-                                    <div>
-                                        <span className="font-bold text-[9px] uppercase text-gray-400 block">Sede de Origen</span>
-                                        <span className="font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded inline-block mt-0.5">{match.sede || 'No especificada'}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
+            <DuplicateDrawer
+                isOpen={showDuplicateDrawer}
+                onClose={() => setShowDuplicateDrawer(false)}
+                results={duplicateCheckResults}
+            />
             {/* PREMIUM ALERTA CUSTOM MODAL */}
             {alertModal.isOpen && (
                 <div className="fixed inset-0 flex items-center justify-center z-[100] animate-fadeIn">

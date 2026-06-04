@@ -27,6 +27,8 @@ SQL_FILES = [
     "nna-service-py/src/infrastructure/db/migrations/003_add_datos_f03_nna.sql",
     "nna-service-py/src/infrastructure/db/migrations/004_add_victima_explotacion_caso.sql",
     "expediente-service-py/src/infrastructure/db/migrations/001_create_tables.sql",
+    "expediente-service-py/src/infrastructure/db/migrations/002_create_informe_situacional.sql",
+    "expediente-service-py/src/infrastructure/db/migrations/003_add_estado_informe_situacional.sql",
     "intervencion-service-py/src/infrastructure/db/migrations/001_create_intervencion_tables.sql",
     "talleres-service-py/src/infrastructure/db/migrations/001_create_taller_tables.sql",
     "derivacion-service-py/src/infrastructure/db/migrations/001_create_derivacion.sql"

@@ -49,9 +49,11 @@ class OracleDiagnosticoRepository:
                 
                 datos_extra_str = json.dumps(data.datos_extra) if data.datos_extra else None
 
+                consumo_val = None if data.consumo_sustancias is None else (1 if data.consumo_sustancias else 0)
+
                 await cur.execute(sql, [
                     codigo_f04, nna_id, data.situacion_calle, data.tiempo_en_calle, data.motivo_ingreso, data.lugar_pernota,
-                    data.actividad_calle, 1 if data.consumo_sustancias else 0, data.nombre_tutor, data.dni_tutor,
+                    data.actividad_calle, consumo_val, data.nombre_tutor, data.dni_tutor,
                     data.direccion_tutor, data.telefono_tutor, datos_extra_str,
                     id_var, created_var, updated_var
                 ])
@@ -104,7 +106,7 @@ class OracleDiagnosticoRepository:
                     SELECT n.NOMBRES, n.APELLIDO_PATERNO, n.APELLIDO_MATERNO, n.NUMERO_DOC, n.TIPO_DOC,
                            n.FECHA_NACIMIENTO, n.DOMICILIO_ACTUAL, n.REFERENCIA_DOMICILIO, n.DEPARTAMENTO_DOM,
                            n.PROVINCIA_DOM, n.DISTRITO_DOM, n.TELEFONO_CONTACTO, n.NOMBRE_TUTOR, n.VIVE_CON,
-                           n.LUGAR_PERNOCTE, n.DETALLE_LUGAR_PERNOCTE, n.TIENEN_HERMANOS, n.CANT_HERMANOS,
+                           n.LUGAR_PERNOCTE, n.DETALLE_LUGAR_PERNOCTE, n.TIENE_HERMANOS, n.CANT_HERMANOS,
                            n.AFILIADO_SIS, n.AFILIADO_OTRO_SEGURO, n.DETALLE_OTRO_SEGURO, n.TIENE_DISCAPACIDAD,
                            n.TIPO_DISCAPACIDAD, n.DETALLE_DISCAPACIDAD, n.SUFRE_ENFERMEDAD, n.DETALLE_ENFERMEDAD,
                            n.OBSERVACIONES_SALUD, n.ESTUDIA_ACTUALMENTE, n.NIVEL_EDUCATIVO, n.GRADO_ESTUDIO,
@@ -125,7 +127,7 @@ class OracleDiagnosticoRepository:
                         SELECT n.NOMBRES, n.APELLIDO_PATERNO, n.APELLIDO_MATERNO, n.NUMERO_DOC, n.TIPO_DOC,
                                n.FECHA_NACIMIENTO, n.DOMICILIO_ACTUAL, n.REFERENCIA_DOMICILIO, n.DEPARTAMENTO_DOM,
                                n.PROVINCIA_DOM, n.DISTRITO_DOM, n.TELEFONO_CONTACTO, n.NOMBRE_TUTOR, n.VIVE_CON,
-                               n.LUGAR_PERNOCTE, n.DETALLE_LUGAR_PERNOCTE, 0 as TIENEN_HERMANOS, 0 as CANT_HERMANOS,
+                               n.LUGAR_PERNOCTE, n.DETALLE_LUGAR_PERNOCTE, 0 as TIENE_HERMANOS, 0 as CANT_HERMANOS,
                                n.AFILIADO_SIS, n.AFILIADO_OTRO_SEGURO, n.DETALLE_OTRO_SEGURO, n.TIENE_DISCAPACIDAD,
                                n.TIPO_DISCAPACIDAD, n.DETALLE_DISCAPACIDAD, n.SUFRE_ENFERMEDAD, n.DETALLE_ENFERMEDAD,
                                n.OBSERVACIONES_SALUD, n.ESTUDIA_ACTUALMENTE, n.NIVEL_EDUCATIVO, n.GRADO_ESTUDIO,
@@ -451,9 +453,11 @@ class OracleDiagnosticoRepository:
                 updated_var = cur.var(oracledb.DB_TYPE_TIMESTAMP)
                 datos_extra_str = json.dumps(data.datos_extra) if data.datos_extra else None
                 
+                consumo_val = None if data.consumo_sustancias is None else (1 if data.consumo_sustancias else 0)
+                
                 await cur.execute(sql, [
                     data.situacion_calle, data.tiempo_en_calle, data.motivo_ingreso, data.lugar_pernota,
-                    data.actividad_calle, 1 if data.consumo_sustancias else 0, data.nombre_tutor, data.dni_tutor,
+                    data.actividad_calle, consumo_val, data.nombre_tutor, data.dni_tutor,
                     data.direccion_tutor, data.telefono_tutor, datos_extra_str,
                     diag_id, updated_var
                 ])

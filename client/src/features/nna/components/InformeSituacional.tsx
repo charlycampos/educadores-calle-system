@@ -1,13 +1,26 @@
-import { useState } from 'react';
-import { Printer, Save, ClipboardList, MapPin, Users, CheckCircle2, HeartPulse, GraduationCap, FileSignature, PenLine } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Printer, Save, CheckCircle2 as CheckIcon, ClipboardList, MapPin, Users, CheckCircle2, FileSignature, PenLine } from 'lucide-react';
+import { EXPEDIENTE_API_URL } from '../../../config/api';
+import { formatTipoDoc } from '../../../data/ubigeo';
+
+const formatSexo = (sexo: any): string => {
+    if (!sexo) return '---';
+    const s = String(sexo).trim();
+    if (s.startsWith('1')) return 'Masculino';
+    if (s.startsWith('2')) return 'Femenino';
+    return s;
+};
 
 interface InformeSituacionalProps {
     nna: any;
+    caso: any;
     onClose: () => void;
 }
 
-export const InformeSituacional = ({ nna, onClose }: InformeSituacionalProps) => {
+export const InformeSituacional = ({ nna, caso, onClose }: InformeSituacionalProps) => {
     const [isSaving, setIsSaving] = useState(false);
+    const [isFinalizing, setIsFinalizing] = useState(false);
+    const [estadoActual, setEstadoActual] = useState<string>('BORRADOR');
 
     const [formData, setFormData] = useState({
         fechaInforme:       new Date().toISOString().split('T')[0],
@@ -22,17 +35,124 @@ export const InformeSituacional = ({ nna, onClose }: InformeSituacionalProps) =>
         recomendaciones:    '',
     });
 
+    useEffect(() => {
+        if (!caso?.id) return;
+        const token = localStorage.getItem('token');
+        fetch(`${EXPEDIENTE_API_URL}/informe-situacional/caso/${caso.id}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        })
+        .then(res => {
+            if (!res.ok) throw new Error('Error del servidor');
+            return res.json();
+        })
+        .then(data => {
+            if (!data) return;
+            setEstadoActual(data.estado || 'BORRADOR');
+            setFormData({
+                fechaInforme: data.fecha_informe || new Date().toISOString().split('T')[0],
+                destinatario: data.destinatario || 'COORDINACIÓN DEL SERVICIO DE EDUCADORES DE CALLE',
+                asunto: data.asunto || `INFORME SITUACIONAL DEL NNA ${nna.nombres} ${nna.apellidoPaterno}`.toUpperCase(),
+                antecedentes: data.antecedentes || '',
+                estrategias: data.estrategias || '',
+                situacionSalud: data.situacion_salud || '',
+                situacionEducacion: data.situacion_educativa || '',
+                situacionFamiliar: data.situacion_familiar || '',
+                conclusiones: data.conclusiones || '',
+                recomendaciones: data.recomendaciones || '',
+            });
+        })
+        .catch(err => {
+            console.log(err.message);
+        });
+    }, [caso?.id, nna]);
+
     const up = (key: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
         setFormData(prev => ({ ...prev, [key]: e.target.value }));
 
-    const handleSave = async () => {
-        setIsSaving(true);
-        setTimeout(() => { setIsSaving(false); alert('Informe guardado correctamente'); }, 900);
+    const buildBody = (estado: string) => ({
+        fecha_informe: formData.fechaInforme,
+        destinatario: formData.destinatario,
+        asunto: formData.asunto,
+        antecedentes: formData.antecedentes,
+        estrategias: formData.estrategias,
+        situacion_salud: formData.situacionSalud,
+        situacion_educativa: formData.situacionEducacion,
+        situacion_familiar: formData.situacionFamiliar,
+        conclusiones: formData.conclusiones,
+        recomendaciones: formData.recomendaciones,
+        estado,
+    });
+
+    const saveToApi = async (estado: string) => {
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${EXPEDIENTE_API_URL}/informe-situacional/caso/${caso.id}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify(buildBody(estado)),
+        });
+        if (!res.ok) throw new Error('Error al guardar el informe');
+        return res.json();
     };
 
-    const edad = nna.fechaNacimiento
-        ? `${new Date().getFullYear() - new Date(nna.fechaNacimiento).getFullYear()} años`
-        : '---';
+    const handleSaveBorrador = async () => {
+        if (!caso?.id) { alert('No existe un caso activo para este NNA'); return; }
+        setIsSaving(true);
+        try {
+            await saveToApi('BORRADOR');
+            setEstadoActual('BORRADOR');
+            alert('Borrador guardado correctamente');
+        } catch (e) {
+            console.error(e);
+            alert('Error al guardar el borrador');
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleFinalizar = async () => {
+        if (!caso?.id) { alert('No existe un caso activo para este NNA'); return; }
+        if (!window.confirm('¿Confirmas que el informe situacional está completo y deseas finalizarlo? Esta acción lo registrará en el Expediente Digital.')) return;
+        setIsFinalizing(true);
+        const token = localStorage.getItem('token');
+        try {
+            await saveToApi('FINALIZADO');
+            setEstadoActual('FINALIZADO');
+
+            const vistaUrl = `${EXPEDIENTE_API_URL}/informe-situacional/caso/${caso.id}/vista`;
+            const folioRes = await fetch(`${EXPEDIENTE_API_URL}/expediente/caso/${caso.id}/folio`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({
+                    tipo_documento: 'F09',
+                    titulo: `INFORME SITUACIONAL (F09) — ${formData.asunto}`.substring(0, 200),
+                    archivo_url: vistaUrl,
+                    contenido_hash: `INF-SIT-${caso.id}`.substring(0, 40),
+                }),
+            });
+            if (!folioRes.ok) {
+                alert('Informe finalizado, pero no se pudo registrar en el Expediente. Recarga la página.');
+            } else {
+                alert('Informe finalizado y registrado en el Expediente Digital.');
+            }
+            onClose();
+        } catch (e) {
+            console.error(e);
+            alert('Error al finalizar el informe');
+        } finally {
+            setIsFinalizing(false);
+        }
+    };
+
+    const edad = (() => {
+        if (!nna.fechaNacimiento) return '---';
+        const hoy = new Date();
+        const nac = new Date(nna.fechaNacimiento);
+        let años = hoy.getFullYear() - nac.getFullYear();
+        if (hoy.getMonth() < nac.getMonth() || (hoy.getMonth() === nac.getMonth() && hoy.getDate() < nac.getDate())) {
+            años--;
+        }
+        return `${años} años`;
+    })();
 
     return (
         <div className="bg-bg flex flex-col gap-3">
@@ -54,7 +174,7 @@ export const InformeSituacional = ({ nna, onClose }: InformeSituacionalProps) =>
                         <div>
                             <label className="text-[12px] font-medium text-fg-2 block mb-1">Documento de Identidad</label>
                             <div className="text-[13px] font-semibold text-fg px-3 py-2 bg-surface-muted border border-border rounded-[6px]">
-                                {nna.tipoDoc} {nna.numeroDoc || 'S/D'}
+                                {formatTipoDoc(nna.tipoDoc)} {nna.numeroDoc || 'S/D'}
                             </div>
                         </div>
                     </div>
@@ -65,7 +185,7 @@ export const InformeSituacional = ({ nna, onClose }: InformeSituacionalProps) =>
                         </div>
                         <div>
                             <label className="text-[12px] font-medium text-fg-2 block mb-1">Sexo</label>
-                            <div className="text-[13px] font-semibold text-fg px-3 py-2 bg-surface-muted border border-border rounded-[6px]">{nna.sexo || '---'}</div>
+                            <div className="text-[13px] font-semibold text-fg px-3 py-2 bg-surface-muted border border-border rounded-[6px]">{formatSexo(nna.sexo)}</div>
                         </div>
                         <div>
                             <label className="text-[12px] font-medium text-fg-2 block mb-1">Carpeta</label>
@@ -126,7 +246,7 @@ export const InformeSituacional = ({ nna, onClose }: InformeSituacionalProps) =>
                         value={formData.estrategias}
                         onChange={up('estrategias')}
                         rows={3}
-                        placeholder="Técnicas de abordaje, ludopatía, observación participante..."
+                        placeholder="Técnicas de abordaje, lúdicas, observación participante..."
                         className="w-full text-[13px] px-3 py-2 border border-border-strong rounded-[6px] bg-surface text-fg outline-none resize-vertical focus:border-primary focus:ring-1 focus:ring-primary"
                         style={{ lineHeight: 1.6 }}
                     />
@@ -218,20 +338,45 @@ export const InformeSituacional = ({ nna, onClose }: InformeSituacionalProps) =>
             </div>
 
             {/* ── Footer con botones ── */}
-            <div className="bg-surface border border-border rounded-[8px] px-5 py-3 flex justify-end gap-2">
-                <button
-                    onClick={() => window.print()}
-                    className="flex items-center gap-1.5 bg-surface border border-border-strong text-fg px-4 py-2 rounded-[6px] text-[13px] font-medium hover:bg-surface-muted transition-colors"
-                >
-                    <Printer size={14} /> Imprimir / PDF
-                </button>
-                <button
-                    onClick={handleSave}
-                    disabled={isSaving}
-                    className="flex items-center gap-1.5 bg-primary text-primary-fg px-4 py-2 rounded-[6px] text-[13px] font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
-                >
-                    <Save size={14} /> {isSaving ? 'Guardando…' : 'Guardar Informe'}
-                </button>
+            <div className="bg-surface border border-border rounded-[8px] px-5 py-3 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                    {estadoActual === 'FINALIZADO' && (
+                        <span className="flex items-center gap-1.5 text-[12px] font-bold text-success bg-success-soft border border-success/20 px-3 py-1.5 rounded-[6px]">
+                            <CheckIcon size={13} /> Informe Finalizado
+                        </span>
+                    )}
+                    {estadoActual === 'BORRADOR' && (
+                        <span className="text-[11px] text-fg-muted font-medium px-2 py-1 bg-warning-soft border border-warning/20 rounded-[6px]">
+                            Borrador
+                        </span>
+                    )}
+                </div>
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => window.print()}
+                        className="flex items-center gap-1.5 bg-surface border border-border-strong text-fg px-4 py-2 rounded-[6px] text-[13px] font-medium hover:bg-surface-muted transition-colors"
+                    >
+                        <Printer size={14} /> Imprimir
+                    </button>
+                    {estadoActual !== 'FINALIZADO' && (
+                        <button
+                            onClick={handleSaveBorrador}
+                            disabled={isSaving || isFinalizing}
+                            className="flex items-center gap-1.5 bg-surface border border-border-strong text-fg px-4 py-2 rounded-[6px] text-[13px] font-medium hover:bg-surface-muted transition-colors disabled:opacity-50"
+                        >
+                            <Save size={14} /> {isSaving ? 'Guardando…' : 'Guardar Borrador'}
+                        </button>
+                    )}
+                    {estadoActual !== 'FINALIZADO' && (
+                        <button
+                            onClick={handleFinalizar}
+                            disabled={isSaving || isFinalizing}
+                            className="flex items-center gap-1.5 bg-success text-white px-4 py-2 rounded-[6px] text-[13px] font-medium hover:bg-success/90 transition-colors disabled:opacity-50"
+                        >
+                            <CheckIcon size={14} /> {isFinalizing ? 'Finalizando…' : 'Finalizar'}
+                        </button>
+                    )}
+                </div>
             </div>
 
         </div>

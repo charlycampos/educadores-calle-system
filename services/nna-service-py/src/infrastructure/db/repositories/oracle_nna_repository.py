@@ -9,6 +9,21 @@ from src.domain.entities.nna import Nna
 from src.infrastructure.db.connection import get_pool
 
 
+def _to_bool_int(val) -> int:
+    if val is None:
+        return 0
+    if isinstance(val, bool):
+        return 1 if val else 0
+    if isinstance(val, str):
+        val_lower = val.lower().strip()
+        if val_lower in ("true", "1", "si", "sí", "yes", "s"):
+            return 1
+        return 0
+    if isinstance(val, (int, float)):
+        return 1 if val != 0 else 0
+    return 1 if bool(val) else 0
+
+
 _nna_columns_exist = None
 
 async def _check_columns_cached() -> bool:
@@ -140,7 +155,7 @@ def _row_to_nna(row) -> Nna:
         tiene_discapacidad=bool(row[37]),
         tipo_discapacidad=row[38],
         detalle_discapacidad=row[39],
-        estudia_actualmente=bool(row[40]),
+        estudia_actualmente=row[40],
         nivel_educativo=row[41],
         grado_estudio=row[42],
         institucion_educativa=row[43],
@@ -377,7 +392,7 @@ class OracleNnaRepository:
                         "sexo":          _get("sexo"),
                         "nac":           _get("nacionalidad") or "PERUANA",
                         "carpeta":       carpeta_id,
-                        "partida":       1 if _get("tiene_partida_nacimiento") else 0,
+                        "partida":       _to_bool_int(_get("tiene_partida_nacimiento")),
                         "det_sin_doc":   _get("detalle_sin_doc"),
                         "dep_nac":       _get("departamento_nac"),
                         "prov_nac":      _get("provincia_nac"),
@@ -391,22 +406,22 @@ class OracleNnaRepository:
                         "tutor":         tutor_nom,
                         "vive_con":      _get("vive_con"),
                         "det_vive_con":  _get("detalle_vive_con"),
-                        "hermanos":      1 if tiene_hermanos else 0,
+                        "hermanos":      _to_bool_int(tiene_hermanos),
                         "cant_h":        cant_hermanos,
                         "pernocte":      _get("lugar_pernocte"),
                         "det_pernocte":  _get("detalle_lugar_pernocte"),
-                        "antec_alb":     1 if _get("tiene_antecedente_albergue") else 0,
+                        "antec_alb":     _to_bool_int(_get("tiene_antecedente_albergue")),
                         "det_antec_alb": _get("detalle_antecedente_albergue"),
                         "sis":           _get("afiliado_sis"),
                         "otro_seg":      _get("afiliado_otro_seguro"),
                         "det_otro_seg":  _get("detalle_otro_seguro"),
-                        "enfermedad":    1 if _get("sufre_enfermedad") else 0,
+                        "enfermedad":    _to_bool_int(_get("sufre_enfermedad")),
                         "det_enf":       _get("detalle_enfermedad"),
                         "obs_salud":     _get("observaciones_salud"),
-                        "discap":        1 if _get("tiene_discapacidad") else 0,
+                        "discap":        _to_bool_int(_get("tiene_discapacidad")),
                         "tipo_discap":   _get("tipo_discapacidad"),
                         "det_discap":    _get("detalle_discapacidad"),
-                        "estudia":       1 if _get("estudia_actualmente") else 0,
+                        "estudia":       _get("estudia_actualmente") or 0,
                         "nivel":         _get("nivel_educativo"),
                         "grado":         _get("grado_estudio"),
                         "institucion":   _get("institucion_educativa"),
@@ -416,7 +431,7 @@ class OracleNnaRepository:
                         "unidad_edad":   _get("unidad_edad") or "ANIOS",
                         "act_libre":     _get("actividades_tiempo_libre"),
                         "caract":        _get("caracteristicas"),
-                        "tiene_tutor_apo": 1 if _get("tiene_tutor_apo") else 0,
+                        "tiene_tutor_apo": _to_bool_int(_get("tiene_tutor_apo")),
                         "pri_ape_tut_apo": _get("pri_ape_tut_apo"),
                         "seg_ape_tut_apo": _get("seg_ape_tut_apo"),
                         "nom_ape_tut_apo": _get("nom_ape_tut_apo"),
@@ -587,6 +602,7 @@ class OracleNnaRepository:
                     "DEPARTAMENTO_DOM=:dep_dom", "PROVINCIA_DOM=:prov_dom", "DISTRITO_DOM=:dist_dom",
                     "TELEFONO_CONTACTO=:tel",
                     "NOMBRE_TUTOR=:tutor", "VIVE_CON=:vive_con", "DETALLE_VIVE_CON=:det_vive_con",
+                    "TIENE_HERMANOS=:hermanos", "CANT_HERMANOS=:cant_h", "DETALLES_HERMANOS=:detalles_h",
                     "LUGAR_PERNOCTE=:pernocte", "DETALLE_LUGAR_PERNOCTE=:det_pernocte",
                     "TIENE_ANTECEDENTE_ALBERGUE=:antec_alb", "DETALLE_ANTECEDENTE_ALBERGUE=:det_antec_alb",
                     "AFILIADO_SIS=:sis", "AFILIADO_OTRO_SEGURO=:otro_seg", "DETALLE_OTRO_SEGURO=:det_otro_seg",
@@ -620,7 +636,7 @@ class OracleNnaRepository:
                     "fnac":          fnac_parsed,
                     "sexo":          _get("sexo"),
                     "nac":           _get("nacionalidad") or "PERUANA",
-                    "partida":       1 if _get("tiene_partida_nacimiento") else 0,
+                    "partida":       _to_bool_int(_get("tiene_partida_nacimiento")),
                     "det_sin_doc":   _get("detalle_sin_doc"),
                     "dep_nac":       _get("departamento_nac"),
                     "prov_nac":      _get("provincia_nac"),
@@ -634,20 +650,23 @@ class OracleNnaRepository:
                     "tutor":         tutor_nom,
                     "vive_con":      _get("vive_con"),
                     "det_vive_con":  _get("detalle_vive_con"),
+                    "hermanos":      _to_bool_int(_get("tiene_hermanos")),
+                    "cant_h":        _get("cant_hermanos"),
+                    "detalles_h":    _get("detalles_hermanos"),
                     "pernocte":      _get("lugar_pernocte"),
                     "det_pernocte":  _get("detalle_lugar_pernocte"),
-                    "antec_alb":     1 if _get("tiene_antecedente_albergue") else 0,
+                    "antec_alb":     _to_bool_int(_get("tiene_antecedente_albergue")),
                     "det_antec_alb": _get("detalle_antecedente_albergue"),
                     "sis":           _get("afiliado_sis"),
                     "otro_seg":      _get("afiliado_otro_seguro"),
                     "det_otro_seg":  _get("detalle_otro_seguro"),
-                    "enfermedad":    1 if _get("sufre_enfermedad") else 0,
+                    "enfermedad":    _to_bool_int(_get("sufre_enfermedad")),
                     "det_enf":       _get("detalle_enfermedad"),
                     "obs_salud":     _get("observaciones_salud"),
-                    "discap":        1 if _get("tiene_discapacidad") else 0,
+                    "discap":        _to_bool_int(_get("tiene_discapacidad")),
                     "tipo_discap":   _get("tipo_discapacidad"),
                     "det_discap":    _get("detalle_discapacidad"),
-                    "estudia":       1 if _get("estudia_actualmente") else 0,
+                    "estudia":       _get("estudia_actualmente") or 0,
                     "nivel":         _get("nivel_educativo"),
                     "grado":         _get("grado_estudio"),
                     "institucion":   _get("institucion_educativa"),
@@ -657,7 +676,7 @@ class OracleNnaRepository:
                     "unidad_edad":   _get("unidad_edad") or "ANIOS",
                     "act_libre":     _get("actividades_tiempo_libre"),
                     "caract":        _get("caracteristicas"),
-                    "tiene_tutor_apo": 1 if _get("tiene_tutor_apo") else 0,
+                    "tiene_tutor_apo": _to_bool_int(_get("tiene_tutor_apo")),
                     "pri_ape_tut_apo": _get("pri_ape_tut_apo"),
                     "seg_ape_tut_apo": _get("seg_ape_tut_apo"),
                     "nom_ape_tut_apo": _get("nom_ape_tut_apo"),

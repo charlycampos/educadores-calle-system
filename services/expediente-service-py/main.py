@@ -1,3 +1,9 @@
+import sys
+import asyncio
+
+if sys.platform == 'win32':
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,6 +14,8 @@ from src.infrastructure.db.connection import init_pool, close_pool
 from src.infrastructure.http.routers.folio_router import router as folio_router
 from src.infrastructure.http.routers.cierre_router import router as cierre_router
 from src.infrastructure.http.routers.stats_router import router as stats_router
+from src.infrastructure.http.routers.informe_situacional_router import router as situacional_router
+
 
 
 @asynccontextmanager
@@ -37,6 +45,8 @@ app.add_middleware(
 app.include_router(folio_router)
 app.include_router(cierre_router)
 app.include_router(stats_router)
+app.include_router(situacional_router)
+
 
 
 @app.get("/health")

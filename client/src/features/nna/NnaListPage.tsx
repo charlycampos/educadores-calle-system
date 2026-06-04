@@ -8,18 +8,7 @@ import { Link } from 'react-router-dom';
 import { DerivacionModal } from './components/DerivacionModal';
 import { Button } from '../../components/ui/Button';
 import { PdfViewerModal } from './components/PdfViewerModal';
-
-const calculateAge = (dobString: string | Date | null) => {
-    if (!dobString) return '-';
-    const today = new Date();
-    const birthDate = new Date(dobString);
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const m = today.getMonth() - birthDate.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-        age--;
-    }
-    return age >= 0 ? age : '-';
-};
+import { calculateAge } from '../../utils/age';
 
 export const NnaListPage = () => {
     const { nnas, isLoading, fetchAllNnas } = useNnaStore();

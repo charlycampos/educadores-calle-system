@@ -9,7 +9,21 @@
       "Bash(xargs grep -l \"F0[3456]\")",
       "Bash(xargs grep -l \"DIAGNOSTICO_SOCIAL\")",
       "Bash(xargs grep -l \"Formato.*Print\\\\|Formato.*Social\")",
-      "Bash(grep -E \"\\(\\\\.tsx|\\\\.ts\\)$\")"
+      "Bash(grep -E \"\\(\\\\.tsx|\\\\.ts\\)$\")",
+      "Bash(python run_all_migrations.py)",
+      "Bash(python3 run_all_migrations.py)",
+      "Bash(where py *)",
+      "Bash(where python.exe)",
+      "Bash(where python3.exe)",
+      "Bash(py run_all_migrations.py)",
+      "Bash(netstat -ano)",
+      "Bash(findstr :3006)",
+      "Bash(taskkill *)",
+      "PowerShell(Stop-Process *)",
+      "PowerShell(Start-Process -FilePath \"C:\\\\Windows\\\\py.exe\" -ArgumentList \"main.py\" -WorkingDirectory \"D:\\\\Usuarios\\\\ccampos\\\\Documents\\\\Python Scripts\\\\Educadores_calle\\\\educadores-calle-system\\\\services\\\\expediente-service-py\" -WindowStyle Normal)",
+      "PowerShell(netstat *)",
+      "PowerShell(Start-Process -FilePath \"D:\\\\Usuarios\\\\ccampos\\\\Documents\\\\Python Scripts\\\\Educadores_calle\\\\educadores-calle-system\\\\services\\\\expediente-service-py\\\\venv\\\\Scripts\\\\python.exe\" -ArgumentList \"main.py\" -WorkingDirectory \"D:\\\\Usuarios\\\\ccampos\\\\Documents\\\\Python Scripts\\\\Educadores_calle\\\\educadores-calle-system\\\\services\\\\expediente-service-py\" -WindowStyle Normal)",
+      "PowerShell($token = \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\"; Invoke-WebRequest -Uri \"http://localhost:3006/api/informe-situacional/caso/284\" -Headers @{Authorization=\"Bearer $token\"} -UseBasicParsing 2>&1 | Select-Object StatusCode, Content)"
     ]
   }
 }

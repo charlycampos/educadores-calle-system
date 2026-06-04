@@ -452,7 +452,8 @@ export const useNnaStore = create<NnaState>((set, get) => ({
                     backendDocs = await Promise.all(folios.map(async (f: any) => {
                         const isF05Full  = f.tipo_documento === 'F05';
                         const isF05Fase  = Object.prototype.hasOwnProperty.call(F05_FASE_LABELS, f.tipo_documento);
-                        const usePdfUrl  = isF05Full || isF05Fase;
+                        const isF09      = f.tipo_documento === 'F09';
+                        const usePdfUrl  = isF05Full || isF05Fase || isF09;
 
                         let pages = 1;
                         if (isF05Fase) {
@@ -474,7 +475,9 @@ export const useNnaStore = create<NnaState>((set, get) => ({
                                 ? F05_FASE_LABELS[f.tipo_documento]
                                 : isF05Full
                                     ? 'FICHA DE LOGROS (FORMATO 5)'
-                                    : (f.tipo_documento || 'DOCUMENTO SUBIDO'),
+                                    : isF09
+                                        ? 'INFORME SITUACIONAL (FORMATO 9)'
+                                        : (f.tipo_documento || 'DOCUMENTO SUBIDO'),
                             code: f.hash_documento ? f.hash_documento.toUpperCase() : `FOLIO-${f.numero_folio}`,
                             date: f.fecha_creacion || new Date().toISOString(),
                             pages,
