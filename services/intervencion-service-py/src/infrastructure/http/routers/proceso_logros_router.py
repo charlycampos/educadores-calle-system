@@ -191,14 +191,38 @@ async def cerrar_fase(
 
     FASE_CONFIG = {1: (5, "I"), 2: (10, "II"), 3: (5, "III")}
 
-    # Para Fase 2 y 3, verificar que la fase anterior esté completa
+    # Para Fase 2 y 3, verificar que la fase anterior esté completa (o ya archivada en el expediente)
     if fase_num >= 2:
         prev_total, prev_label = FASE_CONFIG[fase_num - 1]
-        if not all(logros.get(f"f{fase_num - 1}_i{i}") == "SI" for i in range(1, prev_total + 1)):
-            raise HTTPException(
-                status_code=422,
-                detail=f"Debe completar la Fase {prev_label} antes de cerrar la Fase {FASE_CONFIG[fase_num][1]}.",
-            )
+        
+        # Verificar si la fase anterior ya tiene un folio registrado (está archivada)
+        fase_anterior_archivada = False
+        caso_id = logros.get("caso_id")
+        if caso_id:
+            try:
+                pool = get_repo() # Wait, repo is connection pool or repository?
+                # Wait! Let's check how get_pool is imported or used in the repository.
+                # In oracle_proceso_logros_repository.py, it imports get_pool from src.infrastructure.db.connection
+                from src.infrastructure.db.connection import get_pool
+                db_pool = get_pool()
+                async with db_pool.acquire() as conn:
+                    async with conn.cursor() as cur:
+                        await cur.execute(
+                            "SELECT COUNT(*) FROM EXP_FOLIO WHERE CASO_ID = :1 AND TIPO_DOCUMENTO = :2",
+                            [caso_id, f"F05-FASE-{fase_num - 1}"]
+                        )
+                        crow = await cur.fetchone()
+                        if crow and crow[0] > 0:
+                            fase_anterior_archivada = True
+            except Exception as e:
+                logger.error(f"Error checkeando folio anterior en DB: {e}")
+
+        if not fase_anterior_archivada:
+            if not all(logros.get(f"f{fase_num - 1}_i{i}") == "SI" for i in range(1, prev_total + 1)):
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Debe completar la Fase {prev_label} antes de cerrar la Fase {FASE_CONFIG[fase_num][1]}.",
+                )
 
     total, label = FASE_CONFIG[fase_num]
     pendientes = [f"ítem {i}" for i in range(1, total + 1) if logros.get(f"f{fase_num}_i{i}") != "SI"]
@@ -279,13 +303,33 @@ async def finalizar_logros(
     if not logros:
         raise HTTPException(status_code=404, detail="Registro F05 no encontrado")
 
-    # Las Fases I y II deben estar completas antes de poder finalizar la Fase III
+    # Las Fases I y II deben estar completas (o ya archivadas en el expediente) antes de poder finalizar la Fase III
+    caso_id = logros.get("caso_id")
     for fase, total, nombre in [(1, 5, "I"), (2, 10, "II")]:
-        if not all(logros.get(f"f{fase}_i{i}") == "SI" for i in range(1, total + 1)):
-            raise HTTPException(
-                status_code=422,
-                detail=f"Debe completar la Fase {nombre} antes de finalizar la Fase III.",
-            )
+        # Verificar si la fase ya está archivada
+        fase_archivada = False
+        if caso_id:
+            try:
+                from src.infrastructure.db.connection import get_pool
+                db_pool = get_pool()
+                async with db_pool.acquire() as conn:
+                    async with conn.cursor() as cur:
+                        await cur.execute(
+                            "SELECT COUNT(*) FROM EXP_FOLIO WHERE CASO_ID = :1 AND TIPO_DOCUMENTO = :2",
+                            [caso_id, f"F05-FASE-{fase}"]
+                        )
+                        crow = await cur.fetchone()
+                        if crow and crow[0] > 0:
+                            fase_archivada = True
+            except Exception as e:
+                logger.error(f"Error checkeando folio de fase {nombre} en DB: {e}")
+
+        if not fase_archivada:
+            if not all(logros.get(f"f{fase}_i{i}") == "SI" for i in range(1, total + 1)):
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Debe completar la Fase {nombre} antes de finalizar la Fase III.",
+                )
 
     # Verificar que los 5 ítems de la Fase III estén en SI
     pendientes = [f"ítem {i}" for i in range(1, 6) if logros.get(f"f3_i{i}") != "SI"]

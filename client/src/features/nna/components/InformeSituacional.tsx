@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Printer, Save, CheckCircle2 as CheckIcon, ClipboardList, MapPin, Users, CheckCircle2, FileSignature, PenLine } from 'lucide-react';
 import { EXPEDIENTE_API_URL } from '../../../config/api';
 import { formatTipoDoc } from '../../../data/ubigeo';
+import { useNnaStore } from '../../../store/nna.store';
 
 const formatSexo = (sexo: any): string => {
     if (!sexo) return '---';
@@ -113,27 +114,14 @@ export const InformeSituacional = ({ nna, caso, onClose }: InformeSituacionalPro
         if (!caso?.id) { alert('No existe un caso activo para este NNA'); return; }
         if (!window.confirm('¿Confirmas que el informe situacional está completo y deseas finalizarlo? Esta acción lo registrará en el Expediente Digital.')) return;
         setIsFinalizing(true);
-        const token = localStorage.getItem('token');
         try {
             await saveToApi('FINALIZADO');
             setEstadoActual('FINALIZADO');
 
-            const vistaUrl = `${EXPEDIENTE_API_URL}/informe-situacional/caso/${caso.id}/vista`;
-            const folioRes = await fetch(`${EXPEDIENTE_API_URL}/expediente/caso/${caso.id}/folio`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({
-                    tipo_documento: 'F09',
-                    titulo: `INFORME SITUACIONAL (F09) — ${formData.asunto}`.substring(0, 200),
-                    archivo_url: vistaUrl,
-                    contenido_hash: `INF-SIT-${caso.id}`.substring(0, 40),
-                }),
-            });
-            if (!folioRes.ok) {
-                alert('Informe finalizado, pero no se pudo registrar en el Expediente. Recarga la página.');
-            } else {
-                alert('Informe finalizado y registrado en el Expediente Digital.');
-            }
+            // Recargar los documentos en el store del expediente digital
+            await useNnaStore.getState().loadDocuments(nna.id, nna);
+
+            alert('Informe finalizado y registrado en el Expediente Digital.');
             onClose();
         } catch (e) {
             console.error(e);

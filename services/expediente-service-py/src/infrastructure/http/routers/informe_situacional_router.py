@@ -7,6 +7,10 @@ from pydantic import BaseModel
 from src.infrastructure.db.repositories.oracle_informe_situacional_repository import OracleInformeSituacionalRepository
 from src.infrastructure.http.middleware.jwt_middleware import get_current_user, verificar_token
 
+import os
+from fastapi.responses import FileResponse
+from src.infrastructure.services.pdf_generator_f09 import generate_f09_pdf
+
 router = APIRouter(prefix="/api/informe-situacional", tags=["informe-situacional"])
 
 
@@ -60,6 +64,38 @@ async def save_informe_situacional(
 ):
     repo = OracleInformeSituacionalRepository()
     informe = await repo.save(caso_id, body.model_dump(), user["userId"])
+    
+    # Registrar en el expediente digital (EXP_FOLIO) si no existe y está FINALIZADO
+    if informe.estado == "FINALIZADO":
+        from src.infrastructure.db.repositories.oracle_folio_repository import OracleFolioRepository
+        folio_repo = OracleFolioRepository()
+        folios = await folio_repo.list_by_caso(caso_id)
+        tipo_doc = "INFORME_SITUACIONAL"
+        existe_folio = any(f.tipo_documento == tipo_doc for f in folios)
+        if not existe_folio:
+            siguiente_folio = await folio_repo.get_next_numero_folio(caso_id)
+            await folio_repo.create(
+                caso_id=caso_id,
+                sede_id=user.get("sedeId", 1),
+                numero_folio=siguiente_folio,
+                tipo_documento=tipo_doc,
+                titulo="Informe Situacional",
+                archivo_url=f"/api/informe-situacional/caso/{caso_id}/pdf",
+                hash_documento=None,
+                creado_por_id=user["userId"]
+            )
+        
+        # Generar e introducir el PDF inmediatamente en el repositorio de archivos
+        try:
+            nna = await repo.get_nna_by_caso(caso_id)
+            repositorio_dir = os.path.abspath("./repositorio_archivos/informes_situacionales")
+            os.makedirs(repositorio_dir, exist_ok=True)
+            pdf_path = os.path.join(repositorio_dir, f"informe_situacional_{caso_id}.pdf")
+            informe_dict = _serialize(informe)
+            generate_f09_pdf(informe_dict, nna, pdf_path)
+        except Exception as e:
+            print(f"Error generando PDF de Informe Situacional en guardado: {e}")
+            
     return _serialize(informe)
 
 
@@ -73,6 +109,55 @@ async def delete_informe_situacional(caso_id: int, user: dict = Depends(get_curr
             detail="No existe informe situacional para eliminar"
         )
     return {"status": "ok", "message": "Informe situacional eliminado"}
+
+
+@router.get("/caso/{caso_id}/pdf")
+async def exportar_pdf_informe_situacional(
+    caso_id: int,
+    token: Optional[str] = None,
+    user: Optional[dict] = Depends(get_current_user)
+):
+    if not user:
+        if not token:
+            raise HTTPException(status_code=401, detail="No autorizado")
+        try:
+            user = verificar_token(token)
+        except Exception:
+            raise HTTPException(status_code=401, detail="Token inválido")
+            
+    repo = OracleInformeSituacionalRepository()
+    inf = await repo.find_by_caso(caso_id)
+    if not inf:
+        raise HTTPException(status_code=404, detail="Informe no encontrado")
+        
+    nna = await repo.get_nna_by_caso(caso_id)
+    
+    # Generar PDF en el repositorio de archivos
+    repositorio_dir = os.path.abspath("./repositorio_archivos/informes_situacionales")
+    os.makedirs(repositorio_dir, exist_ok=True)
+    pdf_path = os.path.join(repositorio_dir, f"informe_situacional_{caso_id}.pdf")
+    
+    informe_dict = {
+        "fecha_informe": inf.fecha_informe,
+        "destinatario": inf.destinatario,
+        "asunto": inf.asunto,
+        "antecedentes": inf.antecedentes,
+        "estrategias": inf.estrategias,
+        "situacion_salud": inf.situacion_salud,
+        "situacion_educativa": inf.situacion_educativa,
+        "situacion_familiar": inf.situacion_familiar,
+        "conclusiones": inf.conclusiones,
+        "recomendaciones": inf.recomendaciones
+    }
+    
+    generate_f09_pdf(informe_dict, nna, pdf_path)
+    
+    return FileResponse(
+        pdf_path,
+        media_type="application/pdf",
+        filename="Informe_Situacional.pdf",
+        headers={"Content-Disposition": "inline; filename=Informe_Situacional.pdf"}
+    )
 
 
 @router.get("/caso/{caso_id}/vista", response_class=HTMLResponse)

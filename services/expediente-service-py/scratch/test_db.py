@@ -8,16 +8,15 @@ if sys.platform == 'win32':
 # Add path so imports work
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from src.infrastructure.db.connection import init_pool, close_pool
-from src.infrastructure.http.routers.informe_situacional_router import get_informe_situacional
+from src.infrastructure.db.connection import init_pool, close_pool, get_pool
+from src.infrastructure.http.routers.informe_situacional_router import exportar_pdf_informe_situacional
 
 async def main():
     await init_pool()
     try:
-        print("Calling endpoint function directly...")
-        # Simulate user dictionary dependency
-        res = await get_informe_situacional(286, {"userId": 1, "sedeId": 1})
-        print("Success! Result:", res)
+        print("Calling exportar_pdf_informe_situacional for caso 286...")
+        res = await exportar_pdf_informe_situacional(286, None, {"userId": 6, "sedeId": 1})
+        print("Success! FileResponse path:", res.path)
     except Exception as e:
         import traceback
         print("ERROR:")

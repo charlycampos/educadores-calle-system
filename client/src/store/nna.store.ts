@@ -452,13 +452,17 @@ export const useNnaStore = create<NnaState>((set, get) => ({
                     backendDocs = await Promise.all(folios.map(async (f: any) => {
                         const isF05Full  = f.tipo_documento === 'F05';
                         const isF05Fase  = Object.prototype.hasOwnProperty.call(F05_FASE_LABELS, f.tipo_documento);
-                        const isF09      = f.tipo_documento === 'F09';
-                        const usePdfUrl  = isF05Full || isF05Fase || isF09;
+                        const isInformeSituacional = f.tipo_documento === 'F09' || f.tipo_documento === 'INFORME_SITUACIONAL';
+                        const usePdfUrl  = isF05Full || isF05Fase || isInformeSituacional;
+
+                        const resolvedArchivoUrl = f.archivo_url.startsWith('/api/')
+                            ? EXPEDIENTE_API_URL + f.archivo_url.substring(4)
+                            : f.archivo_url;
 
                         let pages = 1;
                         if (isF05Fase) {
                             try {
-                                const pagesResp = await fetch(`${f.archivo_url}/pages`, {
+                                const pagesResp = await fetch(`${resolvedArchivoUrl}/pages`, {
                                     headers: { 'Authorization': `Bearer ${token}` },
                                 });
                                 if (pagesResp.ok) {
@@ -475,16 +479,16 @@ export const useNnaStore = create<NnaState>((set, get) => ({
                                 ? F05_FASE_LABELS[f.tipo_documento]
                                 : isF05Full
                                     ? 'FICHA DE LOGROS (FORMATO 5)'
-                                    : isF09
-                                        ? 'INFORME SITUACIONAL (FORMATO 9)'
+                                    : isInformeSituacional
+                                        ? 'INFORME SITUACIONAL'
                                         : (f.tipo_documento || 'DOCUMENTO SUBIDO'),
                             code: f.hash_documento ? f.hash_documento.toUpperCase() : `FOLIO-${f.numero_folio}`,
                             date: f.fecha_creacion || new Date().toISOString(),
                             pages,
                             nombreResponsable: f.nombreResponsable || 'Usuario Autenticado',
                             ...(usePdfUrl
-                                ? { pdfUrl: `${f.archivo_url}?token=${token}` }
-                                : { filename: f.archivo_url.split('/').pop() }
+                                ? { pdfUrl: `${resolvedArchivoUrl}?token=${token}` }
+                                : { filename: resolvedArchivoUrl.split('/').pop() }
                             ),
                             status: 'APROBADO'
                         };

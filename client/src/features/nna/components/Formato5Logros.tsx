@@ -105,11 +105,15 @@ export const Formato5Logros = ({ nna, caso, initialData, onClose, onSuccess }: F
         }
     }, [initialData]);
 
-    // Fase N se desbloquea si fue oficialmente cerrada (folio en expediente) O si todos sus ítems están en SI en los datos guardados
+    // Fase N se desbloquea si fue oficialmente cerrada (folio en expediente) O si todos sus ítems están en SI en el estado local (en tiempo real)
     const fase1Cerrada = documents.some(d => d.pdfUrl?.includes('/pdf/fase/1'));
     const fase2Cerrada = documents.some(d => d.pdfUrl?.includes('/pdf/fase/2'));
-    const fase2Desbloqueada = fase1Cerrada || (initialData ? ITEMS_FASE_1.every(it => initialData[`f1_i${it.id}`] === 'SI') : false);
-    const fase3Desbloqueada = fase2Cerrada || (initialData ? ITEMS_FASE_2.every(it => initialData[`f2_i${it.id}`] === 'SI') : false);
+    
+    const fase1TodoSi = ITEMS_FASE_1.every(it => logros[`f1_${it.id}`] === 'SI');
+    const fase2TodoSi = ITEMS_FASE_2.every(it => logros[`f2_${it.id}`] === 'SI');
+    
+    const fase2Desbloqueada = fase1Cerrada || fase1TodoSi;
+    const fase3Desbloqueada = fase2Cerrada || fase2TodoSi;
 
     const getItems = (fase: number) => {
         if (fase === 1) return ITEMS_FASE_1;

@@ -14,7 +14,7 @@ TIPOS_DOCUMENTO = [
     "F08",        # Ejecución de Taller
     "F10",        # Seguimiento Familiar
     "F11",        # Informe Mensual
-    "F09",        # Informe Situacional
+    "INFORME_SITUACIONAL",  # Informe Situacional
     "F12",        # Informe de Egreso
     "F05",        # Logros y Actividades
     "INF",        # Informe de Cierre

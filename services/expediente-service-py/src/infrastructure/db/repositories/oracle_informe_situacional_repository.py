@@ -130,5 +130,30 @@ class OracleInformeSituacionalRepository:
         async with pool.acquire() as conn:
             async with conn.cursor() as cur:
                 await cur.execute("DELETE FROM EXP_INFORME_SITUACIONAL WHERE CASO_ID = :caso", {"caso": caso_id})
+                deleted = cur.rowcount > 0
+                await cur.execute("DELETE FROM EXP_FOLIO WHERE CASO_ID = :caso AND TIPO_DOCUMENTO IN ('F09', 'INFORME_SITUACIONAL')", {"caso": caso_id})
                 await conn.commit()
-                return cur.rowcount > 0
+                return deleted
+
+    async def get_nna_by_caso(self, caso_id: int) -> dict:
+        pool = get_pool()
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    """SELECT n.NOMBRES, n.APELLIDO_PATERNO, n.APELLIDO_MATERNO, n.NUMERO_DOC, n.SEXO, n.FECHA_NACIMIENTO
+                       FROM NNA n
+                       JOIN NNA_CASO c ON n.ID = c.NNA_ID
+                       WHERE c.ID = :caso""",
+                    {"caso": caso_id}
+                )
+                row = await cur.fetchone()
+                if row:
+                    return {
+                        "nombres": row[0],
+                        "apellido_paterno": row[1],
+                        "apellido_materno": row[2] or "",
+                        "numero_doc": row[3] or "S/D",
+                        "sexo": row[4] or "",
+                        "fecha_nacimiento": row[5]
+                    }
+                return {}

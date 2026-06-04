@@ -30,6 +30,10 @@ export const InformeSituacionalList = ({
             });
 
             if (!response.ok) {
+                if (response.status === 404) {
+                    setInforme(null);
+                    return;
+                }
                 throw new Error(`Error del servidor: ${response.status}`);
             }
             const data = await response.json();
@@ -69,7 +73,7 @@ export const InformeSituacionalList = ({
             <div className="px-5 py-4 border-b border-border flex items-center justify-between">
                 <div>
                     <h3 className="text-[15px] font-semibold text-fg">Informe Situacional</h3>
-                    <p className="text-[12px] text-fg-2 mt-0.5">Formato 09 — Sustento de Abordaje y Diagnóstico</p>
+                    <p className="text-[12px] text-fg-2 mt-0.5">Sustento de Abordaje y Diagnóstico</p>
                 </div>
                 <div className="flex gap-2">
                     <button
