@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useNnaStore } from '../../store/nna.store';
-import { MapPin, Users, Briefcase, School, HeartPulse, Home, Plus, Trash2, AlertCircle, Zap, Calendar, X, Edit2, Search } from 'lucide-react';
+import { MapPin, Users, Briefcase, School, HeartPulse, Home, Plus, Trash2, AlertCircle, Zap, Calendar, X, Edit2, Search, AlertTriangle, CheckCircle, XCircle, Info } from 'lucide-react';
 import { clsx } from 'clsx';
 import { InputField, SelectField, SectionHeader, FooterButtons } from '../../components/ui/FormFields';
 import { UbigeoFields } from '../../components/forms/UbigeoFields';
@@ -98,6 +98,8 @@ interface CasoExpedienteData {
     horarioInicio2?: string;
     horarioFin2?: string;
     diasTrabajo?: string;
+    victimaExplotacion?: string;
+    victima_explotacion?: string;
 }
 
 interface LegacyJornadaDia {
@@ -190,6 +192,7 @@ interface RegistrarNnaPayload {
     crear_nueva_carpeta?: boolean;
     familiares?: any[];
     victima_explotacion?: string | null;
+    es_borrador?: boolean;
 }
 
 interface NnaFormData {
@@ -262,6 +265,7 @@ interface FamiliarFormDataItem {
     telefono?: string;
     ocupacion?: string;
     viveCon?: string; // "SI" / "NO"
+    tipoDoc?: string;
     
     // Datos detallados SEC 2026 si aplica
     priApeTutApo?: string;
@@ -319,6 +323,7 @@ const TimeActivityModal = ({ isOpen, onClose, onSave, initialData }: {
     const [nombre, setNombre] = useState(initialData?.nombre || '');
     const [categoria, setCategoria] = useState<ActividadTiempoLibre['categoria']>(initialData?.categoria || 'ESTUDIAR');
     const [horarios, setHorarios] = useState<HorariosActividad>(initialData?.horarios || initializeHorarios());
+    const [error, setError] = useState('');
 
     function initializeHorarios(): HorariosActividad {
         const dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
@@ -387,9 +392,10 @@ const TimeActivityModal = ({ isOpen, onClose, onSave, initialData }: {
 
     const handleSave = () => {
         if (!nombre.trim()) {
-            alert('Por favor ingrese un nombre de actividad');
+            setError('Por favor ingrese un nombre de actividad');
             return;
         }
+        setError('');
         onSave({
             id: initialData?.id || Math.random().toString(36).substr(2, 9),
             nombre,
@@ -412,6 +418,12 @@ const TimeActivityModal = ({ isOpen, onClose, onSave, initialData }: {
                         <X size={24} />
                     </button>
                 </div>
+
+                {error && (
+                    <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg border border-red-200 text-xs font-semibold">
+                        {error}
+                    </div>
+                )}
 
                 <div className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -830,6 +842,23 @@ export const NnaCreatePage = () => {
     const [showTutorModal, setShowTutorModal] = useState(false);
     const [editingFamiliarIndex, setEditingFamiliarIndex] = useState<number | null>(null);
     const [isCheckingDuplicates, setIsCheckingDuplicates] = useState<boolean>(false);
+    const [alertModal, setAlertModal] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        type: 'success' | 'warning' | 'error' | 'info';
+        onConfirm?: () => void;
+    }>({
+        isOpen: false,
+        title: '',
+        message: '',
+        type: 'info'
+    });
+
+    const showAlert = (title: string, message: string, type: 'success' | 'warning' | 'error' | 'info' = 'info', onConfirm?: () => void) => {
+        setAlertModal({ isOpen: true, title, message, type, onConfirm });
+    };
+    const [tutorError, setTutorError] = useState('');
     const [familiarModalData, setFamiliarModalData] = useState<FamiliarFormDataItem>({
         priApeTutApo: '',
         segApeTutApo: '',
@@ -864,7 +893,7 @@ export const NnaCreatePage = () => {
         { id: 'paso6_familia', label: 'VI. Familia / Otros', icon: Home, description: 'Vivienda y Observaciones' },
     ];
 
-    const { register, control, handleSubmit, watch, setValue, reset, formState: { errors } } = useForm<NnaFormData>({
+    const { register, control, handleSubmit, watch, setValue, reset, getValues, formState: { errors } } = useForm<NnaFormData>({
         defaultValues: {
              nnas: [{
                  nombres: '', apellidoPaterno: '', apellidoMaterno: '', numeroDoc: '', fechaNacimiento: '',
@@ -1519,7 +1548,7 @@ export const NnaCreatePage = () => {
         // Evitar validaciones vacías molestas al salir del campo
         if (!numeroDocNna && !apellidoPaternoNna) {
             if (isManual) {
-                alert("Por favor ingrese al menos el documento o el apellido paterno del NNA para verificar.");
+                showAlert("Falta información", "Por favor ingrese al menos el documento o el apellido paterno del NNA para verificar.", "warning");
             }
             return;
         }
@@ -1543,20 +1572,83 @@ export const NnaCreatePage = () => {
             if (res.status === 'duplicate' || res.status === 'homonym') {
                 setShowDuplicateDrawer(true);
             } else if (isManual) {
-                alert("¡Ficha Única! No se encontraron homónimos ni duplicados en el sistema nacional.");
+                showAlert("Ficha Única", "¡Excelente! No se encontraron homónimos ni duplicados en el sistema nacional.", "success");
             }
         } catch (error) {
             console.error("Error checking duplicates:", error);
             if (isManual) {
-                alert("No se pudo conectar al servidor para validar duplicados.");
+                showAlert("Error de Conexión", "No se pudo conectar al servidor para validar duplicados.", "error");
             }
         } finally {
             setIsCheckingDuplicates(false);
         }
     };
 
-    const onSubmit = async (data: NnaFormData) => {
+    const onSubmit = async (data: NnaFormData, esBorrador: boolean = false) => {
         setSubmitting(true);
+        
+        if (!esBorrador) {
+            // Strict check of all mandatory fields for final registration
+            if (!data.perfil?.trim()) {
+                showAlert("Campo Requerido", "El perfil del caso es obligatorio para finalizar el registro.", "warning");
+                setSubmitting(false);
+                return;
+            }
+            if (!data.zonaIntervencion?.trim()) {
+                showAlert("Campo Requerido", "La zona de intervención es obligatoria para finalizar el registro.", "warning");
+                setSubmitting(false);
+                return;
+            }
+            if (!data.distritoDom?.trim()) {
+                showAlert("Campo Requerido", "El distrito de intervención / domicilio es obligatorio para finalizar el registro.", "warning");
+                setSubmitting(false);
+                return;
+            }
+            if (!data.nnas || data.nnas.length === 0) {
+                showAlert("Beneficiarios Requeridos", "Debe agregar al menos un beneficiario (NNA) para registrar.", "warning");
+                setSubmitting(false);
+                return;
+            }
+            for (let i = 0; i < data.nnas.length; i++) {
+                const nna = data.nnas[i];
+                const label = data.nnas.length > 1 ? ` del NNA ${i + 1}` : "";
+                if (!nna.nombres?.trim()) {
+                    showAlert("Campo Requerido", `El nombre${label} es obligatorio para finalizar el registro.`, "warning");
+                    setSubmitting(false);
+                    return;
+                }
+                if (!nna.apellidoPaterno?.trim()) {
+                    showAlert("Campo Requerido", `El apellido paterno${label} es obligatorio para finalizar el registro.`, "warning");
+                    setSubmitting(false);
+                    return;
+                }
+                if (!nna.sexo?.trim()) {
+                    showAlert("Campo Requerido", `El sexo${label} es obligatorio para finalizar el registro.`, "warning");
+                    setSubmitting(false);
+                    return;
+                }
+                if (!nna.fechaNacimiento?.trim() && !nna.edad) {
+                    showAlert("Campo Requerido", `La fecha de nacimiento o edad${label} es obligatoria para finalizar el registro.`, "warning");
+                    setSubmitting(false);
+                    return;
+                }
+                if (!nna.tipoDoc?.trim()) {
+                    showAlert("Campo Requerido", `El tipo de documento${label} es obligatorio para finalizar el registro.`, "warning");
+                    setSubmitting(false);
+                    return;
+                }
+                if (nna.tipoDoc !== "SIN_DOC" && !nna.numeroDoc?.trim()) {
+                    showAlert("Campo Requerido", `El número de documento${label} es obligatorio para tipos de documento distintos a SIN DOCUMENTO.`, "warning");
+                    setSubmitting(false);
+                    return;
+                }
+                if (nna.tipoDoc === "SIN_DOC" && !nna.detalleSinDoc?.trim()) {
+                    showAlert("Campo Requerido", `Debe especificar el detalle o motivo de la falta de documento${label}.`, "warning");
+                    setSubmitting(false);
+                    return;
+                }
+            }
+        }
         
         // 1. Process Activities & Uso de Tiempo for each NNA
         const nnasWithBackup: NnaConDatos[] = data.nnas.map((nna) => {
@@ -1729,7 +1821,8 @@ export const NnaCreatePage = () => {
             horario_inicio2: data.horarioInicio2 || null,
             horario_fin2: data.horarioFin2 || null,
             dias_trabajo: data.diasTrabajo || null,
-            familiares: mappedFamiliares
+            familiares: mappedFamiliares,
+            es_borrador: esBorrador
         };
 
         try {
@@ -1738,17 +1831,63 @@ export const NnaCreatePage = () => {
                 const carpetaId = expediente?.[0]?.carpetaId;
                 payload.carpeta_id = carpetaId;
                 await updateExpediente(payload);
-                navigate('/nna');
+                
+                if (esBorrador) {
+                    showAlert("Borrador Actualizado", "El borrador ha sido actualizado exitosamente.", "success", () => navigate('/nna'));
+                } else {
+                    showAlert("Cambios Guardados", "Los cambios han sido guardados exitosamente.", "success", () => navigate('/nna'));
+                }
             } else {
                 payload.crear_nueva_carpeta = true;
-                await createNna(payload);
-                navigate('/nna');
+                const result = await createNna(payload);
+                
+                if (esBorrador) {
+                    const newNna = result?.[0]?.nna;
+                    if (newNna && newNna.id) {
+                        // Extraemos la lista de nnas creados para el expediente
+                        const createdNnas = result.map((r: any) => r.nna);
+                        
+                        // Actualizamos el selectedExpediente en el store instantáneamente
+                        useNnaStore.setState({ selectedExpediente: createdNnas });
+                        
+                        // Cambiamos el modo a edición
+                        setIsEditMode(true);
+                        
+                        // Navegamos a la ruta de edición con replace para actualizar la URL sin recargar
+                        navigate(`/nna/editar/${newNna.id}`, { replace: true });
+                        
+                        showAlert("Borrador Guardado", "Borrador guardado. Puedes retomarlo más tarde para completar el registro.", "success", () => navigate('/nna'));
+                    } else {
+                        showAlert("Borrador Guardado", "Borrador guardado con éxito.", "success", () => navigate('/nna'));
+                    }
+                } else {
+                    const codigoF03 = result?.[0]?.nna?.codigo_ficha03 || result?.[0]?.nna?.codigoFicha03;
+                    const msgCodigo = codigoF03 ? ` Código asignado: ${codigoF03}.` : '';
+                    showAlert("Registro Creado", `El expediente ha sido registrado de manera exitosa.${msgCodigo}`, "success", () => navigate('/nna'));
+                }
             }
-        } catch (e) {
-            alert("Error al guardar: " + e);
+        } catch (e: any) {
+            console.error("Error saving NNA:", e);
+            const serverMessage = e.response?.data?.detail || e.response?.data?.message || e.message || String(e);
+            showAlert("Error al guardar", "Ocurrió un error al guardar los datos: " + serverMessage, "error");
         } finally {
             setSubmitting(false);
         }
+    };
+
+    const handleSaveDraft = async () => {
+        const values = getValues();
+        
+        // Validar el mínimo indispensable para base de datos (Nombres y Apellido Paterno)
+        const nnas = values.nnas || [];
+        const missingFields = nnas.some((nna: any) => !nna.nombres?.trim() || !nna.apellidoPaterno?.trim());
+        
+        if (nnas.length === 0 || missingFields) {
+            showAlert("Campos Requeridos", "Para guardar un borrador, debes ingresar al menos los Nombres y el Apellido Paterno del beneficiario.", "warning");
+            return;
+        }
+        
+        await onSubmit(values, true);
     };
 
     const handleNext = () => {
@@ -1777,7 +1916,7 @@ export const NnaCreatePage = () => {
     };
 
     return (
-        <div className="flex h-[calc(100vh-3.5rem)] lg:h-[calc(100vh-0px)] gap-0 bg-slate-50 overflow-hidden">
+        <div className="flex h-[calc(100vh-7rem)] lg:h-[calc(100vh-3.5rem)] gap-0 bg-slate-50 overflow-hidden">
             {/* SIDEBAR */}
             <aside className="w-52 flex-shrink-0 bg-white border-r border-gray-200 flex flex-col overflow-hidden">
                 <div className="px-4 py-4 border-b border-gray-100 bg-blue-600">
@@ -1787,10 +1926,15 @@ export const NnaCreatePage = () => {
 
                 {isEditMode && selectedExpediente && selectedExpediente.length > 0 && (
                     <div className="px-4 py-3 border-b border-gray-100 bg-blue-50/50 flex flex-col gap-2">
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
                             <span className="text-[9px] font-bold uppercase tracking-wider text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
                                 Edición Activa
                             </span>
+                            {!(selectedExpediente[0] as any).codigoFicha03 && (
+                                <span className="text-[9px] font-bold uppercase tracking-wider text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                                    Borrador
+                                </span>
+                            )}
                         </div>
                         <div>
                             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Beneficiario (NNA)</p>
@@ -1867,7 +2011,7 @@ export const NnaCreatePage = () => {
 
             {/* MAIN CONTENT */}
             <main className="flex-1 bg-white flex flex-col overflow-hidden relative">
-                <form onSubmit={handleSubmit(onSubmit)} className="flex-1 flex flex-col min-h-0">
+                <form onSubmit={handleSubmit((d) => onSubmit(d, false))} className="flex-1 flex flex-col min-h-0">
                     <div className="flex-1 overflow-y-auto p-8">
                         {storeError && (
                             <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
@@ -2688,7 +2832,14 @@ export const NnaCreatePage = () => {
 
                     </div>
 
-                    <FooterButtons onBack={handlePrev} onNext={handleNext} onSave={() => handleSubmit(onSubmit)()} loading={submitting} />
+                    <FooterButtons 
+                        onBack={handlePrev} 
+                        onNext={handleNext} 
+                        onSave={() => handleSubmit((d) => onSubmit(d, false))()} 
+                        onSaveDraft={handleSaveDraft}
+                        loading={submitting} 
+                        submitLabel="Finalizar"
+                    />
                 </form>
             </main>
 
@@ -2720,6 +2871,7 @@ export const NnaCreatePage = () => {
                                 onClick={() => {
                                     setShowTutorModal(false);
                                     setEditingFamiliarIndex(null);
+                                    setTutorError('');
                                 }}
                                 className="p-2 hover:bg-purple-100 rounded-full transition-all text-purple-900"
                             >
@@ -2729,6 +2881,11 @@ export const NnaCreatePage = () => {
 
                         {/* Content */}
                         <div className="p-6 overflow-y-auto space-y-6">
+                            {tutorError && (
+                                <div className="p-3 bg-red-50 text-red-600 rounded-xl border border-red-200 text-xs font-semibold animate-fadeIn">
+                                    {tutorError}
+                                </div>
+                            )}
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <InputField
                                     label="Primer Apellido"
@@ -2932,6 +3089,7 @@ export const NnaCreatePage = () => {
                                 onClick={() => {
                                     setShowTutorModal(false);
                                     setEditingFamiliarIndex(null);
+                                    setTutorError('');
                                 }}
                                 className="px-4 py-2 border border-gray-300 text-gray-700 text-xs font-bold rounded-lg hover:bg-gray-100 transition-all"
                             >
@@ -2941,9 +3099,10 @@ export const NnaCreatePage = () => {
                                 type="button"
                                 onClick={() => {
                                     if (!familiarModalData.nomApeTutApo && !familiarModalData.nombres) {
-                                        alert('Por favor ingrese al menos el nombre del familiar.');
+                                        setTutorError('Por favor ingrese al menos el nombre del familiar.');
                                         return;
                                     }
+                                    setTutorError('');
 
                                     const pri = familiarModalData.priApeTutApo || '';
                                     const seg = familiarModalData.segApeTutApo || '';
@@ -3061,6 +3220,73 @@ export const NnaCreatePage = () => {
                                 </div>
                             </div>
                         ))}
+                    </div>
+                </div>
+            )}
+            {/* PREMIUM ALERTA CUSTOM MODAL */}
+            {alertModal.isOpen && (
+                <div className="fixed inset-0 flex items-center justify-center z-[100] animate-fadeIn">
+                    {/* Glass backdrop blur overlay */}
+                    <div 
+                        className="absolute inset-0 bg-slate-900/60 backdrop-blur-md transition-opacity duration-300"
+                        onClick={() => setAlertModal(prev => ({ ...prev, isOpen: false }))}
+                    />
+                    
+                    {/* Modal Card */}
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full mx-4 overflow-hidden border border-slate-100 transform scale-100 transition-all duration-300 z-10 animate-scaleUp">
+                        {/* Status bar header indicator */}
+                        <div className={clsx(
+                            "h-2 w-full bg-gradient-to-r",
+                            alertModal.type === 'success' && "from-emerald-400 to-teal-500",
+                            alertModal.type === 'warning' && "from-amber-400 to-orange-500",
+                            alertModal.type === 'error' && "from-rose-500 to-red-600",
+                            alertModal.type === 'info' && "from-blue-500 to-indigo-600"
+                        )} />
+
+                        <div className="p-6 flex flex-col items-center text-center">
+                            {/* Animated Icon Container */}
+                            <div className={clsx(
+                                "w-16 h-16 rounded-full flex items-center justify-center mb-4 transition-transform duration-500 hover:scale-110",
+                                alertModal.type === 'success' && "bg-emerald-50 text-emerald-600",
+                                alertModal.type === 'warning' && "bg-amber-50 text-amber-600",
+                                alertModal.type === 'error' && "bg-rose-50 text-rose-600",
+                                alertModal.type === 'info' && "bg-blue-50 text-blue-600"
+                            )}>
+                                {alertModal.type === 'success' && <CheckCircle size={32} className="animate-bounce" />}
+                                {alertModal.type === 'warning' && <AlertTriangle size={32} className="animate-pulse" />}
+                                {alertModal.type === 'error' && <XCircle size={32} className="animate-shake" />}
+                                {alertModal.type === 'info' && <Info size={32} />}
+                            </div>
+
+                            {/* Heading */}
+                            <h3 className="text-gray-900 font-bold text-base leading-tight mb-2 tracking-tight">
+                                {alertModal.title}
+                            </h3>
+                            
+                            {/* Body Message */}
+                            <p className="text-gray-500 text-xs font-semibold leading-relaxed mb-6 px-2">
+                                {alertModal.message}
+                            </p>
+
+                            {/* Accept Button */}
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const cb = alertModal.onConfirm;
+                                    setAlertModal(prev => ({ ...prev, isOpen: false, onConfirm: undefined }));
+                                    cb?.();
+                                }}
+                                className={clsx(
+                                    "w-full py-2.5 px-4 rounded-xl text-xs font-black text-white shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all duration-150 uppercase tracking-wider",
+                                    alertModal.type === 'success' && "bg-gradient-to-r from-emerald-500 to-teal-600 hover:shadow-emerald-100",
+                                    alertModal.type === 'warning' && "bg-gradient-to-r from-amber-500 to-orange-600 hover:shadow-amber-100",
+                                    alertModal.type === 'error' && "bg-gradient-to-r from-rose-500 to-red-600 hover:shadow-rose-100",
+                                    alertModal.type === 'info' && "bg-gradient-to-r from-blue-600 to-indigo-700 hover:shadow-blue-100"
+                                )}
+                            >
+                                Entendido
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

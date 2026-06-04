@@ -124,13 +124,16 @@ interface FooterButtonsProps {
     loading?: boolean;
     nextLabel?: string;
     submitLabel?: string;
+    onSaveDraft?: () => void;
+    draftLabel?: string;
 }
 
 export const FooterButtons = ({
-    onBack, onNext, onSave,
+    onBack, onNext, onSave, onSaveDraft,
     loading = false,
     nextLabel = 'Siguiente',
     submitLabel = 'Guardar',
+    draftLabel = 'Guardar Borrador',
 }: FooterButtonsProps) => (
     <div className="flex items-center justify-between pt-4 border-t border-border mt-4 bg-surface sticky bottom-0 z-10 px-6 py-4">
         {onBack ? (
@@ -145,6 +148,16 @@ export const FooterButtons = ({
         ) : <div />}
 
         <div className="flex gap-3">
+            {onSaveDraft && (
+                <button
+                    type="button"
+                    onClick={onSaveDraft}
+                    disabled={loading}
+                    className="flex items-center gap-2 px-5 py-2 bg-amber-600 text-white hover:bg-amber-700 rounded-md text-[13px] font-medium transition-colors disabled:opacity-50 shadow-sm"
+                >
+                    <Save size={14} /> {draftLabel}
+                </button>
+            )}
             {onNext && (
                 <button
                     type="button"
@@ -163,7 +176,7 @@ export const FooterButtons = ({
                     className="flex items-center gap-2 px-5 py-2 bg-primary hover:bg-primary-hover text-primary-fg rounded-md text-[13px] font-medium transition-colors disabled:opacity-50"
                 >
                     {loading ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                    {loading ? 'Guardando…' : submitLabel}
+                    {submitLabel}
                 </button>
             )}
         </div>

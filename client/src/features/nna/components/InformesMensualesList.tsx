@@ -225,7 +225,7 @@ export const InformesMensualesList = ({ nna }: { nna: any }) => {
             {/* Hidden Print Component */}
             {currentPrintInforme && (
                 <div style={{ position: 'fixed', left: '-9999px', top: 0 }}>
-                    <Formato12Print id="formato-12-hidden-print" nna={nna} informe={currentPrintInforme} />
+                    <Formato12Print id="formato-12-hidden-print" nna={nna} ficha={currentPrintInforme} />
                 </div>
             )}
         </div>

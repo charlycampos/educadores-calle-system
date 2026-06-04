@@ -36,10 +36,12 @@ class FamiliaresRequest(BaseModel):
 
 
 class NnaItemRequest(BaseModel):
+    id: Optional[int] = None
+    carpeta_id: Optional[int] = None
     nombres: str
     apellido_paterno: str
     apellido_materno: Optional[str] = None
-    tipo_doc: str
+    tipo_doc: Optional[str] = "SIN_DOC"
     numero_doc: Optional[str] = None
     fecha_nacimiento: Optional[datetime] = None
     sexo: Optional[str] = None
@@ -130,7 +132,7 @@ class NnaItemRequest(BaseModel):
 
 class RegistrarNnaRequest(BaseModel):
     nnas: list[NnaItemRequest]
-    perfil: str
+    perfil: Optional[str] = "SIN_PERFIL"
     zona_intervencion: Optional[str] = None
     distrito_intervencion: Optional[str] = None
     situacion_calle: Optional[str] = None
@@ -148,7 +150,9 @@ class RegistrarNnaRequest(BaseModel):
     dias_trabajo: Optional[str] = None
     victima_explotacion: Optional[str] = "NO"
     crear_nueva_carpeta: Optional[bool] = True
+    carpeta_id: Optional[int] = None
     familiares: Optional[list[FamiliarItem]] = None
+    es_borrador: Optional[bool] = False
 
 
 class VerificarDuplicadosRequest(BaseModel):
@@ -238,6 +242,8 @@ async def registrar_nna(body: RegistrarNnaRequest, background_tasks: BackgroundT
 
             nnas_input.append(
                 NnaInput(
+                    id=_get("id"),
+                    carpeta_id=_get("carpeta_id"),
                     nombres=_get("nombres"),
                     apellido_paterno=_get("apellido_paterno"),
                     apellido_materno=_get("apellido_materno"),
@@ -333,7 +339,9 @@ async def registrar_nna(body: RegistrarNnaRequest, background_tasks: BackgroundT
         resultado = await use_case.execute(
             nnas_input=nnas_input,
             caso_input=caso_input,
+            carpeta_id=body.carpeta_id,
             crear_nueva_carpeta=body.crear_nueva_carpeta if body.crear_nueva_carpeta is not None else True,
+            es_borrador=body.es_borrador if body.es_borrador is not None else False,
         )
 
         # Si hay carpeta_id, podemos guardar familiares
@@ -358,7 +366,18 @@ async def registrar_nna(body: RegistrarNnaRequest, background_tasks: BackgroundT
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
     except Exception as e:
         logger.error(f"Error en registro: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        err_msg = str(e)
+        if "ORA-01400" in err_msg:
+            user_friendly = "Error de validación de datos obligatorio: Intenta ingresar un campo vacío que es requerido por el sistema."
+        elif "ORA-00001" in err_msg:
+            user_friendly = "Registro duplicado: El número de documento o código de ficha ingresado ya existe en la base de datos."
+        elif "ORA-02291" in err_msg:
+            user_friendly = "Error de integridad referencial: Una de las claves foráneas (como la sede o responsable) no es válida."
+        elif "ORA-" in err_msg:
+            user_friendly = f"Error interno de base de datos (Oracle). Por favor contacte al administrador del sistema SEC."
+        else:
+            user_friendly = f"Error al procesar el registro: {err_msg}"
+        raise HTTPException(status_code=400, detail=user_friendly)
 
 
 @router.get("/parametros")
@@ -381,6 +400,24 @@ async def get_parametros(user: dict = Depends(get_current_user)):
         return result
     except Exception as e:
         logger.error(f"Error al obtener parametros: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/carpeta/{carpeta_id}/generar-codigo")
+async def generar_codigo_expediente(carpeta_id: int, user: dict = Depends(get_current_user)):
+    """
+    Genera y asigna el número de expediente a una carpeta.
+    Se llama cuando F03 + F04 + F05 existen para el NNA
+    (según Modelo Operacional Actividad 5004954).
+    """
+    try:
+        carpeta_repo = OracleCarpetaRepository()
+        codigo = await carpeta_repo.generar_codigo_carpeta(carpeta_id)
+        return {"ok": True, "carpeta_id": carpeta_id, "codigo": codigo}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error generando código de expediente carpeta {carpeta_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -509,6 +546,8 @@ async def debug_loaded():
 @router.put("/{carpeta_id}")
 async def actualizar_expediente(carpeta_id: int, body: dict, background_tasks: BackgroundTasks, user: dict = Depends(get_current_user)):
     """Actualiza todos los NNA y familiares de una carpeta."""
+    from src.infrastructure.db.connection import get_pool
+    pool = None
     rol = user.get("rol", "")
     if rol == "ESTADISTICO":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acceso denegado")
@@ -518,33 +557,107 @@ async def actualizar_expediente(carpeta_id: int, body: dict, background_tasks: B
     caso_repo = OracleCasoRepository()
     fam_repo = OracleFamiliarRepository()
 
-    # 1. Actualizar datos de los NNA
-    if "nnas" in body:
-        for n_data in body["nnas"]:
-            nna_id = n_data.get("id")
-            if nna_id:
-                # Extraer campos de salud para formateo si vienen como booleanos
-                if "sufreEnfermedad" in n_data:
-                    val = n_data["sufreEnfermedad"]
-                    n_data["sufre_enfermedad"] = 1 if (val == 'SI' or val is True) else 0
-                
-                await nna_repo.update(nna_id, n_data)
+    try:
+        # 1. Actualizar datos de los NNA
+        if "nnas" in body:
+            es_borrador = body.get("es_borrador", False)
+            for n_data in body["nnas"]:
+                nna_id = n_data.get("id")
+                if nna_id:
+                    n_data["es_borrador"] = es_borrador
+                    # Extraer campos de salud para formateo si vienen como booleanos
+                    if "sufreEnfermedad" in n_data:
+                        val = n_data["sufreEnfermedad"]
+                        n_data["sufre_enfermedad"] = 1 if (val == 'SI' or val is True) else 0
+                    
+                    await nna_repo.update(nna_id, n_data)
 
-    # 2. Actualizar datos del caso (perfil, etc) de la carpeta
-    await caso_repo.update_caso_by_carpeta(carpeta_id, user.get("sedeId"), body)
+        # 2. Actualizar datos del caso (perfil, etc) de la carpeta
+        await caso_repo.update_caso_by_carpeta(carpeta_id, user.get("sedeId"), body, user.get("userId"))
 
-    # 3. Actualizar familiares
-    if "familiares" in body:
-        await fam_repo.save_bulk(carpeta_id, body["familiares"])
+        # Si es_borrador se establece en False (promover/registrar borrador), actualizamos el estado de los casos a EN_EVALUACION
+        if "es_borrador" in body:
+            es_borrador = body["es_borrador"]
+            if not es_borrador:
+                pool = get_pool()
+                async with pool.acquire() as conn:
+                    async with conn.cursor() as cur:
+                        await cur.execute(
+                            """UPDATE NNA_CASO SET ESTADO = 'EN_EVALUACION', UPDATED_AT = SYSTIMESTAMP 
+                               WHERE NNA_ID IN (SELECT ID FROM NNA WHERE CARPETA_ID = :cid) AND ESTADO = 'BORRADOR'""",
+                            {"cid": carpeta_id}
+                        )
+                        await conn.commit()
 
-    # 4. Encolar regeneración del PDF para cada NNA actualizado
-    if "nnas" in body:
-        for n_data in body["nnas"]:
-            nna_id = n_data.get("id")
-            if nna_id:
-                background_tasks.add_task(trigger_pdf_generation, nna_id)
+        # 3. Actualizar familiares
+        if "familiares" in body:
+            await fam_repo.save_bulk(carpeta_id, body["familiares"])
 
-    return {"ok": True}
+        # 4. Encolar regeneración del PDF para cada NNA actualizado
+        if "nnas" in body:
+            for n_data in body["nnas"]:
+                nna_id = n_data.get("id")
+                if nna_id:
+                    background_tasks.add_task(trigger_pdf_generation, nna_id)
+
+        # 5. Verificar apertura del expediente de forma síncrona
+        carpeta_repo = OracleCarpetaRepository()
+        if "nnas" in body:
+            for n_data in body["nnas"]:
+                nna_id = n_data.get("id")
+                if nna_id:
+                    await _verificar_apertura_expediente(nna_id, carpeta_id, carpeta_repo)
+
+        return {"ok": True}
+
+    except Exception as e:
+        logger.error(f"Error en actualizar_expediente: {e}", exc_info=True)
+        err_msg = str(e)
+        if "ORA-01400" in err_msg:
+            user_friendly = "Error de validación de datos obligatorio: Intenta actualizar con un campo vacío que es requerido por el sistema."
+        elif "ORA-00001" in err_msg:
+            user_friendly = "Registro duplicado: El número de documento o código de ficha ingresado ya existe en la base de datos."
+        elif "ORA-02291" in err_msg:
+            user_friendly = "Error de integridad referencial: Una de las claves foráneas (como la sede o responsable) no es válida o no existe."
+        elif "ORA-" in err_msg:
+            user_friendly = f"Error interno de base de datos (Oracle). Por favor contacte al administrador del sistema SEC."
+        else:
+            user_friendly = f"Error al actualizar el expediente: {err_msg}"
+        raise HTTPException(status_code=400, detail=user_friendly)
+
+
+async def _verificar_apertura_expediente(nna_id: int, carpeta_id: int, carpeta_repo) -> None:
+    """Genera el código de expediente si se cumplen F03 + F04 + F05."""
+    from src.infrastructure.db.connection import get_pool
+    pool = get_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute("SELECT CODIGO_FICHA03 FROM NNA WHERE ID = :1", [nna_id])
+            row = await cur.fetchone()
+        if not row or not row[0]:
+            return
+        async with conn.cursor() as cur:
+            await cur.execute("SELECT CODIGO FROM NNA_CARPETA WHERE ID = :1", [carpeta_id])
+            crow = await cur.fetchone()
+        if not crow or crow[0]:
+            return
+        async with conn.cursor() as cur:
+            await cur.execute("SELECT COUNT(1) FROM DIAGNOSTICO_SOCIAL WHERE NNA_ID = :1", [nna_id])
+            f04 = (await cur.fetchone())[0]
+        if f04 == 0:
+            return
+        async with conn.cursor() as cur:
+            await cur.execute(
+                """SELECT COUNT(1) FROM PROCESO_LOGROS
+                   WHERE NNA_ID = :1
+                   AND F1_I1='SI' AND F1_I2='SI' AND F1_I3='SI' AND F1_I4='SI' AND F1_I5='SI'""",
+                [nna_id],
+            )
+            f05 = (await cur.fetchone())[0]
+        if f05 == 0:
+            return
+        codigo = await carpeta_repo.generar_codigo_carpeta(carpeta_id)
+        logger.info(f"Expediente generado al cargar: NNA {nna_id} → {codigo}")
 
 
 @router.get("/{nna_id}/expediente")
@@ -567,6 +680,13 @@ async def get_expediente(nna_id: int, user: dict = Depends(get_current_user)):
     except Exception as e:
         logger.error(f"Error al traducir nna_id a carpeta_id: {e}", exc_info=True)
         # En caso de error, dejamos carpeta_id = nna_id por compatibilidad
+
+    # JIT verification of expediente code generation synchronously
+    try:
+        carpeta_repo = OracleCarpetaRepository()
+        await _verificar_apertura_expediente(nna_id, carpeta_id, carpeta_repo)
+    except Exception as e:
+        logger.error(f"Error en JIT verificar_apertura_expediente para NNA {nna_id}: {e}", exc_info=True)
         
     return await _get_expediente(carpeta_id, user)
 
@@ -748,6 +868,8 @@ def _familiar_to_dict(f) -> dict:
 
 
 def _caso_to_dict(caso) -> dict:
+    if caso is None:
+        return None
     def iso(v):
         return v.isoformat() if v else None
     return {
@@ -809,10 +931,9 @@ async def get_nna_pdf(nna_id: int, request: Request, token: Optional[str] = None
     if not nna:
         raise HTTPException(status_code=404, detail="Beneficiario NNA no encontrado")
 
-    # Obtener código de la ficha (o en su defecto expediente/carpeta) para el nombre único del archivo
     carpeta_repo = OracleCarpetaRepository()
     carpeta = await carpeta_repo.find_by_id(nna.carpeta_id) if nna.carpeta_id else None
-    codigo_archivo = nna.codigo_ficha03 if nna.codigo_ficha03 else (carpeta.codigo if carpeta else f"ID_{nna_id}")
+    codigo_archivo = nna.codigo_ficha03 if nna.codigo_ficha03 else ((carpeta.codigo if carpeta and carpeta.codigo else None) or f"ID_{nna_id}")
     # Sanitizar nombre del archivo
     codigo_archivo = "".join(c for c in codigo_archivo if c.isalnum() or c in ("-", "_", ".")).strip()
 
@@ -877,7 +998,7 @@ async def get_nna_pdf_pages_count(nna_id: int, request: Request, token: Optional
 
     carpeta_repo = OracleCarpetaRepository()
     carpeta = await carpeta_repo.find_by_id(nna.carpeta_id) if nna.carpeta_id else None
-    codigo_archivo = nna.codigo_ficha03 if nna.codigo_ficha03 else (carpeta.codigo if carpeta else f"ID_{nna_id}")
+    codigo_archivo = nna.codigo_ficha03 if nna.codigo_ficha03 else ((carpeta.codigo if carpeta and carpeta.codigo else None) or f"ID_{nna_id}")
     codigo_archivo = "".join(c for c in codigo_archivo if c.isalnum() or c in ("-", "_", ".")).strip()
 
     repositorio_dir = os.getenv("REPOSITORIO_PDFS", "./repositorio_archivos/fichas_f03")

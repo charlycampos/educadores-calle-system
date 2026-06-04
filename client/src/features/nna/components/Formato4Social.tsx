@@ -1,6 +1,6 @@
 import { NNA_API_URL, DERIVACION_API_URL, INTERVENCION_API_URL, AUTH_API_URL, EXPEDIENTE_API_URL } from '../../../config/api';
 import { useState, useEffect, useMemo } from 'react';
-import { Printer, Save, Plus, Edit2, Trash2, X, ArrowLeft, User, Users, GraduationCap, HeartPulse, Target, Clock, Timer, Briefcase, AlertCircle, School } from 'lucide-react';
+import { Printer, Save, Plus, Edit2, Trash2, X, ArrowLeft, User, Users, GraduationCap, HeartPulse, Target, Clock, Timer, Briefcase, AlertCircle, School, CheckCircle2, XCircle } from 'lucide-react';
 import { UbigeoSelectorSimple } from './UbigeoSelectorSimple';
 import { ActividadModal } from './ActividadModal';
 import { InputField, SelectField } from '../../../components/ui/FormFields';
@@ -223,6 +223,20 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
 
     const [activeTab, setActiveTab] = useState<'GENERAL' | 'FAMILIA' | 'EDUCACION' | 'SALUD' | 'NECESIDADES'>('GENERAL');
     const [loading, setLoading] = useState(false);
+    const [showSaveConfirm, setShowSaveConfirm] = useState(false);
+    const [showDraftConfirm, setShowDraftConfirm] = useState(false);
+    const [resultModal, setResultModal] = useState<{
+        type: 'success' | 'draft' | 'error';
+        title: string;
+        message: string;
+        callSuccess?: boolean;
+    } | null>(null);
+
+    const closeResultModal = () => {
+        const shouldCall = resultModal?.callSuccess;
+        setResultModal(null);
+        if (shouldCall && onSuccess) onSuccess();
+    };
 
     // --- ESTADO DEL FORMULARIO (Basado en la estructura del backend) ---
     // ── Parsear datos_f03 CLOB para pre-cargar campos del educador ──────────
@@ -699,6 +713,47 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
     }, [initialData]);
 
     // --- HANDLERS ---
+    const handleSaveDraft = async () => {
+        setLoading(true);
+        try {
+            const token = localStorage.getItem('token');
+            const isEdit = !!(initialData && initialData.id);
+            const method = isEdit ? 'PUT' : 'POST';
+            const url = isEdit
+                ? `${INTERVENCION_API_URL}/diagnostico/${initialData.id}`
+                : `${INTERVENCION_API_URL}/diagnostico/nna/${nna.id}`;
+
+            const payload = {
+                ...formData,
+                actividadesCalle: actividadesCalle,
+                nnaId: nna.id,
+                casoId: caso?.id,
+                es_borrador: true
+            };
+
+            const response = await fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (response.ok) {
+                setResultModal({ type: 'draft', title: 'Borrador guardado', message: 'El avance del Diagnóstico Social (F04) fue guardado como borrador. Podrás retomarlo y completarlo cuando lo necesites.', callSuccess: true });
+            } else {
+                const err = await response.json();
+                setResultModal({ type: 'error', title: 'Error al guardar borrador', message: err.detail || err.message || 'Ocurrió un error al guardar el borrador.' });
+            }
+        } catch (error) {
+            console.error(error);
+            setResultModal({ type: 'error', title: 'Error de conexión', message: 'No se pudo conectar con el servidor. Verifica tu conexión e intenta de nuevo.' });
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleSave = async () => {
         setLoading(true);
         try {
@@ -726,15 +781,14 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
             });
 
             if (response.ok) {
-                alert('Diagnóstico guardado correctamente');
-                if (onSuccess) onSuccess();
+                setResultModal({ type: 'success', title: 'Diagnóstico guardado', message: 'El Diagnóstico Social (F04) fue registrado correctamente en el expediente digital del beneficiario.', callSuccess: true });
             } else {
                 const err = await response.json();
-                alert('Error al guardar: ' + (err.detail || err.message));
+                setResultModal({ type: 'error', title: 'Error al guardar', message: err.detail || err.message || 'Ocurrió un error al guardar el diagnóstico.' });
             }
         } catch (error) {
             console.error(error);
-            alert('Error de conexión con el servidor');
+            setResultModal({ type: 'error', title: 'Error de conexión', message: 'No se pudo conectar con el servidor. Verifica tu conexión e intenta de nuevo.' });
         } finally {
             setLoading(false);
         }
@@ -873,8 +927,16 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                         </div>
                         <div className="flex gap-2">
                             <button
-                                onClick={handleSave}
-                                className="flex items-center gap-1.5 bg-primary text-primary-fg px-4 py-2 rounded-[6px] text-[13px] font-medium hover:bg-primary/90 transition-colors"
+                                onClick={() => setShowDraftConfirm(true)}
+                                disabled={loading}
+                                className="flex items-center gap-1.5 bg-warning-soft text-warning border border-warning/30 px-4 py-2 rounded-[6px] text-[13px] font-medium hover:bg-warning/10 transition-colors disabled:opacity-60"
+                            >
+                                <Clock size={16} /> Borrador
+                            </button>
+                            <button
+                                onClick={() => setShowSaveConfirm(true)}
+                                disabled={loading}
+                                className="flex items-center gap-1.5 bg-primary text-primary-fg px-4 py-2 rounded-[6px] text-[13px] font-medium hover:bg-primary/90 transition-colors disabled:opacity-60"
                             >
                                 <Save size={16} /> Guardar
                             </button>
@@ -3254,6 +3316,187 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                 </table>
 
             </div>
+
+        {/* ── Modal de resultado (éxito / borrador / error) ── */}
+        {resultModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                <div className="bg-surface rounded-2xl shadow-2xl border border-border w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                    <div className={`h-1.5 ${resultModal.type === 'success' ? 'bg-gradient-to-r from-success via-success/70 to-success/30' : resultModal.type === 'draft' ? 'bg-gradient-to-r from-warning via-warning/70 to-warning/30' : 'bg-gradient-to-r from-danger via-danger/70 to-danger/30'}`} />
+                    <div className="p-7">
+                        {/* Ícono */}
+                        <div className="flex justify-center mb-5">
+                            <div className={`w-16 h-16 rounded-full flex items-center justify-center ${resultModal.type === 'success' ? 'bg-success-soft' : resultModal.type === 'draft' ? 'bg-warning-soft' : 'bg-danger-soft'}`}>
+                                {resultModal.type === 'success' && <CheckCircle2 size={32} className="text-success" />}
+                                {resultModal.type === 'draft'   && <Clock       size={32} className="text-warning" />}
+                                {resultModal.type === 'error'   && <XCircle     size={32} className="text-danger"  />}
+                            </div>
+                        </div>
+
+                        {/* Texto */}
+                        <div className="text-center mb-6">
+                            <h3 className={`text-[17px] font-black mb-2 ${resultModal.type === 'success' ? 'text-success' : resultModal.type === 'draft' ? 'text-warning' : 'text-danger'}`}>
+                                {resultModal.title}
+                            </h3>
+                            <p className="text-[13px] text-fg-muted leading-relaxed">
+                                {resultModal.message}
+                            </p>
+                        </div>
+
+                        {/* Botón */}
+                        <button
+                            onClick={closeResultModal}
+                            className={`w-full px-4 py-2.5 rounded-xl font-bold text-[13px] transition-all ${resultModal.type === 'success' ? 'bg-success text-white hover:bg-success/90' : resultModal.type === 'draft' ? 'bg-warning text-white hover:bg-warning/90' : 'bg-danger text-white hover:bg-danger/90'}`}
+                        >
+                            Aceptar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* ── Modal de confirmación de borrador ── */}
+        {showDraftConfirm && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                <div className="bg-surface rounded-2xl shadow-2xl border border-border w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                    <div className="h-1.5 bg-gradient-to-r from-warning via-warning/70 to-warning/30" />
+                    <div className="p-7">
+                        {/* Ícono */}
+                        <div className="flex justify-center mb-5">
+                            <div className="relative">
+                                <div className="w-16 h-16 rounded-full bg-warning-soft flex items-center justify-center">
+                                    <Clock size={28} className="text-warning" />
+                                </div>
+                                <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-warning flex items-center justify-center border-2 border-surface">
+                                    <Save size={11} className="text-white" />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Texto */}
+                        <div className="text-center mb-5">
+                            <h3 className="text-[17px] font-black text-fg mb-1.5">¿Guardar como borrador?</h3>
+                            <p className="text-[13px] text-fg-muted leading-relaxed">
+                                Se guardará el avance parcial del <span className="font-bold text-fg">Diagnóstico Social (F04)</span> de:
+                            </p>
+                            <p className="text-[13px] font-bold text-warning mt-1 truncate">
+                                {nna?.nombres} {nna?.apellidoPaterno} {nna?.apellidoMaterno}
+                            </p>
+                        </div>
+
+                        {/* Nota */}
+                        <div className="flex items-start gap-2.5 bg-warning-soft/60 border border-warning/20 rounded-xl px-4 py-3 mb-6">
+                            <AlertCircle size={14} className="text-warning shrink-0 mt-0.5" />
+                            <p className="text-[11px] text-fg-2 font-medium leading-relaxed">
+                                El borrador quedará guardado pero <span className="font-bold">no será considerado un diagnóstico finalizado</span>. Podrás retomarlo y completarlo en cualquier momento.
+                            </p>
+                        </div>
+
+                        {/* Botones */}
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowDraftConfirm(false)}
+                                disabled={loading}
+                                className="flex-1 px-4 py-2.5 rounded-xl border border-border text-fg font-semibold text-[13px] hover:bg-surface-muted transition-colors disabled:opacity-50"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    setShowDraftConfirm(false);
+                                    await handleSaveDraft();
+                                }}
+                                disabled={loading}
+                                className="flex-1 px-4 py-2.5 rounded-xl bg-warning text-white font-bold text-[13px] hover:bg-warning/90 transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
+                            >
+                                {loading ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                        Guardando...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Clock size={14} />
+                                        Sí, guardar borrador
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* ── Modal de confirmación de guardado ── */}
+        {showSaveConfirm && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                <div className="bg-surface rounded-2xl shadow-2xl border border-border w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                    <div className="h-1.5 bg-gradient-to-r from-primary via-primary/70 to-primary/30" />
+                    <div className="p-7">
+                        {/* Ícono */}
+                        <div className="flex justify-center mb-5">
+                            <div className="relative">
+                                <div className="w-16 h-16 rounded-full bg-primary-soft flex items-center justify-center">
+                                    <Save size={28} className="text-primary" />
+                                </div>
+                                <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-success flex items-center justify-center border-2 border-surface">
+                                    <CheckCircle2 size={13} className="text-white" />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Texto */}
+                        <div className="text-center mb-5">
+                            <h3 className="text-[17px] font-black text-fg mb-1.5">¿Guardar diagnóstico?</h3>
+                            <p className="text-[13px] text-fg-muted leading-relaxed">
+                                Se guardará el <span className="font-bold text-fg">Diagnóstico Social (F04)</span> del beneficiario:
+                            </p>
+                            <p className="text-[13px] font-bold text-primary mt-1 truncate">
+                                {nna?.nombres} {nna?.apellidoPaterno} {nna?.apellidoMaterno}
+                            </p>
+                        </div>
+
+                        {/* Nota */}
+                        <div className="flex items-start gap-2.5 bg-info-soft/60 border border-info/20 rounded-xl px-4 py-3 mb-6">
+                            <AlertCircle size={14} className="text-info shrink-0 mt-0.5" />
+                            <p className="text-[11px] text-fg-2 font-medium leading-relaxed">
+                                Los cambios quedarán registrados en el expediente digital y podrán revisarse o actualizarse en cualquier momento.
+                            </p>
+                        </div>
+
+                        {/* Botones */}
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowSaveConfirm(false)}
+                                disabled={loading}
+                                className="flex-1 px-4 py-2.5 rounded-xl border border-border text-fg font-semibold text-[13px] hover:bg-surface-muted transition-colors disabled:opacity-50"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    setShowSaveConfirm(false);
+                                    await handleSave();
+                                }}
+                                disabled={loading}
+                                className="flex-1 px-4 py-2.5 rounded-xl bg-primary text-primary-fg font-bold text-[13px] hover:bg-primary/90 transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
+                            >
+                                {loading ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-primary-fg/30 border-t-primary-fg rounded-full animate-spin" />
+                                        Guardando...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Save size={14} />
+                                        Sí, guardar
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
         </div >
     );
 };

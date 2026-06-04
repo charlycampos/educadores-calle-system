@@ -39,8 +39,14 @@ const TABS = [
 
 const fmt = (s: string) => s ? s.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase()) : '—';
 
-const calcEdad = (fechaNacimiento: string | null): string => {
-    if (!fechaNacimiento) return '—';
+const calcEdad = (fechaNacimiento: string | null, nna?: any): string => {
+    if (!fechaNacimiento) {
+        if (nna?.edad != null) {
+            const unidad = nna.unidadEdad === 'MESES' ? 'meses' : nna.unidadEdad === 'DIAS' ? 'días' : 'años';
+            return `${nna.edad} ${unidad}`;
+        }
+        return '—';
+    }
     const hoy = new Date();
     const nac = new Date(fechaNacimiento);
     const edad = hoy.getFullYear() - nac.getFullYear();
@@ -297,7 +303,7 @@ const TabAtendidos = ({ nnaActual, familia }: { nnaActual: any; familia: any[] }
                                             </span>
                                             <span className="w-1 h-1 bg-border rounded-full" />
                                             <span className="text-[12px] text-fg-muted font-medium">
-                                                {calcEdad(miembro.fechaNacimiento)}
+                                                {calcEdad(miembro.fechaNacimiento, miembro)}
                                             </span>
                                             <span className="w-1 h-1 bg-border rounded-full" />
                                             <span className="text-[12px] text-fg-muted capitalize font-medium">
@@ -782,7 +788,7 @@ export const ResumenCaso = ({ nna, caso, familia }: ResumenCasoProps) => {
                             </div>
                             <div className="flex flex-col">
                                 <span className="text-[10px] font-black text-fg-muted uppercase tracking-widest">Edad</span>
-                                <span className="text-[14px] font-bold text-fg">{calcEdad(nna.fechaNacimiento)}</span>
+                                <span className="text-[14px] font-bold text-fg">{calcEdad(nna.fechaNacimiento, nna)}</span>
                             </div>
                             <div className="flex flex-col">
                                 <span className="text-[10px] font-black text-fg-muted uppercase tracking-widest">Fase Actual</span>

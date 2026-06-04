@@ -433,6 +433,7 @@ export const useNnaStore = create<NnaState>((set, get) => ({
         }
 
         // 3. Cargar documentos físicos/subidos reales desde el microservicio expediente-service
+        // El F05 entra al expediente vía EXP_FOLIO cuando el educador presiona "Finalizar F05".
         let backendDocs = [];
         const activeCase = nnaData?.casos?.find((c: any) => c.estado !== 'CERRADO') || nnaData?.casos?.[0];
         if (activeCase) {
@@ -443,19 +444,48 @@ export const useNnaStore = create<NnaState>((set, get) => ({
                 });
                 if (response.ok) {
                     const folios = await response.json();
-                    backendDocs = folios.map((f: any) => {
+                    const F05_FASE_LABELS: Record<string, string> = {
+                        'F05-FASE-1': 'FICHA DE LOGROS — FASE I · Contacto e Integración (F05)',
+                        'F05-FASE-2': 'FICHA DE LOGROS — FASE II · Desarrollo e Intervención (F05)',
+                        'F05-FASE-3': 'FICHA DE LOGROS — FASE III · Seguimiento y Egreso (F05)',
+                    };
+                    backendDocs = await Promise.all(folios.map(async (f: any) => {
+                        const isF05Full  = f.tipo_documento === 'F05';
+                        const isF05Fase  = Object.prototype.hasOwnProperty.call(F05_FASE_LABELS, f.tipo_documento);
+                        const usePdfUrl  = isF05Full || isF05Fase;
+
+                        let pages = 1;
+                        if (isF05Fase) {
+                            try {
+                                const pagesResp = await fetch(`${f.archivo_url}/pages`, {
+                                    headers: { 'Authorization': `Bearer ${token}` },
+                                });
+                                if (pagesResp.ok) {
+                                    const pd = await pagesResp.json();
+                                    pages = pd.pages || 1;
+                                }
+                            } catch (_) { /* continuar */ }
+                        }
+
                         return {
                             id: f.id,
                             nnaId,
-                            type: f.tipo_documento || 'DOCUMENTO SUBIDO',
+                            type: isF05Fase
+                                ? F05_FASE_LABELS[f.tipo_documento]
+                                : isF05Full
+                                    ? 'FICHA DE LOGROS (FORMATO 5)'
+                                    : (f.tipo_documento || 'DOCUMENTO SUBIDO'),
                             code: f.hash_documento ? f.hash_documento.toUpperCase() : `FOLIO-${f.numero_folio}`,
                             date: f.fecha_creacion || new Date().toISOString(),
-                            pages: 1,
+                            pages,
                             nombreResponsable: f.nombreResponsable || 'Usuario Autenticado',
-                            filename: f.archivo_url.split('/').pop(),
+                            ...(usePdfUrl
+                                ? { pdfUrl: `${f.archivo_url}?token=${token}` }
+                                : { filename: f.archivo_url.split('/').pop() }
+                            ),
                             status: 'APROBADO'
                         };
-                    });
+                    }));
                 }
             } catch (err) {
                 console.error("Error fetching backend folios:", err);

@@ -22,6 +22,7 @@ import { useAuthStore } from '../../../store/auth.store';
 
 interface FichaTalleresProps {
     nna?: any;
+    onClose?: () => void;
 }
 
 export const FichaTalleres = ({ nna }: FichaTalleresProps) => {

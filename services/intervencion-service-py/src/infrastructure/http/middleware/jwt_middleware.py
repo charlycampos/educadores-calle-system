@@ -4,8 +4,6 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from src.config import settings
 
-_PDF_SUFFIXES = ("/pdf", "/pdf/pages")
-
 class JWTMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         # Dejar pasar preflights CORS sin validar token
@@ -13,7 +11,8 @@ class JWTMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
         if request.url.path.startswith("/api/"):
             path = request.url.path
-            is_pdf_endpoint = any(path.endswith(s) for s in _PDF_SUFFIXES)
+            # Cualquier ruta que sirva un PDF o cuente sus páginas acepta token en query param
+            is_pdf_endpoint = "/pdf" in path
 
             # Para endpoints PDF el token puede venir en el query param (iframe no envía headers)
             auth_header = request.headers.get("Authorization")

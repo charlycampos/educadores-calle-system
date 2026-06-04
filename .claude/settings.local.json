@@ -3,7 +3,13 @@
     "allow": [
       "Bash(npx tsc *)",
       "Bash(npm run *)",
-      "Bash(D:\\\\Usuarios\\\\ccampos\\\\Documents\\\\Python Scripts\\\\Educadores_calle\\\\educadores-calle-system\\\\services\\\\intervencion-service-py\\\\venv\\\\Scripts\\\\pip.exe install *)"
+      "Bash(D:\\\\Usuarios\\\\ccampos\\\\Documents\\\\Python Scripts\\\\Educadores_calle\\\\educadores-calle-system\\\\services\\\\intervencion-service-py\\\\venv\\\\Scripts\\\\pip.exe install *)",
+      "Bash(Get-ChildItem -Path \"D:\\\\Usuarios\\\\ccampos\\\\Documents\\\\Python Scripts\\\\Educadores_calle\\\\educadores-calle-system\" -Directory)",
+      "Bash(Select-Object Name)",
+      "Bash(xargs grep -l \"F0[3456]\")",
+      "Bash(xargs grep -l \"DIAGNOSTICO_SOCIAL\")",
+      "Bash(xargs grep -l \"Formato.*Print\\\\|Formato.*Social\")",
+      "Bash(grep -E \"\\(\\\\.tsx|\\\\.ts\\)$\")"
     ]
   }
 }

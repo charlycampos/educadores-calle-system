@@ -488,19 +488,63 @@ class OracleNnaRepository:
             partes = [tutor_paterno or "", tutor_materno or "", tutor_nombres or ""]
             tutor_nom = " ".join(p.strip() for p in partes if p.strip()).strip() or None
 
+        def _parse_datetime(val):
+            if not val:
+                return None
+            if isinstance(val, __import__('datetime').datetime):
+                return val
+            if isinstance(val, __import__('datetime').date):
+                return __import__('datetime').datetime(val.year, val.month, val.day)
+            if isinstance(val, str):
+                val = val.strip()
+                if val.lower() in ('', 'null', 'undefined'):
+                    return None
+                try:
+                    clean_val = val
+                    if clean_val.endswith('Z'):
+                        clean_val = clean_val[:-1]
+                    t_idx = clean_val.find('T')
+                    if t_idx != -1:
+                        for sign in ('+', '-'):
+                            sign_idx = clean_val.find(sign, t_idx)
+                            if sign_idx != -1:
+                                clean_val = clean_val[:sign_idx]
+                                break
+                    if '.' in clean_val:
+                        clean_val = clean_val.split('.')[0]
+                    if 'T' in clean_val:
+                        return __import__('datetime').datetime.strptime(clean_val, '%Y-%m-%dT%H:%M:%S')
+                    return __import__('datetime').datetime.strptime(clean_val, '%Y-%m-%d')
+                except Exception as e:
+                    print(f"[NNA UPDATE _parse_datetime ERROR] Could not parse '{val}': {e}")
+                    pass
+            return val
+
+        fnac_parsed = _parse_datetime(_get("fecha_nacimiento"))
+        fecha_nac_apo_parsed = _parse_datetime(_get("fecha_nac_apo"))
+
         pool = get_pool()
 
-        # Obtenemos primero los DATOS_F03 actuales para mezclarlos y no perder información previa
+        # Obtenemos primero los DATOS_F03 y CODIGO_FICHA03 actuales para mezclarlos y no perder información previa
         existing_datos = None
+        existing_codigo_f03 = None
         try:
             async with pool.acquire() as conn:
                 async with conn.cursor() as cur:
-                    await cur.execute("SELECT DATOS_F03 FROM NNA WHERE ID = :id", {"id": nna_id})
+                    await cur.execute("SELECT DATOS_F03, CODIGO_FICHA03 FROM NNA WHERE ID = :id", {"id": nna_id})
                     row = await cur.fetchone()
-                    if row and row[0]:
+                    if row:
                         existing_datos = row[0].read() if hasattr(row[0], "read") else row[0]
+                        existing_codigo_f03 = row[1]
         except Exception as e:
-            print(f"[NNA UPDATE] Error reading existing DATOS_F03: {e}")
+            print(f"[NNA UPDATE] Error reading existing NNA info: {e}")
+
+        # Determinamos si debemos generar el CODIGO_FICHA03
+        es_borrador = _get("es_borrador", False)
+        new_codigo_f03 = existing_codigo_f03
+        if not es_borrador and not existing_codigo_f03:
+            proximo_num = await self.get_next_codigo_f03()
+            new_codigo_f03 = f"F03-{__import__('datetime').datetime.now().year}-{proximo_num:04d}"
 
         import json
         datos_json = {}
@@ -562,6 +606,7 @@ class OracleNnaRepository:
                     "AUT_IDE_ET_APO=:aut_ide_et_apo", "AUT_IDE_ET_ESP_APO=:aut_ide_et_esp_apo",
                     "TIPO_DISCAP_APO=:tipo_discap_apo", "CERT_DISCAP_APO=:cert_discap_apo",
                     "DATOS_F03=:datos_f03",
+                    "CODIGO_FICHA03=:codigo_f03",
                     "UPDATED_AT=SYSTIMESTAMP"
                 ]
 
@@ -572,7 +617,7 @@ class OracleNnaRepository:
                     "am":            _get("apellido_materno"),
                     "tipo_doc":      _get("tipo_doc") or "SIN_DOC",
                     "num_doc":       _get("numero_doc"),
-                    "fnac":          _get("fecha_nacimiento"),
+                    "fnac":          fnac_parsed,
                     "sexo":          _get("sexo"),
                     "nac":           _get("nacionalidad") or "PERUANA",
                     "partida":       1 if _get("tiene_partida_nacimiento") else 0,
@@ -617,7 +662,7 @@ class OracleNnaRepository:
                     "seg_ape_tut_apo": _get("seg_ape_tut_apo"),
                     "nom_ape_tut_apo": _get("nom_ape_tut_apo"),
                     "sexo_apo":        _get("sexo_apo"),
-                    "fecha_nac_apo":   _get("fecha_nac_apo"),
+                    "fecha_nac_apo":   fecha_nac_apo_parsed,
                     "nacionalidad_apo": _get("nacionalidad_apo") or "PERUANA",
                     "tip_doc_tut_apo": _get("tip_doc_tut_apo"),
                     "nro_doc_tut_apo": _get("nro_doc_tut_apo"),
@@ -629,6 +674,7 @@ class OracleNnaRepository:
                     "tipo_discap_apo": _get("tipo_discap_apo"),
                     "cert_discap_apo": _get("cert_discap_apo"),
                     "datos_f03":     datos_f03_str,
+                    "codigo_f03":    new_codigo_f03,
                 }
 
                 if has_cols:
@@ -780,45 +826,67 @@ class OracleCarpetaRepository:
         return result.get(carpeta_id)
 
     async def create_nueva(self, sede_id: int = None) -> int:
-        """Crea una nueva carpeta y devuelve su ID."""
+        """Crea una nueva carpeta. CORRELATIVO inicial se asigna en 0.
+        El CODIGO (nro expediente) y el CORRELATIVO real de apertura se asignan recién cuando se abre el expediente (F03+F04+F05)."""
         pool = get_pool()
-        
-        sede_name = "DESCONOCIDO"
-        if sede_id:
-            async with pool.acquire() as conn:
-                async with conn.cursor() as cur:
-                    await cur.execute("SELECT NOMBRE FROM SEC_SEDE WHERE ID = :id", {"id": sede_id})
-                    row = await cur.fetchone()
-                    if row and row[0]:
-                        sede_name = str(row[0]).upper().strip()
-
-        suffix = f"-SEC.{sede_name}"
         async with pool.acquire() as conn:
             async with conn.cursor() as cur:
                 anio = __import__('datetime').datetime.now().year
                 out_id = cur.var(int)
                 await cur.execute(
-                    """INSERT INTO NNA_CARPETA (ANIO, CORRELATIVO, CODIGO, SEDE_ID)
-                       VALUES (:anio,
-                               (SELECT NVL(MAX(CORRELATIVO),0)+1 FROM NNA_CARPETA 
-                                WHERE ANIO=:anio2 AND (SEDE_ID=:sede_id OR (SEDE_ID IS NULL AND :sede_id_is_null = 1))),
-                               (SELECT LPAD(NVL(MAX(CORRELATIVO),0)+1,5,'0')||'-'||:anio3||:suffix FROM NNA_CARPETA 
-                                WHERE ANIO=:anio4 AND (SEDE_ID=:sede_id2 OR (SEDE_ID IS NULL AND :sede_id_is_null2 = 1))),
-                               :sede_id3)
+                    """INSERT INTO NNA_CARPETA (ANIO, CORRELATIVO, SEDE_ID)
+                       VALUES (:anio, 0, :sede_id)
                        RETURNING ID INTO :out_id""",
                     {
-                        "anio": anio,
-                        "anio2": anio,
-                        "anio3": anio,
-                        "anio4": anio,
-                        "suffix": suffix,
-                        "sede_id": sede_id,
-                        "sede_id2": sede_id,
-                        "sede_id3": sede_id,
-                        "sede_id_is_null": 1 if sede_id is None else 0,
-                        "sede_id_is_null2": 1 if sede_id is None else 0,
-                        "out_id": out_id
+                        "anio":      anio,
+                        "sede_id":   sede_id,
+                        "out_id":    out_id,
                     },
                 )
                 await conn.commit()
                 return out_id.getvalue()[0]
+
+    async def generar_codigo_carpeta(self, carpeta_id: int) -> str:
+        """Genera el CODIGO de expediente en el momento de apertura (F03+F04+F05).
+        El número correlativo refleja el orden real de apertura, no de registro.
+        Formato: 00001-2026-SEC.LIMA"""
+        pool = get_pool()
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    "SELECT ANIO, SEDE_ID, CODIGO FROM NNA_CARPETA WHERE ID = :1",
+                    [carpeta_id],
+                )
+                row = await cur.fetchone()
+                if not row:
+                    raise ValueError("Carpeta no encontrada")
+
+                anio, sede_id, codigo_actual = row
+
+                if codigo_actual:
+                    return codigo_actual
+
+                # Siguiente correlativo = MAX ya asignado + 1 (evita repetir si se eliminan expedientes)
+                await cur.execute(
+                    "SELECT NVL(MAX(CORRELATIVO), 0) FROM NNA_CARPETA WHERE ANIO = :1",
+                    [anio],
+                )
+                nro_expediente = (await cur.fetchone())[0] + 1
+
+                sede_name = "DESCONOCIDO"
+                if sede_id:
+                    await cur.execute(
+                        "SELECT NOMBRE FROM SEC_SEDE WHERE ID = :1", [sede_id]
+                    )
+                    sede_row = await cur.fetchone()
+                    if sede_row and sede_row[0]:
+                        sede_name = str(sede_row[0]).upper().strip()
+
+                codigo = f"{str(nro_expediente).zfill(5)}-{anio}-SEC.{sede_name}"
+
+                await cur.execute(
+                    "UPDATE NNA_CARPETA SET CODIGO = :1, CORRELATIVO = :2, UPDATED_AT = SYSTIMESTAMP WHERE ID = :3",
+                    [codigo, nro_expediente, carpeta_id],
+                )
+                await conn.commit()
+                return codigo

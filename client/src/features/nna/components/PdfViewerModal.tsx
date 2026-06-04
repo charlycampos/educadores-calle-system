@@ -1,5 +1,4 @@
-import React from 'react';
-import { X } from 'lucide-react';
+import { X, FileWarning } from 'lucide-react';
 import { useAuthStore } from '../../../store/auth.store';
 import { NNA_API_URL, EXPEDIENTE_API_URL } from '../../../config/api';
 
@@ -11,12 +10,16 @@ interface PdfViewerModalProps {
     documentFilename?: string;
     title?: string;
     pdfUrl?: string;
+    codigoFicha03?: string | null;
 }
 
-export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({ isOpen, onClose, nnaId, nnaName, documentFilename, title, pdfUrl: pdfUrlProp }) => {
+export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({ isOpen, onClose, nnaId, nnaName, documentFilename, title, pdfUrl: pdfUrlProp, codigoFicha03 }) => {
     const token = useAuthStore.getState().token;
 
     if (!isOpen) return null;
+
+    // Check if it is a draft F03 sheet
+    const isDraftF03 = !documentFilename && !pdfUrlProp && !codigoFicha03;
 
     // Direct stream URL using the query parameter token for authentication
     const pdfUrl = pdfUrlProp
@@ -50,12 +53,33 @@ export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({ isOpen, onClose,
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 bg-gray-100 flex items-center justify-center relative overflow-hidden">
-                    <iframe
-                        src={pdfUrl}
-                        className="w-full h-full border-none"
-                        title={`Ficha F03 - ${nnaName}`}
-                    />
+                <div className="flex-1 bg-gray-50 flex items-center justify-center relative overflow-hidden p-6">
+                    {isDraftF03 ? (
+                        <div className="max-w-md w-full bg-white p-8 rounded-2xl border border-gray-200 shadow-md flex flex-col items-center text-center space-y-4 animate-scaleUp">
+                            <div className="w-16 h-16 rounded-full bg-amber-50 flex items-center justify-center text-amber-500 border border-amber-200 animate-pulse">
+                                <FileWarning size={32} />
+                            </div>
+                            <div className="space-y-2">
+                                <h4 className="text-[16px] font-black text-gray-800 uppercase tracking-wider">
+                                    Ficha en Estado Borrador
+                                </h4>
+                                <p className="text-xs text-gray-500 font-semibold leading-relaxed">
+                                    Este registro se guardó como borrador. Aún no se han ingresado los datos obligatorios necesarios para finalizar y registrar la Ficha F03 oficial.
+                                </p>
+                            </div>
+                            <div className="w-full pt-4 border-t border-gray-100">
+                                <p className="text-[11px] text-amber-600 font-bold bg-amber-50/50 py-2 px-3 rounded-lg border border-amber-100">
+                                    Por favor, complete y registre los datos desde el botón de edición de la grilla para generar el PDF oficial.
+                                </p>
+                            </div>
+                        </div>
+                    ) : (
+                        <iframe
+                            src={pdfUrl}
+                            className="w-full h-full border-none"
+                            title={`Ficha F03 - ${nnaName}`}
+                        />
+                    )}
                 </div>
             </div>
         </div>

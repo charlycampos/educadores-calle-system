@@ -88,6 +88,13 @@ class OracleDiagnosticoRepository:
                 return []
 
     async def get_prefilled_by_nna(self, nna_id: int) -> dict:
+        def remove_accents(input_str):
+            if not input_str:
+                return ""
+            import unicodedata
+            nfkd_form = unicodedata.normalize('NFKD', str(input_str))
+            return "".join([c for c in nfkd_form if not unicodedata.combining(c)]).upper().strip()
+
         pool = get_pool()
         async with pool.acquire() as conn:
             async with conn.cursor() as cur:
@@ -330,9 +337,9 @@ class OracleDiagnosticoRepository:
                         "edad": str(nna_dict.get('edad') or ''),
                         "unidadEdad": "ANIOS",
                         "direccionActual": nna_dict.get('domicilio_actual') or '',
-                        "ubigeoDepto": nna_dict.get('departamento_dom') or '',
-                        "ubigeoProvinc": nna_dict.get('provincia_dom') or '',
-                        "ubigeoDistrito": nna_dict.get('distrito_dom') or '',
+                        "ubigeoDepto": remove_accents(nna_dict.get('departamento_dom')),
+                        "ubigeoProvinc": remove_accents(nna_dict.get('provincia_dom')),
+                        "ubigeoDistrito": remove_accents(nna_dict.get('distrito_dom')),
                         "referenciaDireccion": nna_dict.get('referencia_domicilio') or '',
                         "telefonoContacto": nna_dict.get('telefono_contacto') or '',
                         "tiempoEnCalle": caso_dict.get('tiempo_en_calle') or '',

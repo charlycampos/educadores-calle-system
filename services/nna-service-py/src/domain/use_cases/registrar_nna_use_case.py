@@ -88,6 +88,8 @@ class NnaInput:
     cert_discap_nna: Optional[str] = None
 
     datos_f03: Optional[str] = None       # CLOB de respaldo (familiares, etc.)
+    id: Optional[int] = None
+    carpeta_id: Optional[int] = None
 
 
 @dataclass
@@ -129,43 +131,148 @@ class RegistrarNnaUseCase:
         caso_input: CasoInput,
         carpeta_id: Optional[int] = None,
         crear_nueva_carpeta: bool = True,
+        es_borrador: bool = False,
     ) -> list[dict]:
-        # 1. Verificar documentos duplicados
+        # 1. Resolver/verificar si corresponde a una actualización de borradores existentes para evitar duplicados
+        nnas_to_process = []
         for nna_data in nnas_input:
-            if nna_data.numero_doc and nna_data.tipo_doc != "SIN_DOC":
-                existente = await self._nna_repo.find_by_doc(nna_data.numero_doc)
-                if existente:
-                    raise ConflictError(
-                        f"El documento {nna_data.numero_doc} ({nna_data.nombres}) ya está registrado"
-                    )
+            existing_nna = None
+            existing_case = None
 
-        # 2. Resolver carpeta
-        if not carpeta_id or crear_nueva_carpeta:
+            # A. Buscar por ID si está presente
+            if nna_data.id:
+                candidate = await self._nna_repo.find_by_id(nna_data.id)
+                if candidate:
+                    cases = await self._caso_repo.find_by_nna_id(candidate.id)
+                    if cases and cases[0].estado == "BORRADOR":
+                        existing_nna = candidate
+                        existing_case = cases[0]
+                    else:
+                        raise ConflictError(
+                            f"El NNA con ID {nna_data.id} ya está registrado y no es un borrador."
+                        )
+
+            # B. Buscar por coincidencias de datos (nombres, documento, etc.)
+            if not existing_nna:
+                coincidencias = await self._nna_repo.find_duplicates(
+                    nombres=nna_data.nombres,
+                    apellido_paterno=nna_data.apellido_paterno,
+                    apellido_materno=nna_data.apellido_materno,
+                    numero_doc=nna_data.numero_doc,
+                    tipo_doc=nna_data.tipo_doc
+                )
+
+                # Si hay alguna coincidencia registrada (no borrador), arrojamos conflicto inmediato
+                for c in coincidencias:
+                    if c["estadoCaso"] != "BORRADOR":
+                        doc_str = f" con documento {nna_data.numero_doc}" if nna_data.numero_doc else ""
+                        raise ConflictError(
+                            f"El NNA {nna_data.nombres} {nna_data.apellido_paterno}{doc_str} ya está registrado en el sistema."
+                        )
+
+                # Si no hay registrados pero hay un borrador coincidente, lo actualizamos
+                for c in coincidencias:
+                    if c["estadoCaso"] == "BORRADOR":
+                        candidate = await self._nna_repo.find_by_id(c["id"])
+                        if candidate:
+                            cases = await self._caso_repo.find_by_nna_id(candidate.id)
+                            if cases and cases[0].estado == "BORRADOR":
+                                existing_nna = candidate
+                                existing_case = cases[0]
+                                break
+
+            nnas_to_process.append((nna_data, existing_nna, existing_case))
+
+        # 2. Resolver carpeta (priorizando la carpeta del borrador existente si aplica)
+        resolved_carpeta_id = carpeta_id
+        for _, ext_nna, _ in nnas_to_process:
+            if ext_nna and ext_nna.carpeta_id:
+                resolved_carpeta_id = ext_nna.carpeta_id
+                break
+
+        if not resolved_carpeta_id:
             sede_id = caso_input.sede_id if caso_input else None
-            carpeta_id = await self._carpeta_repo.create_nueva(sede_id=sede_id)
+            resolved_carpeta_id = await self._carpeta_repo.create_nueva(sede_id=sede_id)
 
-        # 3. Obtener próximo código F03
-        proximo_f03 = await self._nna_repo.get_next_codigo_f03()
+        # 3. Obtener próximo código F03 si estamos registrando definitivamente
+        proximo_f03 = None
+        if not es_borrador:
+            proximo_f03 = await self._nna_repo.get_next_codigo_f03()
 
-        # 4. Crear cada NNA + su caso
+        # 4. Procesar cada NNA (Insertar o Actualizar según corresponda)
         resultado = []
-        for i, nna_data in enumerate(nnas_input):
-            codigo_f03 = f"F03-{datetime.now().year}-{(proximo_f03 + i):04d}"
-            codigo_caso = await self._caso_repo.get_next_codigo_caso()
+        for i, (nna_data, ext_nna, ext_case) in enumerate(nnas_to_process):
+            if ext_nna:
+                # UPDATE: Actualizar borrador existente
+                nna_dict = {}
+                for field in dir(nna_data):
+                    if not field.startswith('_') and not callable(getattr(nna_data, field)):
+                        nna_dict[field] = getattr(nna_data, field)
+                nna_dict["es_borrador"] = es_borrador
 
-            nna = await self._nna_repo.create(
-                nna_data=nna_data,
-                carpeta_id=carpeta_id,
-                codigo_f03=codigo_f03,
-                tiene_hermanos=len(nnas_input) > 1,
-                cant_hermanos=len(nnas_input) - 1,
-            )
+                await self._nna_repo.update(ext_nna.id, nna_dict)
+                nna = await self._nna_repo.find_by_id(ext_nna.id)
 
-            caso = await self._caso_repo.create(
-                nna_id=nna.id,
-                codigo_caso=codigo_caso,
-                caso_input=caso_input,
-            )
+                # Actualizar el caso activo asociado al NNA
+                if ext_case:
+                    case_data = {
+                        "sede_id": caso_input.sede_id,
+                        "responsable_id": caso_input.responsable_id,
+                        "perfil": caso_input.perfil,
+                        "zona_intervencion": caso_input.zona_intervencion,
+                        "distrito_intervencion": caso_input.distrito_intervencion,
+                        "situacion_calle": caso_input.situacion_calle,
+                        "actividad_realizada": caso_input.actividad_realizada,
+                        "tiempo_en_calle": caso_input.tiempo_en_calle,
+                        "condicion": caso_input.condicion,
+                        "fecha_abordaje": caso_input.fecha_abordaje,
+                        "fecha_ingreso": caso_input.fecha_ingreso or datetime.now(),
+                        "fecha_reingreso": caso_input.fecha_reingreso,
+                        "fecha_cambio_perfil": caso_input.fecha_cambio_perfil,
+                        "horario_inicio": caso_input.horario_inicio,
+                        "horario_fin": caso_input.horario_fin,
+                        "horario_inicio2": caso_input.horario_inicio2,
+                        "horario_fin2": caso_input.horario_fin2,
+                        "dias_trabajo": caso_input.dias_trabajo,
+                        "victima_explotacion": caso_input.victima_explotacion or "NO",
+                        "estado": "BORRADOR" if es_borrador else "EN_EVALUACION",
+                    }
+                    await self._caso_repo.update_by_nna_id(nna.id, case_data)
+                    cases = await self._caso_repo.find_by_nna_id(nna.id)
+                    caso = cases[0]
+                else:
+                    codigo_caso = await self._caso_repo.get_next_codigo_caso()
+                    caso_input.estado = "BORRADOR" if es_borrador else "EN_EVALUACION"
+                    caso = await self._caso_repo.create(
+                        nna_id=nna.id,
+                        codigo_caso=codigo_caso,
+                        caso_input=caso_input,
+                    )
+            else:
+                # INSERT: Crear nuevo registro
+                codigo_f03 = None
+                if not es_borrador and proximo_f03 is not None:
+                    codigo_f03 = f"F03-{datetime.now().year}-{(proximo_f03 + i):04d}"
+                codigo_caso = await self._caso_repo.get_next_codigo_caso()
+
+                nna = await self._nna_repo.create(
+                    nna_data=nna_data,
+                    carpeta_id=resolved_carpeta_id,
+                    codigo_f03=codigo_f03,
+                    tiene_hermanos=len(nnas_input) > 1,
+                    cant_hermanos=len(nnas_input) - 1,
+                )
+
+                if es_borrador:
+                    caso_input.estado = "BORRADOR"
+                else:
+                    caso_input.estado = "EN_EVALUACION"
+
+                caso = await self._caso_repo.create(
+                    nna_id=nna.id,
+                    codigo_caso=codigo_caso,
+                    caso_input=caso_input,
+                )
 
             resultado.append({"nna": nna, "caso": caso})
 

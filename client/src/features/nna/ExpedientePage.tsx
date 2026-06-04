@@ -50,18 +50,23 @@ import { formatTipoDoc } from '../../data/ubigeo';
 export const ExpedientePage = () => {
     const { id } = useParams();
     const [searchParams] = useSearchParams();
-    const { selectedExpediente, isLoading, fetchExpediente } = useNnaStore();
+    const { selectedExpediente, isLoading, fetchExpediente, fetchAllNnas } = useNnaStore();
     const [activeTab, setActiveTab] = useState('dashboard');
     const [showDiagnosticoForm, setShowDiagnosticoForm] = useState(false);
     const [currentDiagnosticoId, setCurrentDiagnosticoId] = useState<number | null>(null);
     const [currentDiagnosticoData, setCurrentDiagnosticoData] = useState<any>(null);
     const [showLogrosForm, setShowLogrosForm] = useState(false);
+    const [logrosRefreshKey, setLogrosRefreshKey] = useState(0);
+    const [currentLogrosId, setCurrentLogrosId] = useState<number | null>(null);
+    const [currentLogrosData, setCurrentLogrosData] = useState<any>(null);
+    const [expedienteGenerado, setExpedienteGenerado] = useState<string | null>(null);
 
     useEffect(() => {
         if (id) {
             fetchExpediente(Number(id));
         }
     }, [id, fetchExpediente]);
+
 
     // Fetch diagnóstico para edición — usar el NNA seleccionado, no siempre el [0]
     useEffect(() => {
@@ -87,6 +92,20 @@ export const ExpedientePage = () => {
             setCurrentDiagnosticoData(null);
         }
     }, [currentDiagnosticoId]);
+
+    useEffect(() => {
+        if (currentLogrosId) {
+            const token = localStorage.getItem('token');
+            fetch(`${INTERVENCION_API_URL}/proceso-logros/${currentLogrosId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+                .then(res => res.json())
+                .then(data => setCurrentLogrosData(data))
+                .catch(err => console.error('Error cargando logros:', err));
+        } else {
+            setCurrentLogrosData(null);
+        }
+    }, [currentLogrosId]);
 
     if (isLoading || !selectedExpediente || selectedExpediente.length === 0) {
         return <div className="p-8 text-center text-gray-500">Cargando expediente digital...</div>;
@@ -130,7 +149,15 @@ export const ExpedientePage = () => {
                                 caso={activeCase}
                                 initialData={currentDiagnosticoData}
                                 onClose={() => setShowDiagnosticoForm(false)}
-                                onSuccess={() => setShowDiagnosticoForm(false)}
+                                onSuccess={async () => {
+                                    setShowDiagnosticoForm(false);
+                                    const teniaCodigo = !!mainNna.carpeta?.codigo;
+                                    await fetchExpediente(mainNna.id);
+                                    if (!teniaCodigo) {
+                                        const nuevo = useNnaStore.getState().selectedExpediente?.[0]?.carpeta?.codigo;
+                                        if (nuevo) { setExpedienteGenerado(nuevo); fetchAllNnas(); }
+                                    }
+                                }}
                             />
                         </div>
                     );
@@ -177,7 +204,22 @@ export const ExpedientePage = () => {
                                 <ArrowLeft size={18} />
                                 Volver a la Lista
                             </button>
-                            <Formato5Logros nna={mainNna} onClose={() => setShowLogrosForm(false)} />
+                            <Formato5Logros
+                                nna={mainNna}
+                                caso={activeCase}
+                                initialData={currentLogrosData}
+                                onClose={() => setShowLogrosForm(false)}
+                                onSuccess={async () => {
+                                    setShowLogrosForm(false);
+                                    setLogrosRefreshKey(k => k + 1);
+                                    const teniaCodigo = !!mainNna.carpeta?.codigo;
+                                    await fetchExpediente(mainNna.id);
+                                    if (!teniaCodigo) {
+                                        const nuevo = useNnaStore.getState().selectedExpediente?.[0]?.carpeta?.codigo;
+                                        if (nuevo) { setExpedienteGenerado(nuevo); fetchAllNnas(); }
+                                    }
+                                }}
+                            />
                         </div>
                     );
                 }
@@ -185,9 +227,19 @@ export const ExpedientePage = () => {
                     <LogrosList
                         nnaId={mainNna.id}
                         nnaFullName={`${mainNna.nombres} ${mainNna.apellidoPaterno} ${mainNna.apellidoMaterno}`}
-                        onNuevoLogro={() => setShowLogrosForm(true)}
-                        onVerLogro={() => setShowLogrosForm(true)}
-                        onEditarLogro={() => setShowLogrosForm(true)}
+                        refreshKey={logrosRefreshKey}
+                        onNuevoLogro={() => {
+                            setCurrentLogrosId(null);
+                            setCurrentLogrosData(null);
+                            setShowLogrosForm(true);
+                        }}
+                        onEditarLogro={(id) => {
+                            setCurrentLogrosId(id);
+                            setShowLogrosForm(true);
+                        }}
+                        onFaseCerrada={() => {
+                            useNnaStore.getState().loadDocuments(mainNna.id, mainNna);
+                        }}
                     />
                 );
             case 'informe':
@@ -226,6 +278,7 @@ export const ExpedientePage = () => {
     };
 
     return (
+        <>
         <div className="min-h-screen bg-bg space-y-6">
             {/* Header del Expediente */}
             <div className="bg-surface border-b border-border">
@@ -289,6 +342,24 @@ export const ExpedientePage = () => {
                             })}
                         </div>
                     </div>
+                    {!mainNna.codigoFicha03 && (
+                        <div className="mt-4 p-3 bg-amber-50/80 border border-amber-200 rounded-xl flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-2.5">
+                                <AlertCircle className="text-amber-600 shrink-0" size={18} />
+                                <div>
+                                    <p className="text-xs font-bold text-amber-900">Ficha F03 en Borrador (Ficha Incompleta)</p>
+                                    <p className="text-[11px] text-amber-700 font-medium">Aún faltan completar datos obligatorios para registrar y finalizar oficialmente esta ficha.</p>
+                                </div>
+                            </div>
+                            <Link
+                                to={`/nna/editar/${mainNna.id}`}
+                                className="px-3.5 py-1.5 bg-amber-600 text-white hover:bg-amber-700 text-xs font-bold rounded-lg transition-colors shadow-sm flex items-center gap-1.5 shrink-0"
+                            >
+                                <FilePlus size={13} />
+                                Completar Ficha F03
+                            </Link>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -395,6 +466,37 @@ export const ExpedientePage = () => {
                 </div>
             </div>
         </div>
+
+        {/* Modal: Expediente generado */}
+        {expedienteGenerado && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                <div className="bg-surface rounded-2xl shadow-2xl border border-border w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                    <div className="h-1.5 bg-gradient-to-r from-success via-success/70 to-success/30" />
+                    <div className="p-8 flex flex-col items-center text-center gap-4">
+                        <div className="w-16 h-16 rounded-full bg-success-soft flex items-center justify-center">
+                            <FolderOpen size={30} className="text-success" />
+                        </div>
+                        <div>
+                            <h3 className="text-[18px] font-black text-fg mb-1">¡Expediente Abierto!</h3>
+                            <p className="text-[13px] text-fg-muted">Se ha generado el número de expediente oficial:</p>
+                        </div>
+                        <div className="bg-success-soft border border-success/30 rounded-xl px-6 py-3">
+                            <span className="font-mono font-black text-success text-[18px] tracking-widest">{expedienteGenerado}</span>
+                        </div>
+                        <p className="text-[12px] text-fg-muted">
+                            El expediente de <span className="font-bold text-fg">{mainNna.nombres} {mainNna.apellidoPaterno}</span> ha sido abierto formalmente con F03, F04 y F05 registrados.
+                        </p>
+                        <button
+                            onClick={() => setExpedienteGenerado(null)}
+                            className="w-full py-2.5 bg-success text-white font-bold rounded-xl hover:bg-success/90 transition-colors"
+                        >
+                            Entendido
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+        </>
     );
 };
 
@@ -419,7 +521,7 @@ export const ExpedienteDigitalDocs = ({ nna, caso }: any) => {
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
     const { documents, uploadPhysicalDocument } = useNnaStore();
     const [isPdfOpen, setIsPdfOpen] = useState(false);
-    const [selectedPdfNna, setSelectedPdfNna] = useState<{ id: number, name: string, filename?: string, title?: string, pdfUrl?: string } | null>(null);
+    const [selectedPdfNna, setSelectedPdfNna] = useState<{ id: number, name: string, filename?: string, title?: string, pdfUrl?: string, codigoFicha03?: string | null } | null>(null);
 
     // documents viene del store ahora
 
@@ -671,6 +773,7 @@ export const ExpedienteDigitalDocs = ({ nna, caso }: any) => {
                                                     filename: doc.filename,
                                                     title: doc.type,
                                                     pdfUrl: doc.pdfUrl,
+                                                    codigoFicha03: doc.type.includes('INSCRIPCIÓN') ? nna.codigoFicha03 : undefined,
                                                 });
                                                 setIsPdfOpen(true);
                                             }}
@@ -716,6 +819,7 @@ export const ExpedienteDigitalDocs = ({ nna, caso }: any) => {
                     documentFilename={selectedPdfNna.filename}
                     title={selectedPdfNna.title}
                     pdfUrl={selectedPdfNna.pdfUrl}
+                    codigoFicha03={selectedPdfNna.codigoFicha03}
                 />
             )}
         </div>

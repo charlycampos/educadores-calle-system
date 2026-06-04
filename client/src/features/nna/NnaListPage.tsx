@@ -191,25 +191,26 @@ export const NnaListPage = () => {
                     <table className="w-full text-left text-[13px]">
                         <thead className="bg-surface-muted border-b border-border">
                             <tr>
-                                <th className="px-4 py-3 font-semibold text-fg-secondary w-56 whitespace-nowrap">Expediente</th>
-                                <th className="px-4 py-3 font-semibold text-fg-secondary">Beneficiario</th>
-                                <th className="px-4 py-3 font-semibold text-fg-secondary">Ficha 03</th>
-                                <th className="px-4 py-3 font-semibold text-fg-secondary">Edad / Sexo</th>
+                                <th className="px-4 py-3 font-semibold text-fg-secondary">N° Ficha</th>
                                 <th className="px-4 py-3 font-semibold text-fg-secondary">Fecha Reg.</th>
-                                <th className="px-4 py-3 font-semibold text-fg-secondary">Casos Activos</th>
+                                <th className="px-4 py-3 font-semibold text-fg-secondary">Beneficiario</th>
+                                <th className="px-4 py-3 font-semibold text-fg-secondary">Edad</th>
+                                <th className="px-4 py-3 font-semibold text-fg-secondary">Sexo</th>
+                                <th className="px-4 py-3 font-semibold text-fg-secondary w-56 whitespace-nowrap">Expediente</th>
+                                <th className="px-4 py-3 font-semibold text-fg-secondary">Estado</th>
                                 <th className="px-4 py-3 font-semibold text-fg-secondary text-right">Acciones</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
                             {isLoading ? (
                                 <tr>
-                                    <td colSpan={7} className="px-4 py-12 text-center text-fg-muted">
+                                    <td colSpan={8} className="px-4 py-12 text-center text-fg-muted">
                                         Cargando datos...
                                     </td>
                                 </tr>
                             ) : filteredNnas.length === 0 ? (
                                 <tr>
-                                    <td colSpan={7} className="px-4 py-12 text-center text-fg-muted">
+                                    <td colSpan={8} className="px-4 py-12 text-center text-fg-muted">
                                         {searchTerm ? 'No se encontraron resultados.' : 'No hay beneficiarios registrados.'}
                                     </td>
                                 </tr>
@@ -225,13 +226,63 @@ export const NnaListPage = () => {
                                         {/* Spacer Row between groups (except first) */}
                                         {groupIndex > 0 && (
                                             <tr>
-                                                <td colSpan={7} className="h-3 bg-bg border-none"></td>
+                                                <td colSpan={8} className="h-3 bg-bg border-none"></td>
                                             </tr>
                                         )}
 
                                         {group.map((nna: any, idx: number) => (
                                             <tr key={nna.id} className="hover:bg-surface-muted/50 transition-colors bg-surface relative">
-                                                {/* Render Expediente Cell only for the first item in the group */}
+                                                
+                                                {/* Col 1: N° Ficha */}
+                                                <td className={clsx("px-4 py-3 border-r border-border", idx > 0 ? "border-t border-border" : "")}>
+                                                    <span className="text-[12px] font-mono font-semibold text-fg-secondary">
+                                                        {nna.codigoFicha03 || '---'}
+                                                    </span>
+                                                </td>
+
+                                                {/* Col 2: Fecha Reg. */}
+                                                <td className={clsx("px-4 py-3 border-r border-border", idx > 0 ? "border-t border-border" : "")}>
+                                                    <p className="text-[13px] text-fg font-mono">
+                                                        {nna.createdAt ? new Date(nna.createdAt).toLocaleDateString() : '-'}
+                                                    </p>
+                                                </td>
+
+                                                {/* Col 3: Beneficiario */}
+                                                <td className={clsx("px-4 py-3 border-r border-border", idx > 0 ? "border-t border-border" : "")}>
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-9 h-9 rounded-full bg-primary-soft flex items-center justify-center text-primary font-bold text-[12px] shrink-0">
+                                                            {(nna?.nombres || '').charAt(0)}{(nna?.apellidoPaterno || '').charAt(0)}
+                                                        </div>
+                                                        <div className="min-w-0 flex items-center gap-2">
+                                                            <p className="text-fg text-[13px] truncate">{nna.nombres} {nna.apellidoPaterno} {nna.apellidoMaterno}</p>
+                                                            {isNacional && nna.casos?.[0]?.sede_id && (
+                                                                <span className="inline-flex px-1.5 py-0.5 bg-[#f1f5f9] border border-gray-200 text-gray-600 rounded text-[9px] font-bold uppercase shrink-0">
+                                                                    Sede {nna.casos[0].sede_id}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </td>
+
+                                                {/* Col 4: Edad */}
+                                                <td className={clsx("px-4 py-3 border-r border-border", idx > 0 ? "border-t border-border" : "")}>
+                                                    <p className="text-fg font-medium text-[13px]">
+                                                        {nna.fechaNacimiento
+                                                            ? `${calculateAge(nna.fechaNacimiento)} años`
+                                                            : nna.edad != null
+                                                                ? `${nna.edad} ${nna.unidadEdad === 'MESES' ? 'meses' : nna.unidadEdad === 'DIAS' ? 'días' : 'años'}`
+                                                                : '-'}
+                                                    </p>
+                                                </td>
+
+                                                {/* Col 5: Sexo */}
+                                                <td className={clsx("px-4 py-3 border-r border-border", idx > 0 ? "border-t border-border" : "")}>
+                                                    <p className="text-[11px] text-fg-muted capitalize">
+                                                        {['1', 'M'].includes(String(nna.sexo).trim().toUpperCase()) ? 'Hombre' : ['2', 'F'].includes(String(nna.sexo).trim().toUpperCase()) ? 'Mujer' : '-'}
+                                                    </p>
+                                                </td>
+
+                                                {/* Col 6: Expediente (with rowSpan, only on index 0) */}
                                                 {idx === 0 && (
                                                     <td className="px-4 py-3 align-top border-r border-border bg-surface-muted/30" rowSpan={group.length}>
                                                         <div className="flex flex-col gap-2.5 sticky top-4">
@@ -255,55 +306,20 @@ export const NnaListPage = () => {
                                                     </td>
                                                 )}
 
+                                                {/* Col 7: Estado de la Ficha F03 */}
                                                 <td className={clsx("px-4 py-3 border-r border-border", idx > 0 ? "border-t border-border" : "")}>
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-9 h-9 rounded-full bg-primary-soft flex items-center justify-center text-primary font-bold text-[12px] shrink-0">
-                                                            {(nna?.nombres || '').charAt(0)}{(nna?.apellidoPaterno || '').charAt(0)}
-                                                        </div>
-                                                        <div className="min-w-0">
-                                                            <div className="flex items-center gap-2">
-                                                                <p className="font-semibold text-fg text-[13px] truncate">{nna.nombres} {nna.apellidoPaterno}</p>
-                                                                {isNacional && nna.casos?.[0]?.sede_id && (
-                                                                    <span className="inline-flex px-1.5 py-0.5 bg-[#f1f5f9] border border-gray-200 text-gray-600 rounded text-[9px] font-bold uppercase shrink-0">
-                                                                        Sede {nna.casos[0].sede_id}
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            <p className="text-[11px] text-fg-muted truncate max-w-[150px]">{nna.apellidoMaterno}</p>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className={clsx("px-4 py-3 border-r border-border", idx > 0 ? "border-t border-border" : "")}>
-                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-mono font-semibold ${nna.codigoFicha03 ? 'bg-primary-soft text-primary' : 'text-fg-muted bg-surface-muted'}`}>
-                                                        {nna.codigoFicha03 || '---'}
-                                                    </span>
-                                                </td>
-                                                <td className={clsx("px-4 py-3 border-r border-border", idx > 0 ? "border-t border-border" : "")}>
-                                                    <p className="text-fg font-medium text-[13px]">{calculateAge(nna.fechaNacimiento)} años</p>
-                                                    <p className="text-[11px] text-fg-muted capitalize">
-                                                        {['1', 'M'].includes(String(nna.sexo).trim().toUpperCase()) ? 'Hombre' : ['2', 'F'].includes(String(nna.sexo).trim().toUpperCase()) ? 'Mujer' : '-'}
-                                                    </p>
-                                                </td>
-                                                <td className={clsx("px-4 py-3 border-r border-border", idx > 0 ? "border-t border-border" : "")}>
-                                                    <p className="text-[13px] text-fg font-mono">
-                                                        {nna.createdAt ? new Date(nna.createdAt).toLocaleDateString() : '-'}
-                                                    </p>
-                                                </td>
-                                                <td className={clsx("px-4 py-3 border-r border-border", idx > 0 ? "border-t border-border" : "")}>
-                                                    {nna.casos?.length > 0 ? (
-                                                        <div className="flex flex-col gap-1.5">
-                                                            {nna.casos.map((c: any) => (
-                                                                <span key={c.id} className="inline-flex items-center px-2 py-0.5 rounded-md bg-success-soft text-success text-[11px] font-semibold w-fit">
-                                                                    <div className="w-1.5 h-1.5 rounded-full bg-success mr-1.5"></div>
-                                                                    {c.estado}
-                                                                </span>
-                                                            ))}
-                                                        </div>
+                                                    {nna.codigoFicha03 ? (
+                                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 uppercase tracking-wider w-fit">
+                                                            Registrado
+                                                        </span>
                                                     ) : (
-                                                        <span className="text-fg-muted text-[11px] italic">Sin caso activo</span>
+                                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200 uppercase tracking-wider w-fit">
+                                                            Borrador
+                                                        </span>
                                                     )}
                                                 </td>
-                                                {/* Actions Column */}
+
+                                                {/* Col 8: Acciones (with rowSpan, only on index 0) */}
                                                 {idx === 0 && (
                                                     <td className="px-4 py-3 text-right align-middle bg-surface-muted/30" rowSpan={group.length}>
                                                         <div className="flex items-center justify-end gap-1.5 h-full">
@@ -381,6 +397,7 @@ export const NnaListPage = () => {
                     }}
                     nnaId={selectedPdfNna.id}
                     nnaName={selectedPdfNna.name}
+                    codigoFicha03={selectedPdfNna.codigoFicha03}
                 />
             )}
         </div>

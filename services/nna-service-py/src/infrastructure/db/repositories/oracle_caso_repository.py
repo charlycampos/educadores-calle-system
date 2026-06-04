@@ -147,7 +147,8 @@ class OracleCasoRepository:
                     "nna_id":          nna_id,
                     "sede_id":         caso_input.sede_id,
                     "resp_id":         caso_input.responsable_id,
-                    "perfil":          caso_input.perfil,
+                    "perfil":          caso_input.perfil or "SIN_PERFIL",
+                    "estado":          getattr(caso_input, "estado", "EN_EVALUACION") or "EN_EVALUACION",
                     "zona":            caso_input.zona_intervencion,
                     "distrito":        caso_input.distrito_intervencion,
                     "situacion_calle": caso_input.situacion_calle,
@@ -166,12 +167,6 @@ class OracleCasoRepository:
                     "victima_explotacion": caso_input.victima_explotacion or "NO",
                     "out_id":          out_id,
                 }
-                print("=" * 60)
-                print(f"[NNA_CASO INSERT] nna_id={nna_id} | codigo={codigo_caso}")
-                print(f"[NNA_CASO INSERT] perfil={caso_input.perfil} | situacion_calle={caso_input.situacion_calle}")
-                print(f"[NNA_CASO INSERT] sede_id={caso_input.sede_id} | responsable_id={caso_input.responsable_id}")
-                print(f"[NNA_CASO INSERT] fecha_ingreso={caso_input.fecha_ingreso} | horario_inicio={caso_input.horario_inicio}")
-                print("=" * 60)
                 try:
                     await cur.execute(
                         """INSERT INTO NNA_CASO (
@@ -186,7 +181,7 @@ class OracleCasoRepository:
                             VICTIMA_EXPLOTACION
                         ) VALUES (
                             :codigo, :nna_id, :sede_id, :resp_id,
-                            :perfil, 'EN_EVALUACION', 'CONTACTO_INICIAL',
+                            :perfil, :estado, 'CONTACTO_INICIAL',
                             :zona, :distrito,
                             :situacion_calle,
                             :actividad, :tiempo, :condicion,
@@ -195,17 +190,11 @@ class OracleCasoRepository:
                             :abordaje, :fecha_ingreso, :fecha_reingreso, :fecha_cambio_p,
                             :victima_explotacion
                         ) RETURNING ID INTO :out_id""",
-
                         params,
                     )
                     await conn.commit()
                     new_id = out_id.getvalue()[0]
-                    print(f"[NNA_CASO INSERT] OK - nuevo ID={new_id}")
-                    print("=" * 60)
                 except Exception as e:
-                    print("=" * 60)
-                    print(f"[NNA_CASO INSERT] ERROR ORACLE: {e}")
-                    print("=" * 60)
                     raise
         return await self.find_by_id(new_id)
 
@@ -259,12 +248,13 @@ class OracleCasoRepository:
                 await conn.commit()
 
     async def update_caso_by_carpeta(
-        self, carpeta_id: int, sede_id: int, data: dict
+        self, carpeta_id: int, sede_id: int, data: dict, usuario_id: Optional[int] = None
     ) -> None:
         """
         Actualiza el caso activo (no CERRADO) de todos los NNA en una carpeta.
         Mapea claves camelCase o snake_case del payload a columnas Oracle.
         """
+        pool = get_pool()
         if not data:
             return
 
@@ -289,6 +279,54 @@ class OracleCasoRepository:
             "victima_explotacion": "VICTIMA_EXPLOTACION",
         }
 
+        def _parse_datetime(val):
+            if not val:
+                return None
+            if isinstance(val, __import__('datetime').datetime):
+                return val
+            if isinstance(val, __import__('datetime').date):
+                return __import__('datetime').datetime(val.year, val.month, val.day)
+            if isinstance(val, str):
+                val = val.strip()
+                if val.lower() in ('', 'null', 'undefined'):
+                    return None
+                try:
+                    clean_val = val
+                    if clean_val.endswith('Z'):
+                        clean_val = clean_val[:-1]
+                    t_idx = clean_val.find('T')
+                    if t_idx != -1:
+                        for sign in ('+', '-'):
+                            sign_idx = clean_val.find(sign, t_idx)
+                            if sign_idx != -1:
+                                clean_val = clean_val[:sign_idx]
+                                break
+                    if '.' in clean_val:
+                        clean_val = clean_val.split('.')[0]
+                    if 'T' in clean_val:
+                        return __import__('datetime').datetime.strptime(clean_val, '%Y-%m-%dT%H:%M:%S')
+                    return __import__('datetime').datetime.strptime(clean_val, '%Y-%m-%d')
+                except Exception as e:
+                    print(f"[CASO UPDATE _parse_datetime ERROR] Could not parse '{val}': {e}")
+                    pass
+            return val
+
+        es_borrador = data.get("es_borrador", False)
+
+        # Si NO es borrador, nos aseguramos de que el estado pase a 'EN_EVALUACION' si estaba en 'BORRADOR'
+        if not es_borrador:
+            async with pool.acquire() as conn:
+                async with conn.cursor() as cur:
+                    await cur.execute(
+                        """UPDATE NNA_CASO 
+                           SET ESTADO = 'EN_EVALUACION' 
+                           WHERE ESTADO = 'BORRADOR' 
+                             AND NNA_ID IN (SELECT ID FROM NNA WHERE CARPETA_ID = :cid)""",
+                        {"cid": carpeta_id}
+                    )
+                    await conn.commit()
+
+        # 4. Flujo normal: si ya tiene caso activo, simplemente actualizamos sus columnas
         bind = {}
         set_clauses = []
         for campo, valor in data.items():
@@ -296,7 +334,10 @@ class OracleCasoRepository:
             if col and valor is not None:
                 bind_key = f"p_{campo}"
                 set_clauses.append(f"{col} = :{bind_key}")
-                bind[bind_key] = valor
+                if campo.startswith("fecha_"):
+                    bind[bind_key] = _parse_datetime(valor)
+                else:
+                    bind[bind_key] = valor
 
         if not set_clauses:
             return
@@ -304,7 +345,6 @@ class OracleCasoRepository:
         bind["carpeta_id"] = carpeta_id
         sets_sql = ", ".join(set_clauses)
 
-        pool = get_pool()
         async with pool.acquire() as conn:
             async with conn.cursor() as cur:
                 await cur.execute(

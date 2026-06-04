@@ -91,11 +91,13 @@ async def guardar_diagnostico(
     background_tasks: BackgroundTasks,
     repo: OracleDiagnosticoRepository = Depends(get_repository),
 ):
+    from src.infrastructure.services.expediente_service import trigger_apertura_expediente
     use_case = DiagnosticoUseCase(repo)
     result = await use_case.guardar_diagnostico(nna_id, data)
     diag_id = result.get("id")
     if diag_id:
         background_tasks.add_task(trigger_f04_pdf_generation, diag_id)
+        await trigger_apertura_expediente(nna_id)
     return result
 
 
