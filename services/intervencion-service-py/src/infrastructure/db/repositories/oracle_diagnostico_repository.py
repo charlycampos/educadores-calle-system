@@ -32,9 +32,55 @@ class OracleDiagnosticoRepository:
 
     async def create_diagnostico(self, nna_id: int, data: DiagnosticoSocialCreate) -> dict:
         pool = get_pool()
-        codigo_f04 = f"F04-{datetime.now().year}-{uuid.uuid4().hex[:6].upper()}"
         async with pool.acquire() as conn:
             async with conn.cursor() as cur:
+                # Resolve active case's sede_id
+                await cur.execute(
+                    "SELECT SEDE_ID FROM NNA_CASO WHERE NNA_ID = :1 ORDER BY ID DESC",
+                    [nna_id]
+                )
+                row = await cur.fetchone()
+                sede_id = row[0] if row else None
+                if not sede_id:
+                    raise ValueError("El NNA no tiene un caso con sede asignada. No se puede generar el código F04.")
+
+                # Resolve Sede initials
+                await cur.execute("SELECT NOMBRE FROM SEC_SEDE WHERE ID = :1", [sede_id])
+                row = await cur.fetchone()
+                if not row or not row[0]:
+                    raise ValueError(f"No se encontró la sede con ID {sede_id} en la base de datos.")
+                nombre = row[0]
+                nom = nombre.upper().strip()
+                mapping = {
+                    "LIMA": "LIM", "SEDE CENTRAL LIMA": "LIM",
+                    "HUARAL": "HUA", "HUANCAYO": "HYO", "JUNÍN": "HYO", "JUNIN": "HYO",
+                    "AREQUIPA": "ARE", "LA LIBERTAD": "TRU", "TRUJILLO": "TRU",
+                    "LAMBAYEQUE": "CHI", "CHICLAYO": "CHI", "CAJAMARCA": "CAJ",
+                    "JAÉN": "JAE", "JAEN": "JAE", "PIURA": "PIU", "TUMBES": "TUM",
+                    "CUSCO": "CUS", "PUNO": "PUN", "TACNA": "TAC", "ICA": "ICA",
+                    "AYACUCHO": "AYA", "APURÍMAC": "APU", "APURIMAC": "APU",
+                    "HUÁNUCO": "HCO", "HUANUCO": "HCO", "ANCASH": "ANC",
+                    "LORETO": "IQU", "IQUITOS": "IQU", "UCAYALI": "PUC", "PUCALLPA": "PUC",
+                    "HUANCAVELICA": "HVC", "MOQUEGUA": "MOQ", "PASCO": "PAS",
+                    "CALLAO": "CAL", "TARAPOTO": "TAR", "CHACHAPOYAS": "CHA"
+                }
+                sede_codigo = mapping.get(nom, nom[:3])
+
+                # Count existing F04s for this Sede to get the next number
+                anio = datetime.now().year
+                patron = f"F04-{sede_codigo}-{anio}-%"
+                try:
+                    await cur.execute(
+                        "SELECT COUNT(*) FROM DIAGNOSTICO_SOCIAL WHERE CODIGO_FICHA_04 LIKE :patron",
+                        {"patron": patron}
+                    )
+                    row = await cur.fetchone()
+                    num = (row[0] or 0) + 1
+                except Exception as e:
+                    print(f"Error counting F04 records: {e}")
+                    num = 1
+
+                codigo_f04 = f"F04-{sede_codigo}-{anio}-{num:04d}"
                 sql = """
                     INSERT INTO DIAGNOSTICO_SOCIAL (
                         CODIGO_FICHA_04, NNA_ID, SITUACION_CALLE, TIEMPO_EN_CALLE, MOTIVO_INGRESO, LUGAR_PERNOTA,

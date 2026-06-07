@@ -78,11 +78,11 @@ async def _intentar_abrir_expediente(nna_id: int) -> None:
             if sede_row and sede_row[0]:
                 sede_name = str(sede_row[0]).upper().strip()
 
-        # Calcular el número correlativo real de apertura (los abiertos este año + 1)
+        # Calcular el número correlativo real de apertura (los abiertos este año en esta sede + 1)
         async with conn.cursor() as cur:
             await cur.execute(
-                "SELECT COUNT(1) FROM NNA_CARPETA WHERE ANIO = :1 AND CODIGO IS NOT NULL",
-                [anio],
+                "SELECT COUNT(1) FROM NNA_CARPETA WHERE ANIO = :1 AND SEDE_ID = :2 AND CODIGO IS NOT NULL",
+                [anio, sede_id],
             )
             nro_expediente = (await cur.fetchone())[0] + 1
 

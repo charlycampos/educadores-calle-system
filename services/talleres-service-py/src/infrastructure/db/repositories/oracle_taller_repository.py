@@ -85,6 +85,9 @@ class OracleTallerRepository:
                 """
                 await cur.execute(sql_taller, [data.fecha_ejecucion, taller_id])
                 
+                # Limpiar participantes existentes para evitar conflictos de clave única
+                await cur.execute("DELETE FROM PARTICIPANTE_TALLER WHERE TALLER_ID = :1", [taller_id])
+                
                 # Insertar participantes
                 sql_participante = """
                     INSERT INTO PARTICIPANTE_TALLER (TALLER_ID, NNA_ID, ASISTE, EVALUACION)
@@ -98,7 +101,7 @@ class OracleTallerRepository:
                 
                 if participantes_data:
                     await cur.executemany(sql_participante, participantes_data)
-
+ 
                 await conn.commit()
                 return await self.get_taller_with_participants(taller_id)
 
@@ -127,7 +130,8 @@ class OracleTallerRepository:
             async with conn.cursor() as cur:
                 sql = """
                     SELECT pt.ID, pt.TALLER_ID, pt.NNA_ID, pt.ASISTE, pt.EVALUACION,
-                           n.NOMBRES, n.APELLIDO_PATERNO, n.APELLIDO_MATERNO
+                           n.NOMBRES, n.APELLIDO_PATERNO, n.APELLIDO_MATERNO,
+                           n.FECHA_NACIMIENTO, n.SEXO
                     FROM PARTICIPANTE_TALLER pt
                     JOIN NNA n ON n.ID = pt.NNA_ID
                     WHERE pt.TALLER_ID = :1
@@ -149,7 +153,9 @@ class OracleTallerRepository:
                         "nna": {
                             "nombres": row[5],
                             "apellidoPaterno": row[6],
-                            "apellidoMaterno": row[7]
+                            "apellidoMaterno": row[7],
+                            "fechaNacimiento": row[8].isoformat() if hasattr(row[8], "isoformat") else (str(row[8]) if row[8] else None),
+                            "sexo": row[9]
                         }
                     })
                 return participantes
@@ -266,7 +272,8 @@ class OracleTallerRepository:
             async with conn.cursor() as cur:
                 sql = """
                     SELECT pt.ID, pt.TALLER_ID, pt.NNA_ID, pt.ASISTE, pt.EVALUACION,
-                           n.NOMBRES, n.APELLIDO_PATERNO, n.APELLIDO_MATERNO
+                           n.NOMBRES, n.APELLIDO_PATERNO, n.APELLIDO_MATERNO,
+                           n.FECHA_NACIMIENTO, n.SEXO
                     FROM PARTICIPANTE_TALLER pt
                     JOIN NNA n ON n.ID = pt.NNA_ID
                     WHERE pt.TALLER_ID = :1 AND pt.NNA_ID = :2
@@ -290,7 +297,9 @@ class OracleTallerRepository:
                     "nna": {
                         "nombres": row[5],
                         "apellidoPaterno": row[6],
-                        "apellidoMaterno": row[7]
+                        "apellidoMaterno": row[7],
+                        "fechaNacimiento": row[8].isoformat() if hasattr(row[8], "isoformat") else (str(row[8]) if row[8] else None),
+                        "sexo": row[9]
                     }
                 }
 

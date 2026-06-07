@@ -141,17 +141,19 @@ async def dashboard(user: dict = Depends(get_current_user)):
             params_base,
         )
 
-        # Intentamos contar diagnósticos en la tabla DIAG_SOCIAL (puede no existir aún)
+        # Contar diagnósticos en la tabla DIAGNOSTICO_SOCIAL
         try:
+            and_base = where_base.replace("WHERE", "AND")
             diag_completos = await _scalar(
                 f"""
-                SELECT COUNT(*) FROM NNA_CASO c
-                JOIN DIAG_SOCIAL d ON d.CASO_ID = c.ID AND d.ESTADO = 'COMPLETO'
-                {where_base}
+                SELECT COUNT(DISTINCT c.NNA_ID) FROM NNA_CASO c
+                JOIN DIAGNOSTICO_SOCIAL d ON d.NNA_ID = c.NNA_ID
+                WHERE 1=1 {and_base}
                 """,
                 params_base,
             )
-        except Exception:
+        except Exception as e:
+            print(f"Error querying DIAGNOSTICO_SOCIAL: {e}")
             diag_completos = 0
 
         sin_diagnostico = max(0, activos - diag_completos)

@@ -25,7 +25,7 @@ async def init_pool() -> None:
                 "SELECT SYS_CONTEXT('USERENV','CURRENT_SCHEMA') FROM dual"
             )
             row = await cur.fetchone()
-            print(f"✅ Base de datos conectada — schema: {row[0]}")
+            print(f"[OK] Base de datos conectada - schema: {row[0]}")
 
 
 async def close_pool() -> None:

@@ -10,10 +10,11 @@ class EjecutarTallerUseCase:
         if not taller:
             raise ValueError("Taller no encontrado")
 
-        if taller["estado"] != "PLANIFICADO":
-            raise ValueError("El taller ya ha sido ejecutado o cancelado")
+        if taller["estado"] not in {"PLANIFICADO", "EJECUTADO"}:
+            raise ValueError("El taller no se puede ejecutar en su estado actual (debe estar PLANIFICADO o EJECUTADO)")
 
         if taller["educador_id"] != educador_id and rol != "COORDINADOR":
              raise ValueError("No autorizado para ejecutar este taller")
 
         return await self.repository.ejecutar_taller(taller_id, data)
+

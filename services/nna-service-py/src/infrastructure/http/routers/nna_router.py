@@ -314,8 +314,14 @@ async def registrar_nna(body: RegistrarNnaRequest, background_tasks: BackgroundT
                 )
             )
 
+        sede_id_usuario = user.get("sedeId")
+        if not sede_id_usuario:
+            raise HTTPException(
+                status_code=400,
+                detail="La cuenta no tiene sede asignada. Contacte al administrador para configurar su sede."
+            )
         caso_input = CasoInput(
-            sede_id=user.get("sedeId", 1),
+            sede_id=sede_id_usuario,
             responsable_id=user.get("userId"),
             perfil=body.perfil,
             zona_intervencion=body.zona_intervencion,
@@ -427,7 +433,8 @@ async def get_next_code(user: dict = Depends(get_current_user)):
     if rol == "ESTADISTICO":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acceso denegado")
     repo = OracleNnaRepository()
-    code = await repo.get_next_codigo_ficha03()
+    sede_id = user.get("sedeId")
+    code = await repo.get_next_codigo_ficha03(sede_id)
     return {"code": code}
 
 

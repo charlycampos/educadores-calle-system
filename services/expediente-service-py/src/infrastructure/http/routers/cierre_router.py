@@ -21,6 +21,8 @@ class CerrarCasoRequest(BaseModel):
     logros_alcanzados: Optional[str] = None
     recomendaciones: Optional[str] = None
     archivo_url: Optional[str] = None
+    estado: Optional[str] = "FINALIZADO"
+    detalles: Optional[str] = None
 
 
 @router.post("/caso/{caso_id}", status_code=status.HTTP_201_CREATED)
@@ -45,6 +47,8 @@ async def cerrar_caso(
                 logros_alcanzados=body.logros_alcanzados,
                 recomendaciones=body.recomendaciones,
                 archivo_url=body.archivo_url,
+                estado=body.estado or "FINALIZADO",
+                detalles=body.detalles,
             )
         )
         return {
@@ -53,6 +57,8 @@ async def cerrar_caso(
             "caso_id":          informe.caso_id,
             "motivo_egreso":    informe.motivo_egreso,
             "fecha_egreso":     str(informe.fecha_egreso) if informe.fecha_egreso else None,
+            "estado":           informe.estado,
+            "detalles":         informe.detalles,
         }
     except CasoYaCerradoError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
@@ -74,4 +80,7 @@ async def get_informe_cierre(caso_id: int, user: dict = Depends(get_current_user
         "logros_alcanzados":  informe.logros_alcanzados,
         "recomendaciones":    informe.recomendaciones,
         "archivo_url":        informe.archivo_url,
+        "estado":             informe.estado,
+        "detalles":           informe.detalles,
     }
+

@@ -15,7 +15,7 @@ import {
     ArrowLeftRight,
     BarChart3,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import clsx from 'clsx';
 import { ROLES } from '../../config/api';
 import { SecLogo } from '../SecLogo';
@@ -48,6 +48,11 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
     const navigate = useNavigate();
     const location = useLocation();
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(location.pathname.includes('/nna/expediente/'));
+
+    useEffect(() => {
+        setIsSidebarCollapsed(location.pathname.includes('/nna/expediente/'));
+    }, [location.pathname]);
 
     const handleLogout = () => {
         logout();
@@ -55,7 +60,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
     };
 
     const getSidebarItems = () => {
-        const items = [];
+        const items: any[] = [];
         if (!user) return items;
 
         const isNacional = [ROLES.ADMIN_NACIONAL, ROLES.MONITOR, ROLES.ESTADISTICO].includes(user.rol);
@@ -113,12 +118,20 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
 
             {/* Sidebar */}
             <aside className={clsx(
-                "fixed lg:static inset-y-0 left-0 z-30 w-[220px] bg-surface border-r border-border transform transition-transform duration-200 ease-in-out lg:translate-x-0 flex flex-col shrink-0",
-                isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+                "fixed lg:static inset-y-0 left-0 z-30 w-[220px] bg-surface border-r border-border transform transition-all duration-300 ease-in-out flex flex-col shrink-0",
+                isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
+                isSidebarCollapsed && "lg:-ml-[220px] lg:opacity-0"
             )}>
                 {/* Logo / Branding */}
                 <div className="px-4 py-[14px] border-b border-border flex items-center justify-between">
                     <SecLogo variant="compact" size="sm" />
+                    <button
+                        onClick={() => setIsSidebarCollapsed(true)}
+                        className="hidden lg:block text-fg-muted hover:text-fg p-1 hover:bg-surface-muted rounded transition-colors animate-in fade-in duration-200"
+                        title="Ocultar Menú Principal"
+                    >
+                        <ArrowLeft size={16} />
+                    </button>
                     <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden text-fg-muted hover:text-fg">
                         <X size={18} />
                     </button>
@@ -245,9 +258,13 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
                         </div>
                         <div className="flex-1 min-w-0">
                             <p className="text-[12px] font-semibold text-fg truncate leading-[1.2]">{user?.nombre}</p>
-                            <p className="text-[10px] text-fg-muted truncate">
-                                {rolLabel}
-                            </p>
+                            <p className="text-[10px] text-fg-muted truncate">{rolLabel}</p>
+                            {user?.sedeNombre && (
+                                <p className="text-[10px] text-primary font-semibold truncate flex items-center gap-0.5 mt-0.5">
+                                    <MapPin size={9} className="shrink-0" />
+                                    {user.sedeNombre}
+                                </p>
+                            )}
                         </div>
                     </div>
 
@@ -263,7 +280,18 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
             </aside>
 
             {/* Main Content */}
-            <div className="flex-1 flex flex-col h-screen overflow-hidden">
+            <div className="flex-1 flex flex-col h-screen overflow-hidden relative">
+                {/* Expand button for collapsed sidebar (Desktop only) */}
+                {isSidebarCollapsed && (
+                    <button
+                        onClick={() => setIsSidebarCollapsed(false)}
+                        className="hidden lg:flex absolute left-4 top-4 z-20 bg-surface hover:bg-surface-muted border border-border p-2 rounded-lg shadow-md text-fg-muted hover:text-fg transition-all hover:scale-105 active:scale-95 animate-in fade-in slide-in-from-left duration-250"
+                        title="Mostrar Menú Principal"
+                    >
+                        <Menu size={18} />
+                    </button>
+                )}
+
                 {/* Top bar (mobile only) */}
                 <header className="h-14 bg-surface border-b border-border flex items-center gap-3 px-4 shrink-0 lg:hidden">
                     <button

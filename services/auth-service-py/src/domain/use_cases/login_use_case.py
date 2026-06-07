@@ -50,12 +50,13 @@ class LoginUseCase:
         return LoginOutput(
             token=token,
             user={
-                "id":         usuario.id,
-                "nombre":     usuario.nombre_completo,
-                "email":      usuario.email,
-                "rol":        usuario.rol,
-                "sedeId":     usuario.sede_id,
-                "sedeCodigo": usuario.sede_codigo,
-                "zona":       usuario.zona_asignada,
+                "id":          usuario.id,
+                "nombre":      usuario.nombre_completo,
+                "email":       usuario.email,
+                "rol":         usuario.rol,
+                "sedeId":      usuario.sede_id,
+                "sedeCodigo":  usuario.sede_codigo,
+                "sedeNombre":  usuario.sede_nombre,
+                "zona":        usuario.zona_asignada,
             }
         )

@@ -14,6 +14,8 @@ import {
     getTalleresByNna,
     createTaller,
     getTalleres,
+    getTallerById,
+    updateTaller,
     addParticipante,
     updateParticipante
 } from '../../../api/talleres.api';
@@ -159,16 +161,17 @@ export const FichaTalleres = ({ nna }: FichaTalleresProps) => {
     const handlePlanificarIndividual = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            await createTaller({
+            const created = await createTaller({
                 ...formF7,
                 esIndividual: true,
                 nnaAsociadoId: nna.id,
                 educadorResponsableId: user?.id,
                 estado: 'PLANIFICADO'
             });
+            // Bug 1 fix: registrar al NNA como participante para que aparezca en su historial
+            await addParticipante(created.id, nna.id);
             setShowPlanificarModal(false);
             loadTalleres();
-            // Reset form
             setFormF7({
                 nombre: '',
                 fecha: new Date().toISOString().split('T')[0],
@@ -182,6 +185,27 @@ export const FichaTalleres = ({ nna }: FichaTalleresProps) => {
             });
         } catch (err) {
             alert('Error al crear taller');
+        }
+    };
+
+    // Bug 3 fix: ejecutar taller directamente desde el expediente
+    const handleEjecutar = async (taller: any) => {
+        if (!confirm(`¿Confirmar que el taller "${taller.nombre}" ya fue ejecutado?`)) return;
+        try {
+            setLoading(true);
+            // Obtener lista completa de participantes para no perderlos al ejecutar
+            let fullTaller = await getTallerById(taller.id);
+            if (!fullTaller.participantes || fullTaller.participantes.length === 0) {
+                await addParticipante(taller.id, nna.id);
+                fullTaller = await getTallerById(taller.id);
+            }
+            await updateTaller(taller.id, { ...fullTaller, estado: 'EJECUTADO' });
+            await loadTalleres();
+        } catch (err) {
+            console.error(err);
+            alert('Error al registrar la ejecución del taller.');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -283,6 +307,8 @@ export const FichaTalleres = ({ nna }: FichaTalleresProps) => {
                         talleres={planificados}
                         color="blue"
                         onSelect={setSelectedTaller}
+                        onAction={handleEjecutar}
+                        actionLabel="Marcar como Ejecutado"
                     />
                 )}
 
@@ -667,8 +693,7 @@ const DetalleEvaluacion = ({ taller, nna, onBack, onEval, isGeneratingPDF, handl
                     </div>
 
                     <div className="flex flex-col gap-3">
-                        {/* Botón de evaluación F8 - SOLO para talleres INDIVIDUALES */}
-                        {taller.estado === 'EJECUTADO' && taller.esIndividual && (
+                        {taller.estado === 'EJECUTADO' && (
                             <button
                                 onClick={onEval}
                                 className="bg-warning text-white px-6 py-3 rounded-[16px] font-black text-xs uppercase tracking-widest shadow-lg shadow-warning/20 hover:scale-105 active:scale-95 transition-all"
@@ -688,17 +713,15 @@ const DetalleEvaluacion = ({ taller, nna, onBack, onEval, isGeneratingPDF, handl
                                 F7: Planificación
                             </button>
 
-                            {/* F8 - Evaluación Individual (SOLO talleres INDIVIDUALES) */}
-                            {taller.esIndividual && (
-                                <button
-                                    onClick={() => handleDownloadPDF('formato-8-print-ficha', `F8_Evaluacion_${nna?.nombres.replace(/\s+/g, '_')}`)}
-                                    disabled={isGeneratingPDF}
-                                    className="bg-success text-white px-5 py-2.5 rounded-[16px] font-black text-xs uppercase tracking-widest shadow-lg hover:bg-success/90 transition-all flex items-center gap-2 disabled:opacity-50"
-                                >
-                                    {isGeneratingPDF ? <Loader2 className="animate-spin" size={16} /> : <FileDown size={16} />}
-                                    F8: Evaluación
-                                </button>
-                            )}
+                            {/* F8 - Evaluación Individual */}
+                            <button
+                                onClick={() => handleDownloadPDF('formato-8-print-ficha', `F8_Evaluacion_${nna?.nombres.replace(/\s+/g, '_')}`)}
+                                disabled={isGeneratingPDF}
+                                className="bg-success text-white px-5 py-2.5 rounded-[16px] font-black text-xs uppercase tracking-widest shadow-lg hover:bg-success/90 transition-all flex items-center gap-2 disabled:opacity-50"
+                            >
+                                {isGeneratingPDF ? <Loader2 className="animate-spin" size={16} /> : <FileDown size={16} />}
+                                F8: Evaluación
+                            </button>
 
                             {/* F10 y F11 - Asistencia (SOLO talleres GRUPALES) */}
                             {!taller.esIndividual && (

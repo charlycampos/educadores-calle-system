@@ -113,17 +113,74 @@ class OracleCasoRepository:
                 )
                 return [_row_to_caso(r) for r in await cur.fetchall()]
 
-    async def get_next_codigo_caso(self) -> str:
+    async def get_sede_codigo(self, sede_id: int) -> str:
+        if not sede_id:
+            raise ValueError("La cuenta no tiene sede asignada. No se puede generar el código del caso.")
+        pool = get_pool()
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute("SELECT NOMBRE FROM SEC_SEDE WHERE ID = :sede_id", {"sede_id": sede_id})
+                row = await cur.fetchone()
+                if not row:
+                    raise ValueError(f"No se encontró la sede con ID {sede_id} en la base de datos.")
+                nombre = row[0]
+                nom = nombre.upper().strip()
+                mapping = {
+                    "LIMA": "LIM",
+                    "SEDE CENTRAL LIMA": "LIM",
+                    "HUARAL": "HUA",
+                    "HUANCAYO": "HYO",
+                    "JUNÍN": "HYO",
+                    "JUNIN": "HYO",
+                    "AREQUIPA": "ARE",
+                    "LA LIBERTAD": "TRU",
+                    "TRUJILLO": "TRU",
+                    "LAMBAYEQUE": "CHI",
+                    "CHICLAYO": "CHI",
+                    "CAJAMARCA": "CAJ",
+                    "JAÉN": "JAE",
+                    "JAEN": "JAE",
+                    "PIURA": "PIU",
+                    "TUMBES": "TUM",
+                    "CUSCO": "CUS",
+                    "PUNO": "PUN",
+                    "TACNA": "TAC",
+                    "ICA": "ICA",
+                    "AYACUCHO": "AYA",
+                    "APURÍMAC": "APU",
+                    "APURIMAC": "APU",
+                    "HUÁNUCO": "HCO",
+                    "HUANUCO": "HCO",
+                    "ANCASH": "ANC",
+                    "LORETO": "IQU",
+                    "IQUITOS": "IQU",
+                    "UCAYALI": "PUC",
+                    "PUCALLPA": "PUC",
+                    "HUANCAVELICA": "HVC",
+                    "MOQUEGUA": "MOQ",
+                    "PASCO": "PAS",
+                    "CALLAO": "CAL",
+                    "TARAPOTO": "TAR",
+                    "CHACHAPOYAS": "CHA"
+                }
+                return mapping.get(nom, nom[:3])
+
+    async def get_next_codigo_caso(self, sede_id: int) -> str:
+        if not sede_id:
+            raise ValueError("La cuenta no tiene sede asignada. No se puede generar el código del caso.")
+        sede_codigo = await self.get_sede_codigo(sede_id)
         anio = datetime.now().year
+        patron = f"CAS-{sede_codigo}-{anio}-%"
         pool = get_pool()
         async with pool.acquire() as conn:
             async with conn.cursor() as cur:
                 await cur.execute(
-                    "SELECT NVL(MAX(ID), 0) + 1 FROM NNA_CASO WHERE EXTRACT(YEAR FROM FECHA_APERTURA) = :anio",
-                    {"anio": anio},
+                    "SELECT COUNT(*) FROM NNA_CASO WHERE CODIGO_CASO LIKE :patron",
+                    {"patron": patron},
                 )
                 row = await cur.fetchone()
-                return f"CAS-{anio}-{row[0]:05d}"
+                num = (row[0] or 0) + 1
+                return f"CAS-{sede_codigo}-{anio}-{num:05d}"
 
     async def find_by_nna_id(self, nna_id: int) -> list[Caso]:
         """Devuelve todos los casos de un NNA ordenados del más reciente al más antiguo."""

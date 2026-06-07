@@ -17,4 +17,6 @@ class InformeCierre:
     archivo_url: Optional[str]
     creado_por_id: int
     created_at: Optional[datetime]
+    estado: str = "FINALIZADO"
     updated_at: Optional[datetime] = None
+    detalles: Optional[str] = None

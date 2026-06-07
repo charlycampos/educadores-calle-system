@@ -10,3 +10,9 @@ class PTIUseCase:
 
     async def obtener_ultimo_pti(self, caso_id: int) -> dict:
         return await self.repository.get_last_pti(caso_id)
+
+    async def listar_ptis(self, caso_id: int) -> list:
+        return await self.repository.get_all_ptis(caso_id)
+
+    async def actualizar_accion(self, accion_id: int, data: dict) -> dict:
+        return await self.repository.update_accion(accion_id, data)

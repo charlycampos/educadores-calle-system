@@ -197,7 +197,7 @@ class RegistrarNnaUseCase:
         # 3. Obtener próximo código F03 si estamos registrando definitivamente
         proximo_f03 = None
         if not es_borrador:
-            proximo_f03 = await self._nna_repo.get_next_codigo_f03()
+            proximo_f03 = await self._nna_repo.get_next_codigo_f03(caso_input.sede_id)
 
         # 4. Procesar cada NNA (Insertar o Actualizar según corresponda)
         resultado = []
@@ -241,7 +241,7 @@ class RegistrarNnaUseCase:
                     cases = await self._caso_repo.find_by_nna_id(nna.id)
                     caso = cases[0]
                 else:
-                    codigo_caso = await self._caso_repo.get_next_codigo_caso()
+                    codigo_caso = await self._caso_repo.get_next_codigo_caso(caso_input.sede_id)
                     caso_input.estado = "BORRADOR" if es_borrador else "EN_EVALUACION"
                     caso = await self._caso_repo.create(
                         nna_id=nna.id,
@@ -252,8 +252,9 @@ class RegistrarNnaUseCase:
                 # INSERT: Crear nuevo registro
                 codigo_f03 = None
                 if not es_borrador and proximo_f03 is not None:
-                    codigo_f03 = f"F03-{datetime.now().year}-{(proximo_f03 + i):04d}"
-                codigo_caso = await self._caso_repo.get_next_codigo_caso()
+                    sede_codigo = await self._nna_repo.get_sede_codigo(caso_input.sede_id)
+                    codigo_f03 = f"F03-{sede_codigo}-{datetime.now().year}-{(proximo_f03 + i):04d}"
+                codigo_caso = await self._caso_repo.get_next_codigo_caso(caso_input.sede_id)
 
                 nna = await self._nna_repo.create(
                     nna_data=nna_data,

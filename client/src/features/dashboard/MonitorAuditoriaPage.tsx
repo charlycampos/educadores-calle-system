@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '../../store/auth.store';
-import { Search, FileText, ArrowLeft, RefreshCw, ClipboardCheck, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { Search, FileText, ArrowLeft, RefreshCw, ClipboardCheck, AlertTriangle, ShieldCheck, Check, X, ExternalLink } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '../../components/ui/Button';
-import { NNA_API_URL } from '../../config/api';
+import { NNA_API_URL, INTERVENCION_API_URL } from '../../config/api';
+import { useNnaStore } from '../../store/nna.store';
+import { getSedesAll } from '../../api/sedes.api';
+import type { Sede } from '../../api/sedes.api';
 
 export const MonitorAuditoriaPage = () => {
     const { token, user } = useAuthStore();
@@ -12,12 +15,38 @@ export const MonitorAuditoriaPage = () => {
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [selectedSede, setSelectedSede] = useState('TODAS');
 
+    // States for quick drawer audit
+    const [selectedNna, setSelectedNna] = useState<any>(null);
+    const [drawerOpen, setDrawerOpen] = useState(false);
+    const [loadingDocs, setLoadingDocs] = useState(false);
+
+    const { documents, loadDocuments } = useNnaStore();
+
+    const handleAuditarNna = async (nna: any) => {
+        setSelectedNna(nna);
+        setDrawerOpen(true);
+        setLoadingDocs(true);
+        try {
+            const res = await fetch(`${NNA_API_URL}/nna/${nna.id}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const fullNna = await res.json();
+                await loadDocuments(nna.id, fullNna);
+            }
+        } catch (err) {
+            console.error("Error loading NNA for audit drawer:", err);
+        } finally {
+            setLoadingDocs(false);
+        }
+    };
+
     // Datos mock para auditoría de calidad nacional (mantenidos en sintonía con la arquitectura del sistema)
     const [auditoriaNnas, setAuditoriaNnas] = useState([
         { id: 1, nombre: 'Álvarez Ríos Juan', carpeta: 'CAR-26-0043', sede: 'Lima Metropolitana', f03: true, f04: true, sis: true, dni: true, estadoExp: 'ÓPTIMO' },
         { id: 2, nombre: 'Méndez Castro Luis', carpeta: 'CAR-26-0089', sede: 'Huancayo', f03: true, f04: false, sis: true, dni: false, estadoExp: 'CRÍTICO' },
         { id: 3, nombre: 'Quispe Choque Carmen', carpeta: 'CAR-26-0105', sede: 'Puno', f03: true, f04: true, sis: false, dni: true, estadoExp: 'ADVERTENCIA' },
-        { id: 4, nombre: 'Gómez Ruiz Sofía', carpeta: 'CAR-26-0112', sede: 'Huaral', f03: true, f04: true, sis: true, dni: true, estadoExp: 'ÓPTIMO' },
+        { id: 4, fontName: 'Gómez Ruiz Sofía', nombre: 'Gómez Ruiz Sofía', carpeta: 'CAR-26-0112', sede: 'Huaral', f03: true, f04: true, sis: true, dni: true, estadoExp: 'ÓPTIMO' },
         { id: 5, nombre: 'Mendoza Ticona Raúl', carpeta: 'CAR-26-0145', sede: 'Arequipa', f03: true, f04: false, sis: true, dni: true, estadoExp: 'ADVERTENCIA' },
         { id: 6, nombre: 'Rojas Paredes María', carpeta: 'CAR-26-0210', sede: 'Cusco', f03: true, f04: true, sis: true, dni: false, estadoExp: 'ADVERTENCIA' },
         { id: 7, nombre: 'Huamán Torres Carlos', carpeta: 'CAR-26-0301', sede: 'Trujillo', f03: false, f04: false, sis: false, dni: false, estadoExp: 'CRÍTICO' },
@@ -30,6 +59,19 @@ export const MonitorAuditoriaPage = () => {
 
     const loadAuditoriaData = async () => {
         try {
+            // Fetch real sedes list from database
+            let sedesMap: Record<number, string> = {};
+            try {
+                const sedesList = await getSedesAll();
+                if (Array.isArray(sedesList)) {
+                    sedesList.forEach((s: Sede) => {
+                        sedesMap[s.id] = s.nombre;
+                    });
+                }
+            } catch (err) {
+                console.error('Error fetching sedes for audit mapping:', err);
+            }
+
             const res = await fetch(`${NNA_API_URL}/nna`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
@@ -38,11 +80,27 @@ export const MonitorAuditoriaPage = () => {
             if (res.ok) {
                 const data = await res.json();
                 if (data && data.length > 0) {
-                    const mapped = data.map((nna: any) => {
+                    const mapped = await Promise.all(data.map(async (nna: any) => {
                         const activeCase = nna.casos?.[0] || {};
                         const hasF03 = !!nna.codigoFicha03;
-                        const hasF04 = activeCase.fase && activeCase.fase !== 'CONTACTO_INICIAL' && activeCase.fase !== 'I';
-                        const hasSis = nna.afiliadoSIS === 'SÍ' || nna.afiliadoSIS === 'SI' || !!nna.afiliadoSIS;
+                        
+                        // Real database check for Diagnóstico Social (F04)
+                        let hasF04 = false;
+                        try {
+                            const diagRes = await fetch(`${INTERVENCION_API_URL}/diagnostico/nna/${nna.id}`, {
+                                headers: {
+                                    'Authorization': `Bearer ${token}`
+                                }
+                            });
+                            if (diagRes.ok) {
+                                const diags = await diagRes.json();
+                                hasF04 = Array.isArray(diags) && diags.length > 0;
+                            }
+                        } catch (err) {
+                            console.error(`Error fetching F04 for NNA ${nna.id}:`, err);
+                        }
+
+                        const hasSis = nna.afiliadoSIS === 'SÍ' || nna.afiliadoSIS === 'SI' || nna.afiliadoSIS === '1' || nna.afiliadoSIS === 1 || nna.afiliadoSIS === true;
                         const hasDni = !!nna.numeroDoc;
 
                         let estadoExp = 'ÓPTIMO';
@@ -52,18 +110,21 @@ export const MonitorAuditoriaPage = () => {
                             estadoExp = 'ADVERTENCIA';
                         }
 
+                        const caseSedeId = activeCase.sedeId || activeCase.sede_id;
+                        const resolvedSedeName = caseSedeId && sedesMap[caseSedeId] ? sedesMap[caseSedeId] : 'Lima Metropolitana';
+
                         return {
                             id: nna.id,
-                            nombre: `${nna.nombres} ${nna.apellidoPaterno}`,
+                            nombre: `${nna.nombres || ''} ${nna.apellidoPaterno || ''} ${nna.apellidoMaterno || ''}`.trim(),
                             carpeta: nna.carpeta?.codigo || `CAR-26-${nna.id.toString().padStart(4, '0')}`,
-                            sede: activeCase.sede_id ? `Sede ${activeCase.sede_id}` : 'Lima Metropolitana',
+                            sede: resolvedSedeName,
                             f03: hasF03,
                             f04: hasF04,
                             sis: hasSis,
                             dni: hasDni,
                             estadoExp: estadoExp
                         };
-                    });
+                    }));
                     setAuditoriaNnas(mapped);
                 }
             }
@@ -97,7 +158,7 @@ export const MonitorAuditoriaPage = () => {
     return (
         <div className="space-y-6">
             {/* Header / Banner Superior */}
-            <div className="bg-[#1e40af] text-white p-6 rounded-xl shadow-md">
+            <div className="bg-gradient-to-r from-[#1e40af] via-[#2563eb] to-[#1d4ed8] text-white p-6 rounded-xl shadow-lg border border-blue-400/20">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div className="space-y-1">
                         <div className="flex items-center gap-2">
@@ -218,28 +279,28 @@ export const MonitorAuditoriaPage = () => {
                                 </tr>
                             ) : (
                                 filteredNnas.map(nna => (
-                                    <tr key={nna.id} className="hover:bg-surface-muted/30 transition-colors">
+                                    <tr key={nna.id} onClick={() => handleAuditarNna(nna)} className="hover:bg-surface-muted/30 cursor-pointer transition-colors">
                                         <td className="px-4 py-3.5 font-bold text-fg">{nna.nombre}</td>
                                         <td className="px-4 py-3.5 font-mono text-fg-muted">{nna.carpeta}</td>
                                         <td className="px-4 py-3.5 text-fg-secondary">{nna.sede}</td>
                                         <td className="px-4 py-3.5 text-center">
-                                            <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold ${nna.f03 ? 'bg-success-soft text-success' : 'bg-danger-soft text-danger'}`}>
-                                                {nna.f03 ? '✓' : '✗'}
+                                            <span className={`inline-flex items-center justify-center w-5.5 h-5.5 rounded-full ${nna.f03 ? 'bg-success-soft text-success' : 'bg-danger-soft text-danger'}`}>
+                                                {nna.f03 ? <Check size={11} strokeWidth={3} /> : <X size={11} strokeWidth={3} />}
                                             </span>
                                         </td>
                                         <td className="px-4 py-3.5 text-center">
-                                            <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold ${nna.f04 ? 'bg-success-soft text-success' : 'bg-danger-soft text-danger'}`}>
-                                                {nna.f04 ? '✓' : '✗'}
+                                            <span className={`inline-flex items-center justify-center w-5.5 h-5.5 rounded-full ${nna.f04 ? 'bg-success-soft text-success' : 'bg-danger-soft text-danger'}`}>
+                                                {nna.f04 ? <Check size={11} strokeWidth={3} /> : <X size={11} strokeWidth={3} />}
                                             </span>
                                         </td>
                                         <td className="px-4 py-3.5 text-center">
-                                            <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold ${nna.sis ? 'bg-success-soft text-success' : 'bg-danger-soft text-danger'}`}>
-                                                {nna.sis ? '✓' : '✗'}
+                                            <span className={`inline-flex items-center justify-center w-5.5 h-5.5 rounded-full ${nna.sis ? 'bg-success-soft text-success' : 'bg-danger-soft text-danger'}`}>
+                                                {nna.sis ? <Check size={11} strokeWidth={3} /> : <X size={11} strokeWidth={3} />}
                                             </span>
                                         </td>
                                         <td className="px-4 py-3.5 text-center">
-                                            <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold ${nna.dni ? 'bg-success-soft text-success' : 'bg-danger-soft text-danger'}`}>
-                                                {nna.dni ? '✓' : '✗'}
+                                            <span className={`inline-flex items-center justify-center w-5.5 h-5.5 rounded-full ${nna.dni ? 'bg-success-soft text-success' : 'bg-danger-soft text-danger'}`}>
+                                                {nna.dni ? <Check size={11} strokeWidth={3} /> : <X size={11} strokeWidth={3} />}
                                             </span>
                                         </td>
                                         <td className="px-4 py-3.5">
@@ -251,6 +312,7 @@ export const MonitorAuditoriaPage = () => {
                                         <td className="px-4 py-3.5 text-right">
                                             <Link
                                                 to={`/nna/expediente/${nna.id}`}
+                                                onClick={(e) => e.stopPropagation()}
                                                 className="inline-flex items-center gap-1 px-3 py-1.5 bg-[#1e40af] hover:bg-blue-800 text-white rounded-lg text-[11px] font-bold uppercase transition-colors shadow-sm"
                                             >
                                                 <FileText size={12} /> Auditar
@@ -262,6 +324,132 @@ export const MonitorAuditoriaPage = () => {
                         </tbody>
                     </table>
                 </div>
+            </div>
+
+            {/* Back-drop blur overlay for the drawer */}
+            {drawerOpen && (
+                <div 
+                    className="fixed inset-0 bg-black/40 backdrop-blur-xs z-40 transition-opacity"
+                    onClick={() => setDrawerOpen(false)}
+                />
+            )}
+
+            {/* Premium Sliding Audit Drawer */}
+            <div className={`fixed right-0 top-0 bottom-0 w-[450px] bg-surface border-l border-border shadow-2xl z-50 transform transition-transform duration-300 ease-out flex flex-col ${
+                drawerOpen ? 'translate-x-0' : 'translate-x-full'
+            }`}>
+                {selectedNna && (
+                    <>
+                        {/* Drawer Header */}
+                        <div className="p-5 border-b border-border bg-surface-muted flex items-center justify-between">
+                            <div>
+                                <h3 className="text-[15px] font-black text-fg uppercase tracking-wide leading-none">{selectedNna.nombre}</h3>
+                                <p className="text-[12px] text-fg-secondary font-mono mt-1.5">{selectedNna.carpeta} · {selectedNna.sede}</p>
+                            </div>
+                            <button 
+                                onClick={() => setDrawerOpen(false)}
+                                className="p-1.5 hover:bg-border rounded-full text-fg-muted hover:text-fg transition-colors cursor-pointer"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        {/* Drawer Content */}
+                        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+                            {/* General Status Badge */}
+                            <div className="flex items-center justify-between p-3 rounded-lg border bg-surface-muted/50 border-border">
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-fg-secondary">Estado General</span>
+                                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black uppercase ${
+                                    selectedNna.estadoExp === 'ÓPTIMO' ? 'bg-success-soft text-success' : selectedNna.estadoExp === 'CRÍTICO' ? 'bg-danger-soft text-danger' : 'bg-warning-soft text-warning'
+                                }`}>
+                                    <span className={`w-2 h-2 rounded-full ${selectedNna.estadoExp === 'ÓPTIMO' ? 'bg-success' : selectedNna.estadoExp === 'CRÍTICO' ? 'bg-danger' : 'bg-warning'}`} />
+                                    {selectedNna.estadoExp}
+                                </span>
+                            </div>
+
+                            {/* Checklist of Base documents */}
+                            <div className="space-y-2">
+                                <h4 className="text-[11px] font-bold text-fg-muted uppercase tracking-widest">Documentos Base del Expediente</h4>
+                                <div className="space-y-1.5">
+                                    {[
+                                        { label: 'Ficha de Inscripción (Formato 3)', val: selectedNna.f03 },
+                                        { label: 'Diagnóstico Social (Formato 4)', val: selectedNna.f04 },
+                                        { label: 'Afiliación al Seguro SIS', val: selectedNna.sis },
+                                        { label: 'Número de DNI / Documento', val: selectedNna.dni }
+                                    ].map((item, idx) => (
+                                        <div key={idx} className="flex items-center justify-between p-2.5 rounded-md border border-border bg-surface shadow-xs">
+                                            <span className="text-[12px] text-fg-secondary">{item.label}</span>
+                                            <span className={`w-5 h-5 rounded-full flex items-center justify-center ${item.val ? 'bg-success-soft text-success' : 'bg-danger-soft text-danger'}`}>
+                                                {item.val ? <Check size={10} strokeWidth={3} /> : <X size={10} strokeWidth={3} />}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Real documents loaded inside store */}
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <h4 className="text-[11px] font-bold text-fg-muted uppercase tracking-widest">Archivos Digitales Registrados</h4>
+                                    <span className="text-[11px] font-semibold text-fg-muted bg-surface-muted px-2 py-0.5 rounded-full">{documents.length} archivos</span>
+                                </div>
+
+                                {loadingDocs ? (
+                                    <div className="py-8 flex flex-col items-center justify-center space-y-2 bg-surface-muted/30 rounded-lg border border-border border-dashed">
+                                        <RefreshCw className="animate-spin text-primary" size={20} />
+                                        <span className="text-[12px] text-fg-secondary font-medium">Buscando folios digitales...</span>
+                                    </div>
+                                ) : documents.length === 0 ? (
+                                    <div className="py-8 text-center bg-surface-muted/30 rounded-lg border border-border border-dashed">
+                                        <p className="text-[12px] text-fg-muted italic">No se encontraron folios registrados en el expediente digital.</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-1.5">
+                                        {documents.map((doc, idx) => (
+                                            <div key={idx} className="flex items-center justify-between p-3 rounded-lg border border-border bg-surface shadow-xs hover:border-primary/50 transition-colors">
+                                                <div className="space-y-0.5 max-w-[80%]">
+                                                    <p className="text-[12px] font-bold text-fg truncate">{doc.type}</p>
+                                                    <div className="flex gap-2 text-[10px] text-fg-muted">
+                                                        <span>Cód: {doc.code}</span>
+                                                        <span>·</span>
+                                                        <span>Págs: {doc.pages}</span>
+                                                    </div>
+                                                </div>
+                                                {doc.pdfUrl && (
+                                                    <a 
+                                                        href={doc.pdfUrl} 
+                                                        target="_blank" 
+                                                        rel="noreferrer"
+                                                        className="p-1.5 text-primary hover:bg-primary-soft rounded-md transition-colors"
+                                                        title="Ver PDF"
+                                                    >
+                                                        <ExternalLink size={14} />
+                                                    </a>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Drawer Footer Actions */}
+                        <div className="p-4 border-t border-border bg-surface-muted flex gap-2">
+                            <Link 
+                                to={`/nna/expediente/${selectedNna.id}`}
+                                className="flex-1 py-2 bg-primary hover:bg-primary/95 text-white rounded-lg text-[13px] font-bold uppercase text-center transition-colors shadow-sm cursor-pointer"
+                            >
+                                Expediente Completo
+                            </Link>
+                            <button 
+                                onClick={() => setDrawerOpen(false)}
+                                className="px-4 py-2 border border-border rounded-lg text-[13px] font-medium text-fg hover:bg-border transition-colors cursor-pointer"
+                            >
+                                Cerrar
+                            </button>
+                        </div>
+                    </>
+                )}
             </div>
         </div>
     );

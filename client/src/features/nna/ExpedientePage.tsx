@@ -48,6 +48,7 @@ import { SeguimientoFamiliarList } from './components/SeguimientoFamiliarList';
 import { ResumenCaso } from './components/ResumenCaso';
 import { PdfViewerModal } from './components/PdfViewerModal';
 import { formatTipoDoc } from '../../data/ubigeo';
+import { getLogrosById } from '../../api/logros.api';
 
 export const ExpedientePage = () => {
     const { id } = useParams();
@@ -237,8 +238,15 @@ export const ExpedientePage = () => {
                             setCurrentLogrosData(null);
                             setShowLogrosForm(true);
                         }}
-                        onEditarLogro={(id) => {
+                        onEditarLogro={async (id) => {
                             setCurrentLogrosId(id);
+                            setCurrentLogrosData(null);
+                            try {
+                                const data = await getLogrosById(id);
+                                setCurrentLogrosData(data);
+                            } catch {
+                                // open with null so user sees empty form rather than blocking
+                            }
                             setShowLogrosForm(true);
                         }}
                         onFaseCerrada={() => {
@@ -292,7 +300,7 @@ export const ExpedientePage = () => {
             case 'egreso':
                 return (
                     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden p-6">
-                        <InformeEgresoList nna={mainNna} />
+                        <InformeEgresoList nna={mainNna as any} caso={activeCase} />
                     </div>
                 );
             case 'seguimiento':
@@ -493,13 +501,18 @@ export const ExpedientePage = () => {
         </div>
 
         {/* FAB (Floating Action Button) para abrir Expediente Digital */}
-        <button
-            onClick={() => setIsExpedienteModalOpen(true)}
-            className="fixed bottom-6 right-6 z-30 flex items-center justify-center bg-primary hover:bg-primary/95 text-white w-14 h-14 rounded-full shadow-lg hover:shadow-2xl hover:scale-110 active:scale-95 transition-all duration-200 border border-primary/10"
-            title="Ver Expediente Digital"
-        >
-            <Files size={24} />
-        </button>
+        <div className="fixed bottom-6 right-6 z-30 flex items-center justify-center w-16 h-16">
+            {/* Anillo de pulso/parpadeo animado */}
+            <span className="absolute inline-flex h-full w-full rounded-full bg-primary/40 animate-ping opacity-75 pointer-events-none" />
+            
+            <button
+                onClick={() => setIsExpedienteModalOpen(true)}
+                className="relative flex items-center justify-center bg-primary hover:bg-primary/95 text-white w-16 h-16 rounded-full shadow-lg hover:shadow-xl hover:scale-110 active:scale-95 transition-all duration-200 border border-primary/10"
+                title="Ver Expediente Digital"
+            >
+                <Files size={28} />
+            </button>
+        </div>
 
         {/* Drawer Lateral del Expediente Digital */}
         {isExpedienteModalOpen && (

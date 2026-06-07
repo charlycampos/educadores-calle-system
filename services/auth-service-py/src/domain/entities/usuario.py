@@ -12,6 +12,7 @@ class Usuario:
     rol_id: int
     sede_id: int
     sede_codigo: str
+    sede_nombre: Optional[str]
     region_id: int
     zona_asignada: Optional[str]
     activo: int

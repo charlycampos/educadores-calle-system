@@ -22,7 +22,10 @@ export interface AccionPTI {
 export interface PlanTrabajo {
     id: number;
     casoId: number;
+    codigoPti?: string;
     objetivoGeneral?: string;
+    fechaInicio?: string;
+    fechaRevision?: string;
     estado: string;
     acciones: AccionPTI[];
     createdAt: string;
@@ -73,4 +76,13 @@ export const deleteAccion = async (accionId: number) => {
         headers: getHeaders()
     });
     if (!response.ok) throw new Error('Error deleting action');
+};
+
+export const getAllPtisByCaso = async (casoId: number): Promise<PlanTrabajo[]> => {
+    const response = await fetch(`${API_URL}/pti/caso/${casoId}/all`, {
+        method: 'GET',
+        headers: getHeaders()
+    });
+    if (!response.ok) throw new Error('Error fetching plans');
+    return response.json();
 };

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Save, Printer, AlertCircle, Target, Calendar, CheckCircle, CheckCircle2, Loader2, Lock } from 'lucide-react';
 import { createLogros, updateLogros, type ProcesoLogrosPayload } from '../../../api/logros.api';
 import { useAuthStore } from '../../../store/auth.store';
@@ -114,6 +114,17 @@ export const Formato5Logros = ({ nna, caso, initialData, onClose, onSuccess }: F
     
     const fase2Desbloqueada = fase1Cerrada || fase1TodoSi;
     const fase3Desbloqueada = fase2Cerrada || fase2TodoSi;
+    const fase3Cerrada = documents.some(d => d.type === 'FICHA DE LOGROS (FORMATO 5)');
+
+    // Auto-jump: when opening an existing record, go straight to the first non-archived phase
+    const didAutoJump = useRef(false);
+    useEffect(() => {
+        if (didAutoJump.current || !initialData) return;
+        if (fase1Cerrada) {
+            setActiveFase(fase2Cerrada ? 3 : 2);
+            didAutoJump.current = true;
+        }
+    }, [fase1Cerrada, fase2Cerrada, initialData]);
 
     const getItems = (fase: number) => {
         if (fase === 1) return ITEMS_FASE_1;
@@ -155,11 +166,10 @@ export const Formato5Logros = ({ nna, caso, initialData, onClose, onSuccess }: F
         }
     };
 
-    // La fase activa está bloqueada si ya fue oficialmente cerrada en el expediente
     const faseCerradaActual =
         (activeFase === 1 && fase1Cerrada) ||
         (activeFase === 2 && fase2Cerrada) ||
-        (activeFase === 3 && documents.some(d => d.type === 'FICHA DE LOGROS (FORMATO 5)'));
+        (activeFase === 3 && fase3Cerrada);
 
     const StatusButton = ({ fase, itemId, value, label, colorClass }: any) => {
         const current  = logros[`f${fase}_${itemId}`];
@@ -221,35 +231,43 @@ export const Formato5Logros = ({ nna, caso, initialData, onClose, onSuccess }: F
                         const { done, total } = countLogros(fc.id);
                         const isActive = activeFase === fc.id;
                         const bloqueada = (fc.id === 2 && !fase2Desbloqueada) || (fc.id === 3 && !fase3Desbloqueada);
+                        const isCerrada = (fc.id === 1 && fase1Cerrada) || (fc.id === 2 && fase2Cerrada) || (fc.id === 3 && fase3Cerrada);
                         return (
                             <button
                                 key={fc.id}
                                 onClick={() => !bloqueada && setActiveFase(fc.id)}
                                 disabled={bloqueada}
-                                title={bloqueada ? `Completa la Fase ${fc.id === 2 ? 'I' : 'II'} primero` : undefined}
+                                title={bloqueada ? `Completa la Fase ${fc.id === 2 ? 'I' : 'II'} primero` : isCerrada ? 'Fase cerrada oficialmente — solo lectura' : undefined}
                                 className={`flex-1 py-3 text-sm font-bold uppercase tracking-wider transition-colors relative
                                     ${bloqueada
                                         ? 'text-fg-muted opacity-40 cursor-not-allowed'
-                                        : isActive
-                                            ? `${fc.color} bg-surface`
-                                            : 'text-fg-muted hover:text-fg-2 hover:bg-border/30'
+                                        : isCerrada && !isActive
+                                            ? 'text-success bg-success-soft/30 hover:bg-success-soft/50'
+                                            : isActive
+                                                ? `${fc.color} bg-surface`
+                                                : 'text-fg-muted hover:text-fg-2 hover:bg-border/30'
                                     }`}
                             >
                                 <div className="flex flex-col items-center gap-0.5">
                                     <div className="flex items-center gap-1.5">
-                                        {bloqueada ? <Lock size={13} /> : <Target size={15} />}
+                                        {bloqueada
+                                            ? <Lock size={13} />
+                                            : isCerrada
+                                                ? <CheckCircle2 size={13} className="text-success" />
+                                                : <Target size={15} />}
                                         <span>{fc.label}</span>
                                     </div>
                                     <span className="text-[10px] font-normal normal-case opacity-70">
-                                        {bloqueada ? 'Bloqueada' : fc.sub}
+                                        {bloqueada ? 'Bloqueada' : isCerrada ? 'Archivada en Expediente' : fc.sub}
                                     </span>
                                     {!bloqueada && (
-                                        <span className={`text-[10px] font-bold mt-0.5 ${done === total ? 'text-success' : 'text-fg-muted'}`}>
-                                            {done}/{total} logros
+                                        <span className={`text-[10px] font-bold mt-0.5 ${isCerrada ? 'text-success' : done === total ? 'text-success' : 'text-fg-muted'}`}>
+                                            {isCerrada ? `${total}/${total} — Cerrada` : `${done}/${total} logros`}
                                         </span>
                                     )}
                                 </div>
                                 {isActive && !bloqueada && <div className={`absolute bottom-0 left-0 right-0 h-0.5 ${fc.bar}`} />}
+                                {isCerrada && !isActive && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-success opacity-40" />}
                             </button>
                         );
                     })}

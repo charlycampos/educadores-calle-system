@@ -21,3 +21,4 @@ class InformeSituacional:
     created_at: Optional[datetime]
     estado: str = 'BORRADOR'
     updated_at: Optional[datetime] = None
+    codigo_informe: Optional[str] = None

@@ -29,6 +29,8 @@ class NnaMiniResponse(BaseModel):
     nombres: str
     apellidoPaterno: str
     apellidoMaterno: Optional[str] = None
+    fechaNacimiento: Optional[str] = None
+    sexo: Optional[str] = None
 
 class ParticipanteResponse(BaseModel):
     id: int

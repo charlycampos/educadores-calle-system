@@ -125,7 +125,7 @@ export const updateTaller = async (id: number, data: Partial<Taller>) => {
         participantes: (data.participantes || []).map(p => ({
             nna_id:     p.nnaId,
             asiste:     p.asistio,
-            evaluacion: p.logros || p.limitaciones
+            evaluacion: p.logros || p.limitaciones || p.sugerencias
                 ? `Logros: ${p.logros || '—'}\nLimitaciones: ${p.limitaciones || '—'}\nSugerencias: ${p.sugerencias || '—'}`
                 : undefined,
         })),

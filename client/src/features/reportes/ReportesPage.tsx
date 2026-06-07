@@ -9,6 +9,9 @@ import {
 import { Link } from 'react-router-dom';
 import { Button } from '../../components/ui/Button';
 
+import { getSedesAll } from '../../api/sedes.api';
+import type { Sede } from '../../api/sedes.api';
+
 // Etiquetas de fases del caso
 const ESTADO_LABELS: Record<string, string> = {
     CAPTACION: 'Captación',
@@ -24,10 +27,12 @@ export const ReportesPage = () => {
     const { nnas, fetchAllNnas, isLoading: loadingNna } = useNnaStore();
     const [talleres, setTalleres] = useState<any[]>([]);
     const [loadingTalleres, setLoadingTalleres] = useState(false);
+    const [sedes, setSedes] = useState<Sede[]>([]);
+    const [loadingSedes, setLoadingSedes] = useState(false);
     const [exporting, setExporting] = useState<string | null>(null);
 
     // Filtros de reportería
-    const [selectedSede, setSelectedSede] = useState('TODAS');
+    const [selectedSedeId, setSelectedSedeId] = useState('TODAS');
     const [fechaInicio, setFechaInicio] = useState('');
     const [fechaFin, setFechaFin] = useState('');
     const [selectedPerfil, setSelectedPerfil] = useState('TODOS');
@@ -35,6 +40,7 @@ export const ReportesPage = () => {
     useEffect(() => {
         if (nnas.length === 0) fetchAllNnas();
         loadTalleresData();
+        loadSedesData();
     }, []);
 
     const loadTalleresData = async () => {
@@ -49,22 +55,25 @@ export const ReportesPage = () => {
         }
     };
 
-    // Extraer sedes únicas disponibles en los datos de los NNA
-    const sedesDisponibles = Array.from(
-        new Set(
-            nnas
-                .map(nna => nna.casos?.[0]?.sede_id ? `Sede ${nna.casos[0].sede_id}` : null)
-                .filter(Boolean)
-        )
-    );
+    const loadSedesData = async () => {
+        setLoadingSedes(true);
+        try {
+            const list = await getSedesAll();
+            setSedes(list);
+        } catch (error) {
+            console.error('Error loading sedes for reports', error);
+        } finally {
+            setLoadingSedes(false);
+        }
+    };
 
     // Filtrar NNA según las variables del panel superior
     const getFilteredNnas = () => {
         return nnas.filter(nna => {
             // Filtro de Sede
-            if (selectedSede !== 'TODAS') {
-                const sedeNna = nna.casos?.[0]?.sede_id ? `Sede ${nna.casos[0].sede_id}` : '';
-                if (sedeNna !== selectedSede) return false;
+            if (selectedSedeId !== 'TODAS') {
+                const caseSedeId = nna.casos?.[0]?.sedeId || nna.casos?.[0]?.sede_id;
+                if (String(caseSedeId) !== selectedSedeId) return false;
             }
 
             // Filtro de Perfil
@@ -92,9 +101,9 @@ export const ReportesPage = () => {
     // Filtrar talleres según los parámetros
     const getFilteredTalleres = () => {
         return talleres.filter(t => {
-            if (selectedSede !== 'TODAS') {
-                const sedeIdNum = Number(selectedSede.replace('Sede ', ''));
-                if (t.sede_id !== sedeIdNum) return false;
+            if (selectedSedeId !== 'TODAS') {
+                const tallerSedeId = t.sedeId || t.sede_id;
+                if (String(tallerSedeId) !== selectedSedeId) return false;
             }
             if (fechaInicio) {
                 const dateT = new Date(t.fecha_programada);
@@ -299,12 +308,12 @@ export const ReportesPage = () => {
                             <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Sede del Programa</label>
                             <select
                                 className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-[12px] font-semibold text-gray-700 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
-                                value={selectedSede}
-                                onChange={(e) => setSelectedSede(e.target.value)}
+                                value={selectedSedeId}
+                                onChange={(e) => setSelectedSedeId(e.target.value)}
                             >
                                 <option value="TODAS">TODAS LAS SEDES (Nacional)</option>
-                                {sedesDisponibles.map(sede => (
-                                    <option key={sede} value={sede!}>{sede}</option>
+                                {sedes.map(s => (
+                                    <option key={s.id} value={String(s.id)}>{s.nombre}</option>
                                 ))}
                             </select>
                         </div>
@@ -389,7 +398,7 @@ export const ReportesPage = () => {
                             </p>
                         </div>
                         <Button
-                            variant="success"
+                            variant="primary"
                             className="w-full justify-center gap-2 mt-4 font-bold uppercase text-[11px] py-2 text-white bg-green-600 hover:bg-green-700"
                             onClick={handleExportTalleres}
                             disabled={exporting === 'talleres' || loadingTalleres}

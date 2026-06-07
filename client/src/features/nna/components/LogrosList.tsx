@@ -248,6 +248,9 @@ export const LogrosList = ({ nnaId, refreshKey, onNuevoLogro, onEditarLogro, onF
                             const stats  = phaseStats(record, fase.keys);
                             const status = phaseStatus(stats);
                             const style  = PHASE_STYLE[status];
+                            const isFaseCerrada = (fase.num === 1 && fase1Cerrada) ||
+                                                  (fase.num === 2 && fase2Cerrada) ||
+                                                  (fase.num === 3 && fase3Cerrada);
                             return (
                                 <div key={fase.num} onClick={() => !fase3Cerrada && onEditarLogro(record.id)} className={`rounded-[8px] border p-4 ${style.bg} ${style.border} transition-all ${fase3Cerrada ? 'cursor-default opacity-80' : 'cursor-pointer hover:brightness-95'}`}>
                                     <div className="flex items-start justify-between mb-3">
@@ -255,8 +258,13 @@ export const LogrosList = ({ nnaId, refreshKey, onNuevoLogro, onEditarLogro, onF
                                             <p className={`font-bold text-[13px] ${style.text}`}>{fase.label}</p>
                                             <p className="text-[11px] text-fg-muted mt-0.5 leading-tight">{fase.sub}</p>
                                         </div>
-                                        {status === 'complete'    && <CheckCircle2 size={16} className="text-success" />}
-                                        {status === 'in_progress' && <Clock        size={16} className="text-primary" />}
+                                        {isFaseCerrada
+                                            ? <Lock size={14} className="text-fg-muted opacity-60" />
+                                            : status === 'complete'
+                                                ? <CheckCircle2 size={16} className="text-success" />
+                                                : status === 'in_progress'
+                                                    ? <Clock size={16} className="text-primary" />
+                                                    : null}
                                     </div>
 
                                     <div className="w-full bg-black/10 rounded-full h-1.5 mb-3">
@@ -267,8 +275,8 @@ export const LogrosList = ({ nnaId, refreshKey, onNuevoLogro, onEditarLogro, onF
                                     </div>
 
                                     <div className="flex items-center justify-between">
-                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${style.bg} ${style.text} ${style.border}`}>
-                                            {style.label}
+                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${isFaseCerrada ? 'bg-success-soft text-success border-success/20' : `${style.bg} ${style.text} ${style.border}`}`}>
+                                            {isFaseCerrada ? 'Archivada' : style.label}
                                         </span>
                                         <span className={`text-[11px] font-semibold ${style.text}`}>
                                             {stats.si}/{stats.total}

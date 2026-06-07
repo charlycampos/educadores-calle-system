@@ -21,6 +21,7 @@ _SELECT = """
         r.NOMBRE          AS rol,
         u.SEDE_ID         AS sede_id,
         s.CODIGO          AS sede_codigo,
+        s.NOMBRE          AS sede_nombre,
         s.REGION_ID       AS region_id,
         u.ZONA_ASIGNADA   AS zona_asignada,
         u.ACTIVO          AS activo
@@ -40,9 +41,10 @@ def _row_to_usuario(row) -> Usuario:
         rol=row[5],
         sede_id=row[6],
         sede_codigo=row[7],
-        region_id=row[8],
-        zona_asignada=row[9],
-        activo=row[10],
+        sede_nombre=row[8],
+        region_id=row[9],
+        zona_asignada=row[10],
+        activo=row[11],
     )
 
 

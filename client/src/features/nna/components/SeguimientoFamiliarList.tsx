@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Calendar, FileDown, Users, MapPin, X, Home, ClipboardCheck } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
@@ -14,11 +14,12 @@ const LUGAR_OPTIONS = [
 ];
 
 const EVALUACION_OPTIONS = [
-    { value: 'FAVORABLE',    label: 'Favorable' },
-    { value: 'EN_PROCESO',   label: 'En Proceso' },
-    { value: 'DESFAVORABLE', label: 'Desfavorable' },
-    { value: 'SIN_CAMBIOS',  label: 'Sin Cambios' },
+    { value: 'FAVORABLE',    label: 'Favorable',    color: '#10b981', bgSoft: 'rgba(16, 185, 129, 0.1)', borderCol: 'border-emerald-500/30', description: 'Progreso positivo detectado', icon: '✓' },
+    { value: 'EN_PROCESO',   label: 'En Proceso',   color: '#f59e0b', bgSoft: 'rgba(245, 158, 11, 0.1)', borderCol: 'border-amber-500/30', description: 'Visita de seguimiento regular', icon: '⚡' },
+    { value: 'DESFAVORABLE', label: 'Desfavorable', color: '#f43f5e', bgSoft: 'rgba(244, 63, 94, 0.1)', borderCol: 'border-rose-500/30', description: 'Retroceso o alertas críticas', icon: '⚠' },
+    { value: 'SIN_CAMBIOS',  label: 'Sin Cambios',  color: '#64748b', bgSoft: 'rgba(100, 116, 139, 0.1)', borderCol: 'border-slate-500/30', description: 'Estable sin cambios reportados', icon: '•' },
 ];
+
 
 const blankFicha = (nna: any) => ({
     zona:               '',
@@ -58,6 +59,7 @@ const textareaCls = "w-full px-3 py-2 text-[13px] bg-surface border border-borde
 
 export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any }) => {
     const { registerDocument } = useNnaStore();
+    const [expandedFichaId, setExpandedFichaId] = useState<any>(null);
     const [isGenerating, setIsGenerating]       = useState(false);
     const [isLoading, setIsLoading]             = useState(false);
     const [isSaving, setIsSaving]               = useState(false);
@@ -186,6 +188,13 @@ export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any })
         return 'bg-surface-muted text-fg-muted border-border';
     };
 
+    const getAccentColor = (v: string) => {
+        if (v === 'FAVORABLE')    return 'bg-green-500';
+        if (v === 'EN_PROCESO')   return 'bg-amber-500';
+        if (v === 'DESFAVORABLE') return 'bg-red-500';
+        return 'bg-gray-400';
+    };
+
     return (
         <div className="space-y-4">
             {/* Header */}
@@ -223,8 +232,14 @@ export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any })
                         const lugar   = ficha.lugarSeguimiento || ficha.lugar_seguimiento || '';
                         const acuerdos = ficha.acuerdos || ficha.ACUERDOS || '';
                         const proxima  = ficha.proximaVisita || ficha.proxima_visita || ficha.PROXIMA_VISITA || '';
+                        const isExpanded = expandedFichaId === ficha.id;
                         return (
-                            <div key={ficha.id} className="bg-surface border border-border rounded-[8px] p-4 hover:shadow-2 transition-shadow">
+                            <div
+                                key={ficha.id}
+                                onClick={() => setExpandedFichaId(isExpanded ? null : ficha.id)}
+                                className="relative bg-surface border border-border rounded-[8px] p-4 pl-6 cursor-pointer hover:shadow-lg hover:-translate-y-0.5 transform transition-all duration-300"
+                            >
+                                <div className={`absolute left-0 top-0 bottom-0 w-1.5 rounded-l-[8px] ${getAccentColor(evalVal)}`} />
                                 <div className="flex justify-between items-start mb-3">
                                     <span className="bg-primary-soft text-primary px-2.5 py-0.5 rounded text-[11px] font-bold">
                                         {new Date(ficha.fecha || ficha.FECHA).toLocaleDateString('es-PE')}
@@ -234,7 +249,10 @@ export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any })
                                             {evalVal.replace(/_/g, ' ')}
                                         </span>
                                         <button
-                                            onClick={() => handleDownloadPDF(ficha)}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleDownloadPDF(ficha);
+                                            }}
                                             disabled={isGenerating}
                                             className="p-1.5 text-fg-muted hover:text-primary hover:bg-primary-soft rounded-[5px] transition-all"
                                             title="Descargar PDF"
@@ -253,13 +271,48 @@ export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any })
                                         {ficha.entrevistado || ficha.ENTREVISTADO || '(sin nombre)'}
                                         {(ficha.parentesco || ficha.PARENTESCO) && ` (${ficha.parentesco || ficha.PARENTESCO})`}
                                     </p>
-                                    <p className="text-[12px] text-fg-muted line-clamp-2">
+                                    <p className={`text-[12px] text-fg-muted ${isExpanded ? '' : 'line-clamp-2'}`}>
                                         {ficha.descripcion || ficha.DESCRIPCION || 'Sin descripción registrada.'}
                                     </p>
                                     {acuerdos && (
-                                        <p className="text-[11px] text-fg-2 italic line-clamp-1">
+                                        <p className={`text-[11px] text-fg-2 italic ${isExpanded ? '' : 'line-clamp-1'}`}>
                                             <span className="font-semibold not-italic">Acuerdos: </span>{acuerdos}
                                         </p>
+                                    )}
+
+                                    {isExpanded && (
+                                        <div className="mt-3 pt-3 border-t border-border space-y-2 text-[12px] text-fg-2">
+                                            {(ficha.antecedentes || ficha.ANTECEDENTES) && (
+                                                <div>
+                                                    <span className="font-semibold text-fg block">Antecedentes:</span>
+                                                    <p className="text-fg-muted">{ficha.antecedentes || ficha.ANTECEDENTES}</p>
+                                                </div>
+                                            )}
+                                            {(ficha.direccion || ficha.DIRECCION) && (
+                                                <div>
+                                                    <span className="font-semibold text-fg block">Dirección:</span>
+                                                    <p className="text-fg-muted">{ficha.direccion || ficha.DIRECCION}</p>
+                                                </div>
+                                            )}
+                                            {(ficha.telefono || ficha.TELEFONO) && (
+                                                <div>
+                                                    <span className="font-semibold text-fg block">Teléfono:</span>
+                                                    <p className="text-fg-muted">{ficha.telefono || ficha.TELEFONO}</p>
+                                                </div>
+                                            )}
+                                            {(ficha.observaciones || ficha.OBSERVACIONES) && (
+                                                <div>
+                                                    <span className="font-semibold text-fg block">Observaciones:</span>
+                                                    <p className="text-fg-muted">{ficha.observaciones || ficha.OBSERVACIONES}</p>
+                                                </div>
+                                            )}
+                                            {(ficha.hora || ficha.HORA) && (
+                                                <div>
+                                                    <span className="font-semibold text-fg block">Hora de la visita:</span>
+                                                    <p className="text-fg-muted">{ficha.hora || ficha.HORA}</p>
+                                                </div>
+                                            )}
+                                        </div>
                                     )}
                                 </div>
 
@@ -435,15 +488,16 @@ export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any })
                                 <SectionTitle>Cierre y Evaluación</SectionTitle>
                                 <div className="grid grid-cols-2 gap-3">
                                     <FormField label="Evaluación de la Visita">
-                                        <div className="flex flex-col gap-1.5 mt-1">
+                                        <div className="grid grid-cols-2 gap-2 mt-1">
                                             {EVALUACION_OPTIONS.map(opt => (
                                                 <label
                                                     key={opt.value}
-                                                    className={`flex items-center gap-2.5 px-3 py-2 rounded-[5px] border cursor-pointer transition-all text-[12px] font-medium ${
+                                                    className={`relative flex flex-col p-2.5 rounded-[8px] border cursor-pointer transition-all duration-200 select-none ${
                                                         currentFicha.evaluacion === opt.value
-                                                            ? 'border-primary bg-primary-soft text-primary'
-                                                            : 'border-border text-fg-2 hover:border-primary/50 hover:bg-surface-muted'
+                                                            ? 'border-primary ring-1 ring-primary'
+                                                            : 'border-border bg-surface hover:border-primary/50'
                                                     }`}
+                                                    style={currentFicha.evaluacion === opt.value ? { backgroundColor: opt.bgSoft } : {}}
                                                 >
                                                     <input
                                                         type="radio"
@@ -453,8 +507,12 @@ export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any })
                                                         onChange={up('evaluacion')}
                                                         className="sr-only"
                                                     />
-                                                    <span className={`w-3 h-3 rounded-full border-2 flex-shrink-0 ${currentFicha.evaluacion === opt.value ? 'border-primary bg-primary' : 'border-border-strong'}`} />
-                                                    {opt.label}
+                                                    <div className="flex items-center gap-1.5 font-semibold text-[11px]">
+                                                        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: opt.color }} />
+                                                        <span className={currentFicha.evaluacion === opt.value ? 'text-primary' : 'text-fg'}>{opt.label}</span>
+                                                        <span className="ml-auto text-[10px] opacity-70">{opt.icon}</span>
+                                                    </div>
+                                                    <p className="text-[10px] text-fg-muted mt-1 leading-normal">{opt.description}</p>
                                                 </label>
                                             ))}
                                         </div>

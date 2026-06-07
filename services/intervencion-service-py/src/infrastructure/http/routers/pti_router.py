@@ -1,4 +1,6 @@
 from fastapi import APIRouter, Depends, Request, HTTPException
+from typing import Optional
+from pydantic import BaseModel
 from src.domain.entities.pti import PlanTrabajoCreate, PlanTrabajoResponse
 from src.infrastructure.db.repositories.oracle_pti_repository import OraclePTIRepository
 from src.domain.use_cases.pti_use_case import PTIUseCase
@@ -7,6 +9,13 @@ router = APIRouter(prefix="/api/pti", tags=["PTI"])
 
 def get_repository():
     return OraclePTIRepository()
+
+class AccionUpdate(BaseModel):
+    estado: Optional[str] = None
+    descripcion: Optional[str] = None
+    meta: Optional[str] = None
+    plazo: Optional[str] = None
+    responsable: Optional[str] = None
 
 @router.post("/caso/{caso_id}", response_model=PlanTrabajoResponse)
 async def crear_pti(caso_id: int, data: PlanTrabajoCreate, request: Request, repo: OraclePTIRepository = Depends(get_repository)):
@@ -18,5 +27,18 @@ async def obtener_pti(caso_id: int, repo: OraclePTIRepository = Depends(get_repo
     use_case = PTIUseCase(repo)
     pti = await use_case.obtener_ultimo_pti(caso_id)
     if not pti:
-        return None # Mantener compatibilidad con el frontend que espera null si no existe
+        return None
     return pti
+
+@router.get("/caso/{caso_id}/all")
+async def obtener_todos_ptis(caso_id: int, repo: OraclePTIRepository = Depends(get_repository)):
+    use_case = PTIUseCase(repo)
+    return await use_case.listar_ptis(caso_id)
+
+@router.put("/acciones/{accion_id}")
+async def actualizar_accion(accion_id: int, data: AccionUpdate, repo: OraclePTIRepository = Depends(get_repository)):
+    use_case = PTIUseCase(repo)
+    result = await use_case.actualizar_accion(accion_id, data.model_dump(exclude_none=True))
+    if not result:
+        raise HTTPException(status_code=404, detail="Acción no encontrada")
+    return result

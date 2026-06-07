@@ -8,6 +8,17 @@ class SeguimientoFamiliarBase(BaseModel):
     acuerdos: Optional[str] = None
     evaluacion: Optional[str] = None
     proxima_visita: Optional[datetime] = None
+    zona: Optional[str] = None
+    entrevistado: Optional[str] = None
+    parentesco: Optional[str] = None
+    telefono: Optional[str] = None
+    lugar_seguimiento: Optional[str] = None
+    direccion: Optional[str] = None
+    hora: Optional[str] = None
+    antecedentes: Optional[str] = None
+    descripcion: Optional[str] = None
+    observaciones: Optional[str] = None
+    nombre_educador: Optional[str] = None
 
 class SeguimientoFamiliarCreate(SeguimientoFamiliarBase):
     pass

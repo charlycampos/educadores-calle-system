@@ -22,7 +22,8 @@ export const InformeSituacional = ({ nna, caso, onClose }: InformeSituacionalPro
     const [isSaving, setIsSaving] = useState(false);
     const [isFinalizing, setIsFinalizing] = useState(false);
     const [estadoActual, setEstadoActual] = useState<string>('BORRADOR');
-
+    const [codigoInforme, setCodigoInforme] = useState<string>('');
+ 
     const [formData, setFormData] = useState({
         fechaInforme:       new Date().toISOString().split('T')[0],
         destinatario:       'COORDINACIÓN DEL SERVICIO DE EDUCADORES DE CALLE',
@@ -35,7 +36,7 @@ export const InformeSituacional = ({ nna, caso, onClose }: InformeSituacionalPro
         conclusiones:       '',
         recomendaciones:    '',
     });
-
+ 
     useEffect(() => {
         if (!caso?.id) return;
         const token = localStorage.getItem('token');
@@ -49,6 +50,7 @@ export const InformeSituacional = ({ nna, caso, onClose }: InformeSituacionalPro
         .then(data => {
             if (!data) return;
             setEstadoActual(data.estado || 'BORRADOR');
+            setCodigoInforme(data.codigo_informe || '');
             setFormData({
                 fechaInforme: data.fecha_informe || new Date().toISOString().split('T')[0],
                 destinatario: data.destinatario || 'COORDINACIÓN DEL SERVICIO DE EDUCADORES DE CALLE',
@@ -66,10 +68,10 @@ export const InformeSituacional = ({ nna, caso, onClose }: InformeSituacionalPro
             console.log(err.message);
         });
     }, [caso?.id, nna]);
-
+ 
     const up = (key: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
         setFormData(prev => ({ ...prev, [key]: e.target.value }));
-
+ 
     const buildBody = (estado: string) => ({
         fecha_informe: formData.fechaInforme,
         destinatario: formData.destinatario,
@@ -83,7 +85,7 @@ export const InformeSituacional = ({ nna, caso, onClose }: InformeSituacionalPro
         recomendaciones: formData.recomendaciones,
         estado,
     });
-
+ 
     const saveToApi = async (estado: string) => {
         const token = localStorage.getItem('token');
         const res = await fetch(`${EXPEDIENTE_API_URL}/informe-situacional/caso/${caso.id}`, {
@@ -94,13 +96,16 @@ export const InformeSituacional = ({ nna, caso, onClose }: InformeSituacionalPro
         if (!res.ok) throw new Error('Error al guardar el informe');
         return res.json();
     };
-
+ 
     const handleSaveBorrador = async () => {
         if (!caso?.id) { alert('No existe un caso activo para este NNA'); return; }
         setIsSaving(true);
         try {
-            await saveToApi('BORRADOR');
+            const data = await saveToApi('BORRADOR');
             setEstadoActual('BORRADOR');
+            if (data && data.codigo_informe) {
+                setCodigoInforme(data.codigo_informe);
+            }
             alert('Borrador guardado correctamente');
         } catch (e) {
             console.error(e);
@@ -109,18 +114,21 @@ export const InformeSituacional = ({ nna, caso, onClose }: InformeSituacionalPro
             setIsSaving(false);
         }
     };
-
+ 
     const handleFinalizar = async () => {
         if (!caso?.id) { alert('No existe un caso activo para este NNA'); return; }
         if (!window.confirm('¿Confirmas que el informe situacional está completo y deseas finalizarlo? Esta acción lo registrará en el Expediente Digital.')) return;
         setIsFinalizing(true);
         try {
-            await saveToApi('FINALIZADO');
+            const data = await saveToApi('FINALIZADO');
             setEstadoActual('FINALIZADO');
-
+            if (data && data.codigo_informe) {
+                setCodigoInforme(data.codigo_informe);
+            }
+ 
             // Recargar los documentos en el store del expediente digital
             await useNnaStore.getState().loadDocuments(nna.id, nna);
-
+ 
             alert('Informe finalizado y registrado en el Expediente Digital.');
             onClose();
         } catch (e) {
@@ -130,7 +138,7 @@ export const InformeSituacional = ({ nna, caso, onClose }: InformeSituacionalPro
             setIsFinalizing(false);
         }
     };
-
+ 
     const edad = (() => {
         if (!nna.fechaNacimiento) return '---';
         const hoy = new Date();
@@ -141,15 +149,22 @@ export const InformeSituacional = ({ nna, caso, onClose }: InformeSituacionalPro
         }
         return `${años} años`;
     })();
-
+ 
     return (
         <div className="bg-bg flex flex-col gap-3">
-
+ 
             {/* ── I. Datos de Identificación ── */}
             <div className="bg-surface border border-border rounded-[8px] overflow-hidden">
-                <div className="px-4 py-3 border-b border-border bg-surface-muted flex items-center gap-2">
-                    <ClipboardList size={14} className="text-fg-muted" />
-                    <span className="text-[11px] font-bold uppercase tracking-widest text-fg-muted">I. Datos de Identificación</span>
+                <div className="px-4 py-3 border-b border-border bg-surface-muted flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                        <ClipboardList size={14} className="text-fg-muted" />
+                        <span className="text-[11px] font-bold uppercase tracking-widest text-fg-muted">I. Datos de Identificación</span>
+                    </div>
+                    {codigoInforme && (
+                        <span className="text-[12px] font-bold text-primary bg-primary-soft border border-primary/20 px-2.5 py-1 rounded-[6px]">
+                            N° {codigoInforme}
+                        </span>
+                    )}
                 </div>
                 <div className="p-4 flex flex-col gap-3">
                     <div className="grid grid-cols-2 gap-3">

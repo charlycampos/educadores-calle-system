@@ -264,17 +264,80 @@ class OracleNnaRepository:
                 )
                 return [_row_to_nna(r) for r in await cur.fetchall()]
 
-    async def get_next_codigo_f03(self):
+    async def get_sede_codigo(self, sede_id: int) -> str:
+        if not sede_id:
+            raise ValueError("La cuenta no tiene sede asignada. No se puede generar el código del documento.")
+        pool = get_pool()
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute("SELECT NOMBRE FROM SEC_SEDE WHERE ID = :sede_id", {"sede_id": sede_id})
+                row = await cur.fetchone()
+                if not row:
+                    raise ValueError(f"No se encontró la sede con ID {sede_id} en la base de datos.")
+                nombre = row[0]
+                nom = nombre.upper().strip()
+                mapping = {
+                    "LIMA": "LIM",
+                    "SEDE CENTRAL LIMA": "LIM",
+                    "HUARAL": "HUA",
+                    "HUANCAYO": "HYO",
+                    "JUNÍN": "HYO",
+                    "JUNIN": "HYO",
+                    "AREQUIPA": "ARE",
+                    "LA LIBERTAD": "TRU",
+                    "TRUJILLO": "TRU",
+                    "LAMBAYEQUE": "CHI",
+                    "CHICLAYO": "CHI",
+                    "CAJAMARCA": "CAJ",
+                    "JAÉN": "JAE",
+                    "JAEN": "JAE",
+                    "PIURA": "PIU",
+                    "TUMBES": "TUM",
+                    "CUSCO": "CUS",
+                    "PUNO": "PUN",
+                    "TACNA": "TAC",
+                    "ICA": "ICA",
+                    "AYACUCHO": "AYA",
+                    "APURÍMAC": "APU",
+                    "APURIMAC": "APU",
+                    "HUÁNUCO": "HCO",
+                    "HUANUCO": "HCO",
+                    "ANCASH": "ANC",
+                    "LORETO": "IQU",
+                    "IQUITOS": "IQU",
+                    "UCAYALI": "PUC",
+                    "PUCALLPA": "PUC",
+                    "HUANCAVELICA": "HVC",
+                    "MOQUEGUA": "MOQ",
+                    "PASCO": "PAS",
+                    "CALLAO": "CAL",
+                    "TARAPOTO": "TAR",
+                    "CHACHAPOYAS": "CHA"
+                }
+                return mapping.get(nom, nom[:3])
+
+    async def get_next_codigo_f03(self, sede_id: int):
+        if not sede_id:
+            raise ValueError("La cuenta no tiene sede asignada. No se puede generar el código F03.")
+        sede_codigo = await self.get_sede_codigo(sede_id)
         anio = datetime.now().year
+        patron = f"F03-{sede_codigo}-{anio}-%"
         pool = get_pool()
         async with pool.acquire() as conn:
             async with conn.cursor() as cur:
                 await cur.execute(
                     "SELECT COUNT(*) FROM NNA WHERE CODIGO_FICHA03 LIKE :patron",
-                    {"patron": f"F03-{anio}-%"},
+                    {"patron": patron},
                 )
                 row = await cur.fetchone()
                 return (row[0] or 0) + 1
+
+    async def get_next_codigo_ficha03(self, sede_id: int):
+        if not sede_id:
+            raise ValueError("La cuenta no tiene sede asignada. No se puede generar el código F03.")
+        sede_codigo = await self.get_sede_codigo(sede_id)
+        num = await self.get_next_codigo_f03(sede_id)
+        return f"F03-{sede_codigo}-{datetime.now().year}-{num:04d}"
 
     async def create(self, nna_data, carpeta_id, codigo_f03, tiene_hermanos, cant_hermanos):
         is_dict = isinstance(nna_data, dict)
@@ -558,8 +621,37 @@ class OracleNnaRepository:
         es_borrador = _get("es_borrador", False)
         new_codigo_f03 = existing_codigo_f03
         if not es_borrador and not existing_codigo_f03:
-            proximo_num = await self.get_next_codigo_f03()
-            new_codigo_f03 = f"F03-{__import__('datetime').datetime.now().year}-{proximo_num:04d}"
+            # Look up active case's sede_id
+            sede_id = None
+            try:
+                async with pool.acquire() as conn:
+                    async with conn.cursor() as cur:
+                        await cur.execute(
+                            "SELECT SEDE_ID FROM NNA_CASO WHERE NNA_ID = :nna_id ORDER BY ID DESC",
+                            {"nna_id": nna_id}
+                        )
+                        row = await cur.fetchone()
+                        if row:
+                            sede_id = row[0]
+            except Exception as e:
+                print(f"[NNA UPDATE] Error fetching sede_id for case: {e}")
+            
+            # Default fallback if no case exists (CARPETA)
+            if not sede_id:
+                try:
+                    async with pool.acquire() as conn:
+                        async with conn.cursor() as cur:
+                            await cur.execute(
+                                "SELECT SEDE_ID FROM NNA n JOIN NNA_CARPETA c ON c.ID = n.CARPETA_ID WHERE n.ID = :nna_id",
+                                {"nna_id": nna_id}
+                            )
+                            row = await cur.fetchone()
+                            if row:
+                                sede_id = row[0]
+                except Exception:
+                    pass
+
+            new_codigo_f03 = await self.get_next_codigo_ficha03(sede_id)
 
         import json
         datos_json = {}
@@ -868,7 +960,7 @@ class OracleCarpetaRepository:
     async def generar_codigo_carpeta(self, carpeta_id: int) -> str:
         """Genera el CODIGO de expediente en el momento de apertura (F03+F04+F05).
         El número correlativo refleja el orden real de apertura, no de registro.
-        Formato: 00001-2026-SEC.LIMA"""
+        Formato: 00001-2026-SEC.HUA"""
         pool = get_pool()
         async with pool.acquire() as conn:
             async with conn.cursor() as cur:
@@ -885,23 +977,19 @@ class OracleCarpetaRepository:
                 if codigo_actual:
                     return codigo_actual
 
-                # Siguiente correlativo = MAX ya asignado + 1 (evita repetir si se eliminan expedientes)
+                if not sede_id:
+                    raise ValueError("La carpeta no tiene sede asignada. No se puede generar el código de expediente.")
+
+                # Siguiente correlativo = MAX ya asignado para esta sede + 1
                 await cur.execute(
-                    "SELECT NVL(MAX(CORRELATIVO), 0) FROM NNA_CARPETA WHERE ANIO = :1",
-                    [anio],
+                    "SELECT NVL(MAX(CORRELATIVO), 0) FROM NNA_CARPETA WHERE ANIO = :1 AND SEDE_ID = :2 AND CORRELATIVO > 0",
+                    [anio, sede_id],
                 )
                 nro_expediente = (await cur.fetchone())[0] + 1
 
-                sede_name = "DESCONOCIDO"
-                if sede_id:
-                    await cur.execute(
-                        "SELECT NOMBRE FROM SEC_SEDE WHERE ID = :1", [sede_id]
-                    )
-                    sede_row = await cur.fetchone()
-                    if sede_row and sede_row[0]:
-                        sede_name = str(sede_row[0]).upper().strip()
+                sede_initials = await self.get_sede_codigo(sede_id)
 
-                codigo = f"{str(nro_expediente).zfill(5)}-{anio}-SEC.{sede_name}"
+                codigo = f"{str(nro_expediente).zfill(5)}-{anio}-SEC.{sede_initials}"
 
                 await cur.execute(
                     "UPDATE NNA_CARPETA SET CODIGO = :1, CORRELATIVO = :2, UPDATED_AT = SYSTIMESTAMP WHERE ID = :3",

@@ -3,6 +3,7 @@ import React from 'react';
 interface Formato12Props {
     nna: any;
     ficha: {
+        [key: string]: any;
         zona?: string;
         entrevistado?: string;
         parentesco?: string;
@@ -104,12 +105,34 @@ export const Formato12Print = ({ nna, ficha, id = 'formato-12-print' }: Formato1
         }
     };
 
-    const lugarText = {
+    const lugarText: Record<string, string> = {
         'DOMICILIO': '☑ Domicilio  ☐ Trabajo  ☐ Centro de referencia  ☐ Calle',
         'TRABAJO': '☐ Domicilio  ☑ Trabajo  ☐ Centro de referencia  ☐ Calle',
         'CENTRO_REFERENCIA': '☐ Domicilio  ☐ Trabajo  ☑ Centro de referencia  ☐ Calle',
         'CALLE': '☐ Domicilio  ☐ Trabajo  ☐ Centro de referencia  ☑ Calle'
     };
+
+    // Support camelCase, snake_case, and uppercase Oracle keys
+    const fZona = ficha.zona || ficha.ZONA || '';
+    const fEntrevistado = ficha.entrevistado || ficha.ENTREVISTADO || '';
+    const fParentesco = ficha.parentesco || ficha.PARENTESCO || '';
+    const fLugarSeguimiento = (ficha.lugarSeguimiento || ficha.lugar_seguimiento || ficha.LUGAR_SEGUIMIENTO || 'DOMICILIO') as string;
+    const fDireccion = ficha.direccion || ficha.DIRECCION || '';
+    const fFecha = ficha.fecha || ficha.FECHA || '';
+    const fHora = ficha.hora || ficha.HORA || '';
+    const fTelefono = ficha.telefono || ficha.TELEFONO || '';
+    const fAntecedentes = ficha.antecedentes || ficha.ANTECEDENTES || '';
+    const fDescripcion = ficha.descripcion || ficha.DESCRIPCION || '';
+    // The "Resultados / Compromiso" section in the printed PDF reads ficha.acuerdos
+    const fAcuerdos = ficha.acuerdos || ficha.ACUERDOS || ficha.resultados || ficha.RESULTADOS || '';
+    const fObservaciones = ficha.observaciones || ficha.OBSERVACIONES || '';
+    
+    // For signatures:
+    const fNombreEntrevistado = ficha.nombreEntrevistado || ficha.nombre_entrevistado || ficha.NOMBRE_ENTREVISTADO || fEntrevistado || '';
+    const fNombreUsuario = ficha.nombreUsuario || ficha.nombre_usuario || ficha.NOMBRE_USUARIO || '';
+    const fNombreEducador = ficha.nombreEducador || ficha.nombre_educador || ficha.NOMBRE_EDUCADOR || '';
+
+    const displayLugarText = lugarText[fLugarSeguimiento.toUpperCase()] || lugarText['DOMICILIO'];
 
     return (
         <div id={id} style={styles.page}>
@@ -124,7 +147,7 @@ export const Formato12Print = ({ nna, ficha, id = 'formato-12-print' }: Formato1
                 <tbody>
                     <tr>
                         <td style={{ ...styles.td, ...styles.label, width: '30%' }}>Zona de Intervención</td>
-                        <td style={styles.td} colSpan={3}>{ficha.zona || ''}</td>
+                        <td style={styles.td} colSpan={3}>{fZona}</td>
                     </tr>
                     <tr>
                         <td style={{ ...styles.td, ...styles.label }}>Nombre del NNA</td>
@@ -134,27 +157,27 @@ export const Formato12Print = ({ nna, ficha, id = 'formato-12-print' }: Formato1
                     </tr>
                     <tr>
                         <td style={{ ...styles.td, ...styles.label }}>Nombre del Entrevistado</td>
-                        <td style={styles.td}>{ficha.entrevistado || ''}</td>
+                        <td style={styles.td}>{fEntrevistado}</td>
                         <td style={{ ...styles.td, ...styles.label, width: '15%' }}>Parentesco</td>
-                        <td style={styles.td}>{ficha.parentesco || ''}</td>
+                        <td style={styles.td}>{fParentesco}</td>
                     </tr>
                     <tr>
                         <td style={{ ...styles.td, ...styles.label }}>Lugar de Seguimiento</td>
                         <td style={styles.td} colSpan={3}>
-                            {lugarText[ficha.lugarSeguimiento || 'DOMICILIO']}
+                            {displayLugarText}
                         </td>
                     </tr>
                     <tr>
                         <td style={{ ...styles.td, ...styles.label }}>Dirección</td>
-                        <td style={styles.td}>{ficha.direccion || ''}</td>
+                        <td style={styles.td}>{fDireccion}</td>
                         <td style={{ ...styles.td, ...styles.label }}>Fecha</td>
-                        <td style={styles.td}>{ficha.fecha || new Date().toLocaleDateString('es-PE')}</td>
+                        <td style={styles.td}>{fFecha || new Date().toLocaleDateString('es-PE')}</td>
                     </tr>
                     <tr>
                         <td style={{ ...styles.td, ...styles.label }}>Hora</td>
-                        <td style={styles.td}>{ficha.hora || ''}</td>
+                        <td style={styles.td}>{fHora}</td>
                         <td style={{ ...styles.td, ...styles.label }}>Teléfono</td>
-                        <td style={styles.td}>{ficha.telefono || ''}</td>
+                        <td style={styles.td}>{fTelefono}</td>
                     </tr>
                 </tbody>
             </table>
@@ -168,7 +191,7 @@ export const Formato12Print = ({ nna, ficha, id = 'formato-12-print' }: Formato1
                     </tr>
                     <tr>
                         <td style={styles.td}>
-                            <div style={{ minHeight: '50px' }}>{ficha.antecedentes || ''}</div>
+                            <div style={{ minHeight: '50px', whiteSpace: 'pre-wrap' }}>{fAntecedentes}</div>
                         </td>
                     </tr>
                 </tbody>
@@ -180,7 +203,7 @@ export const Formato12Print = ({ nna, ficha, id = 'formato-12-print' }: Formato1
                 <tbody>
                     <tr>
                         <td style={styles.td}>
-                            <div style={{ minHeight: '80px' }}>{ficha.descripcion || ''}</div>
+                            <div style={{ minHeight: '80px', whiteSpace: 'pre-wrap' }}>{fDescripcion}</div>
                         </td>
                     </tr>
                 </tbody>
@@ -192,7 +215,7 @@ export const Formato12Print = ({ nna, ficha, id = 'formato-12-print' }: Formato1
                 <tbody>
                     <tr>
                         <td style={styles.td}>
-                            <div style={{ minHeight: '60px' }}>{ficha.resultados || ''}</div>
+                            <div style={{ minHeight: '60px', whiteSpace: 'pre-wrap' }}>{fAcuerdos}</div>
                         </td>
                     </tr>
                 </tbody>
@@ -204,7 +227,7 @@ export const Formato12Print = ({ nna, ficha, id = 'formato-12-print' }: Formato1
                 <tbody>
                     <tr>
                         <td style={styles.td}>
-                            <div style={{ minHeight: '50px' }}>{ficha.observaciones || ''}</div>
+                            <div style={{ minHeight: '50px', whiteSpace: 'pre-wrap' }}>{fObservaciones}</div>
                         </td>
                     </tr>
                 </tbody>
@@ -222,7 +245,7 @@ export const Formato12Print = ({ nna, ficha, id = 'formato-12-print' }: Formato1
                         <div style={{ fontSize: '8pt', fontWeight: 'bold' }}>
                             Nombre y firma del entrevistado
                         </div>
-                        <div style={{ fontSize: '8pt', marginTop: '4px' }}>{ficha.nombreEntrevistado || ''}</div>
+                        <div style={{ fontSize: '8pt', marginTop: '4px' }}>{fNombreEntrevistado}</div>
                     </div>
                 </div>
                 <div>
@@ -231,7 +254,7 @@ export const Formato12Print = ({ nna, ficha, id = 'formato-12-print' }: Formato1
                             Nombre y firma del usuario/a
                         </div>
                         <div style={{ fontSize: '8pt', marginTop: '4px' }}>
-                            {ficha.nombreUsuario || `${nna?.nombres} ${nna?.apellidoPaterno}`}
+                            {fNombreUsuario || `${nna?.nombres} ${nna?.apellidoPaterno}`}
                         </div>
                     </div>
                 </div>
@@ -240,7 +263,7 @@ export const Formato12Print = ({ nna, ficha, id = 'formato-12-print' }: Formato1
                         <div style={{ fontSize: '8pt', fontWeight: 'bold' }}>
                             Nombre y firma del / la educador/a
                         </div>
-                        <div style={{ fontSize: '8pt', marginTop: '4px' }}>{ficha.nombreEducador || ''}</div>
+                        <div style={{ fontSize: '8pt', marginTop: '4px' }}>{fNombreEducador}</div>
                     </div>
                 </div>
             </div>

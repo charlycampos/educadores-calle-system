@@ -7,7 +7,8 @@ from src.infrastructure.db.connection import get_pool
 _SELECT = """
     SELECT ID, CASO_ID, FECHA_INFORME, DESTINATARIO, ASUNTO, ANTECEDENTES, ESTRATEGIAS,
            SITUACION_SALUD, SITUACION_EDUCATIVA, SITUACION_FAMILIAR,
-           CONCLUSIONES, RECOMENDACIONES, CREADO_POR_ID, CREATED_AT, ESTADO, UPDATED_AT
+           CONCLUSIONES, RECOMENDACIONES, CREADO_POR_ID, CREATED_AT, ESTADO, UPDATED_AT,
+           CODIGO_INFORME
     FROM EXP_INFORME_SITUACIONAL
 """
 
@@ -40,7 +41,8 @@ async def _row_to_informe(row) -> InformeSituacional:
         creado_por_id=row[12],
         created_at=row[13],
         estado=row[14] or 'BORRADOR',
-        updated_at=row[15]
+        updated_at=row[15],
+        codigo_informe=row[16] if len(row) > 16 else None
     )
 
 
@@ -53,6 +55,71 @@ class OracleInformeSituacionalRepository:
                 await cur.execute(f"{_SELECT} WHERE CASO_ID = :caso", {"caso": caso_id})
                 row = await cur.fetchone()
                 return await _row_to_informe(row) if row else None
+
+    async def get_sede_codigo(self, sede_id: int) -> str:
+        if not sede_id:
+            raise ValueError("La cuenta no tiene sede asignada. No se puede generar el código del informe.")
+        pool = get_pool()
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute("SELECT NOMBRE FROM SEC_SEDE WHERE ID = :sede_id", {"sede_id": sede_id})
+                row = await cur.fetchone()
+                if not row:
+                    raise ValueError(f"No se encontró la sede con ID {sede_id} en la base de datos.")
+                nombre = row[0]
+                nom = nombre.upper().strip()
+                mapping = {
+                    "LIMA": "LIM",
+                    "SEDE CENTRAL LIMA": "LIM",
+                    "HUARAL": "HUA",
+                    "HUANCAYO": "HYO",
+                    "JUNÍN": "HYO",
+                    "JUNIN": "HYO",
+                    "AREQUIPA": "ARE",
+                    "LA LIBERTAD": "TRU",
+                    "TRUJILLO": "TRU",
+                    "LAMBAYEQUE": "CHI",
+                    "CHICLAYO": "CHI",
+                    "CAJAMARCA": "CAJ",
+                    "JAÉN": "JAE",
+                    "JAEN": "JAE",
+                    "PIURA": "PIU",
+                    "TUMBES": "TUM",
+                    "CUSCO": "CUS",
+                    "PUNO": "PUN",
+                    "TACNA": "TAC",
+                    "ICA": "ICA",
+                    "AYACUCHO": "AYA",
+                    "APURÍMAC": "APU",
+                    "APURIMAC": "APU",
+                    "HUÁNUCO": "HCO",
+                    "HUANUCO": "HCO",
+                    "ANCASH": "ANC",
+                    "LORETO": "IQU",
+                    "IQUITOS": "IQU",
+                    "UCAYALI": "PUC",
+                    "PUCALLPA": "PUC",
+                    "HUANCAVELICA": "HVC",
+                    "MOQUEGUA": "MOQ",
+                    "PASCO": "PAS",
+                    "CALLAO": "CAL",
+                    "TARAPOTO": "TAR",
+                    "CHACHAPOYAS": "CHA"
+                }
+                return mapping.get(nom, nom[:3])
+
+    async def get_next_correlativo(self, anio: int, sede_id: int) -> int:
+        pool = get_pool()
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    "SELECT COUNT(*) FROM EXP_INFORME_SITUACIONAL r "
+                    "JOIN NNA_CASO c ON c.ID = r.CASO_ID "
+                    "WHERE EXTRACT(YEAR FROM r.CREATED_AT) = :anio AND c.SEDE_ID = :sede_id",
+                    {"anio": anio, "sede_id": sede_id},
+                )
+                row = await cur.fetchone()
+                return (row[0] or 0) + 1
 
     async def save(self, caso_id: int, data: dict, creado_por_id: int) -> InformeSituacional:
         pool = get_pool()
@@ -98,13 +165,21 @@ class OracleInformeSituacionalRepository:
                         }
                     )
                 else:
+                    await cur.execute("SELECT SEDE_ID FROM NNA_CASO WHERE ID = :caso", {"caso": caso_id})
+                    sede_row = await cur.fetchone()
+                    sede_id = sede_row[0] if sede_row else None
+                    sede_codigo = await self.get_sede_codigo(sede_id)
+                    anio = datetime.now().year
+                    correlativo = await self.get_next_correlativo(anio, sede_id)
+                    codigo_informe = f"F09-{sede_codigo}-{anio}-{str(correlativo).zfill(4)}"
+
                     await cur.execute(
                         """INSERT INTO EXP_INFORME_SITUACIONAL
                            (CASO_ID, FECHA_INFORME, DESTINATARIO, ASUNTO, ANTECEDENTES, ESTRATEGIAS,
                             SITUACION_SALUD, SITUACION_EDUCATIVA, SITUACION_FAMILIAR,
-                            CONCLUSIONES, RECOMENDACIONES, CREADO_POR_ID, ESTADO)
+                            CONCLUSIONES, RECOMENDACIONES, CREADO_POR_ID, ESTADO, CODIGO_INFORME)
                            VALUES (:caso, :fecha, :dest, :asunto, :antec, :estrat,
-                                   :salud, :edu, :fam, :concl, :recom, :usr, :estado)""",
+                                   :salud, :edu, :fam, :concl, :recom, :usr, :estado, :codigo)""",
                         {
                             "caso": caso_id,
                             "fecha": fecha_inf,
@@ -118,7 +193,8 @@ class OracleInformeSituacionalRepository:
                             "concl": data.get("conclusiones"),
                             "recom": data.get("recomendaciones"),
                             "usr": creado_por_id,
-                            "estado": estado
+                            "estado": estado,
+                            "codigo": codigo_informe
                         }
                     )
                 await conn.commit()

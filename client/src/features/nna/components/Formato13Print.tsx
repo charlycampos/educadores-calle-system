@@ -1,134 +1,75 @@
 import React from 'react';
 
 interface Formato13Props {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     nna: any;
-    ficha: {
-        trabajoInfantil?: boolean;
-        mendicidad?: boolean;
-        vidaCalle?: boolean;
-        transito?: boolean;
-        convivencia?: boolean;
-        fechaIngreso?: string;
-        fechaEgreso?: string;
-
-        // Modalidad de Egreso
-        cumplioFases?: boolean;
-        mayoriaEdad?: boolean;
-        derivacion?: boolean;
-        interesSuperior?: boolean;
-        noUbicado?: boolean;
-        noDeseaParticipar?: boolean;
-
-        cuentaConResolucion?: 'SI' | 'NO';
-        situacionResolucion?: 'SI' | 'NO';
-
-        recibeDefensaPublica?: 'SI' | 'NO';
-        defensaDescripcion?: string;
-
-        faseAlEgreso?: 'I' | 'II' | 'III';
-
-        // Logros (1-6)
-        logros?: {
-            [key: number]: boolean;
-        };
-
-        // Observaciones
-        observacionesGenerales?: string;
-
-        derechosRestituidos?: {
-            identidad?: boolean;
-            salud?: boolean;
-            educacion?: boolean;
-            recreacion?: boolean;
-            otros?: boolean;
-        };
-        seEntregoDirectorio?: 'SI' | 'NO';
-
-        institucionDerivada?: string;
-        evidenciaDerivacion?: string; // Solo referencia texto
-
-        accionesTrata?: string;
-
-        accionesBusqueda?: string; // No ubicado
-
-        motivoNoDesea?: string;
-
-        datosEducador?: {
-            nombre?: string;
-            dni?: string;
-            lugarFecha?: string;
-        };
-        datosCoordinador?: {
-            nombre?: string;
-            dni?: string;
-        };
-    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ficha: any;
     id?: string;
 }
 
+const styles = {
+    page: {
+        width: '210mm',
+        minHeight: '297mm',
+        padding: '15mm',
+        backgroundColor: 'white',
+        color: 'black',
+        fontFamily: 'Arial, sans-serif',
+        fontSize: '8pt',
+        boxSizing: 'border-box' as const,
+        position: 'relative' as const
+    },
+    header: {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '10px',
+        borderBottom: '1px solid #000'
+    },
+    table: {
+        width: '100%',
+        borderCollapse: 'collapse' as const,
+        marginBottom: '5px',
+        border: '1px solid #000'
+    },
+    th: {
+        border: '1px solid #000',
+        padding: '2px 4px',
+        backgroundColor: '#f0f0f0',
+        fontWeight: 'bold' as const,
+        textAlign: 'center' as const,
+        fontSize: '7pt'
+    },
+    td: {
+        border: '1px solid #000',
+        padding: '2px 4px',
+        fontSize: '8pt'
+    },
+    sectionTitle: {
+        backgroundColor: '#e0e0e0',
+        fontWeight: 'bold' as const,
+        padding: '2px',
+        border: '1px solid #000',
+        fontSize: '8pt'
+    },
+    checkbox: {
+        width: '12px',
+        height: '12px',
+        display: 'inline-block',
+        border: '1px solid #000',
+        textAlign: 'center' as const,
+        lineHeight: '10px',
+        fontSize: '10px',
+        marginRight: '4px'
+    }
+};
+
+const Check = ({ checked }: { checked?: boolean }) => (
+    <span style={styles.checkbox}>{checked ? 'X' : ''}</span>
+);
+
 export const Formato13Print = ({ nna, ficha, id = 'formato-13-print' }: Formato13Props) => {
-    const styles = {
-        // ... (mismos estilos base)
-        page: {
-            width: '210mm',
-            minHeight: '297mm',
-            padding: '15mm',
-            backgroundColor: 'white',
-            color: 'black',
-            fontFamily: 'Arial, sans-serif',
-            fontSize: '8pt',
-            boxSizing: 'border-box' as const,
-            position: 'relative' as const
-        },
-        header: {
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '10px',
-            borderBottom: '1px solid #000'
-        },
-        table: {
-            width: '100%',
-            borderCollapse: 'collapse' as const,
-            marginBottom: '5px',
-            border: '1px solid #000'
-        },
-        th: {
-            border: '1px solid #000',
-            padding: '2px 4px',
-            backgroundColor: '#f0f0f0',
-            fontWeight: 'bold' as const,
-            textAlign: 'center' as const,
-            fontSize: '7pt'
-        },
-        td: {
-            border: '1px solid #000',
-            padding: '2px 4px',
-            fontSize: '8pt'
-        },
-        sectionTitle: {
-            backgroundColor: '#e0e0e0',
-            fontWeight: 'bold' as const,
-            padding: '2px',
-            border: '1px solid #000',
-            fontSize: '8pt'
-        },
-        checkbox: {
-            width: '12px',
-            height: '12px',
-            display: 'inline-block',
-            border: '1px solid #000',
-            textAlign: 'center' as const,
-            lineHeight: '10px',
-            fontSize: '10px',
-            marginRight: '4px'
-        }
-    };
-
-    const Check = ({ checked }: { checked?: boolean }) => (
-        <span style={styles.checkbox}>{checked ? 'X' : ''}</span>
-    );
-
     const formatDate = (dateStr?: string) => {
         if (!dateStr) return { d: '', m: '', a: '' };
         const d = new Date(dateStr);
@@ -167,7 +108,7 @@ export const Formato13Print = ({ nna, ficha, id = 'formato-13-print' }: Formato1
                         <td style={styles.th}>MM</td>
                         <td style={styles.th}>AA</td>
                         <td style={styles.th} rowSpan={2}>DNI</td>
-                        <td style={styles.td} rowSpan={2}>{nna.documento}</td>
+                        <td style={styles.td} rowSpan={2}>{nna.numeroDoc || nna.documento || ""}</td>
                         <td style={styles.th} colSpan={2}>SEXO</td>
                         <td style={styles.th} colSpan={4}>CUENTA CON SEGURO DE SALUD</td>
                     </tr>
@@ -184,16 +125,17 @@ export const Formato13Print = ({ nna, ficha, id = 'formato-13-print' }: Formato1
                     </tr>
                     <tr>
                         <td style={{ ...styles.td, textAlign: 'center' }} colSpan={4}>---</td>
-                        <td style={styles.td} colSpan={2}>
-                            <Check checked={nna.sexo === 'MASCULINO'} />
+                        <td style={styles.td} colSpan={2}></td>
+                        <td style={styles.td}>
+                            <Check checked={["M", "HOMBRE", "1", "MASCULINO"].includes(String(nna.sexo).toUpperCase())} />
                         </td>
                         <td style={styles.td}>
-                            <Check checked={nna.sexo === 'FEMENINO'} />
+                            <Check checked={["F", "MUJER", "2", "FEMENINO"].includes(String(nna.sexo).toUpperCase())} />
                         </td>
-                        <td style={styles.td}><Check checked={false} /></td>
-                        <td style={styles.td}><Check checked={true} /></td>
-                        <td style={styles.td}><Check checked={false} /></td>
-                        <td style={styles.td}><Check checked={false} /></td>
+                        <td style={styles.td}><Check checked={ficha.seguroSalud === "NO" || !ficha.seguroSalud} /></td>
+                        <td style={styles.td}><Check checked={ficha.seguroSalud === "SIS"} /></td>
+                        <td style={styles.td}><Check checked={ficha.seguroSalud === "ESSALUD"} /></td>
+                        <td style={styles.td}><Check checked={ficha.seguroSalud === "OTRO"} /></td>
                     </tr>
                 </tbody>
             </table>
@@ -202,18 +144,16 @@ export const Formato13Print = ({ nna, ficha, id = 'formato-13-print' }: Formato1
             <table style={styles.table}>
                 <tbody>
                     <tr>
-                        <td style={styles.th} rowSpan={2}>PERFIL DEL USUARIO/A</td>
-                        <td style={styles.th}>Trabajo Infantil</td>
-                        <td style={styles.th}>Mendicidad</td>
+                        <td style={styles.th} rowSpan={3}>PERFIL DEL USUARIO/A</td>
+                        <td style={styles.th} rowSpan={2}>Trabajo Infantil</td>
+                        <td style={styles.th} rowSpan={2}>Mendicidad</td>
                         <td style={styles.th} colSpan={2}>Vida en calle</td>
-                        <td style={styles.th} rowSpan={2} width="20%">FECHO DEL INGRESO AL SERVICIO</td>
+                        <td style={styles.th} rowSpan={2} width="20%">FECHA DE INGRESO AL SERVICIO</td>
                         <td style={styles.th}>DD</td>
                         <td style={styles.th}>MM</td>
                         <td style={styles.th}>AA</td>
                     </tr>
                     <tr>
-                        <td style={{ ...styles.td, textAlign: 'center' }}><Check checked={ficha.trabajoInfantil} /></td>
-                        <td style={{ ...styles.td, textAlign: 'center' }}><Check checked={ficha.mendicidad} /></td>
                         <td style={styles.th}>Tránsito</td>
                         <td style={styles.th}>Con vivencia</td>
                         <td style={styles.td}>{fecIngreso.d}</td>
@@ -221,8 +161,11 @@ export const Formato13Print = ({ nna, ficha, id = 'formato-13-print' }: Formato1
                         <td style={styles.td}>{fecIngreso.a}</td>
                     </tr>
                     <tr>
-                        <td style={styles.td} colSpan={5}></td>
-                        <td style={styles.th} rowSpan={2}>FECHO DE EGRESO AL SERVICIO</td>
+                        <td style={{ ...styles.td, textAlign: 'center' }}><Check checked={ficha.trabajoInfantil} /></td>
+                        <td style={{ ...styles.td, textAlign: 'center' }}><Check checked={ficha.mendicidad} /></td>
+                        <td style={{ ...styles.td, textAlign: 'center' }}><Check checked={ficha.vidaCalleTransito} /></td>
+                        <td style={{ ...styles.td, textAlign: 'center' }}><Check checked={ficha.vidaCalleConVivienda} /></td>
+                        <td style={styles.th}>FECHA DE EGRESO DEL SERVICIO</td>
                         <td style={styles.td}>{fecEgreso.d}</td>
                         <td style={styles.td}>{fecEgreso.m}</td>
                         <td style={styles.td}>{fecEgreso.a}</td>
@@ -248,15 +191,15 @@ export const Formato13Print = ({ nna, ficha, id = 'formato-13-print' }: Formato1
                         <td style={{ ...styles.td, textAlign: 'center' }}>Marcar con X</td>
                         <td style={{ ...styles.td, textAlign: 'center' }}><Check checked={ficha.cumplioFases} /></td>
                         <td style={{ ...styles.td, textAlign: 'center' }}><Check checked={ficha.mayoriaEdad} /></td>
-                        <td style={{ ...styles.td, textAlign: 'center' }}><Check checked={ficha.derivacion} /></td>
+                        <td style={{ ...styles.td, textAlign: 'center' }}><Check checked={ficha.derivacionServicios} /></td>
                         <td style={{ ...styles.td, textAlign: 'center' }}>--</td>
-                        <td style={{ ...styles.td, textAlign: 'center' }}><Check checked={ficha.interesSuperior} /></td>
-                        <td style={{ ...styles.td, textAlign: 'center' }}><Check checked={ficha.noDeseaParticipar} /></td>
+                        <td style={{ ...styles.td, textAlign: 'center' }}><Check checked={ficha.modalidadRetiro === 'INTERES_SUPERIOR'} /></td>
+                        <td style={{ ...styles.td, textAlign: 'center' }}><Check checked={ficha.modalidadRetiro === 'NO_DESEA'} /></td>
                         <td style={{ ...styles.td, textAlign: 'center' }}>
-                            SI <Check checked={ficha.cuentaConResolucion === 'SI'} /> NO <Check checked={ficha.cuentaConResolucion === 'NO'} />
+                            SI <Check checked={ficha.cuentaResolucionUPE === 'SI'} /> NO <Check checked={ficha.cuentaResolucionUPE === 'NO'} />
                         </td>
                         <td style={{ ...styles.td, textAlign: 'center' }}>
-                            SI <Check checked={ficha.situacionResolucion === 'SI'} /> NO <Check checked={ficha.situacionResolucion === 'NO'} />
+                            SI <Check checked={ficha.situacionResolucionUPE === 'SI'} /> NO <Check checked={ficha.situacionResolucionUPE === 'NO'} />
                         </td>
                     </tr>
                 </tbody>
@@ -293,12 +236,12 @@ export const Formato13Print = ({ nna, ficha, id = 'formato-13-print' }: Formato1
                         <td style={styles.td} colSpan={2}>
                             <div style={{ fontSize: '7pt' }}>
                                 DERECHOS RESTITUIDOS (Marcar):<br />
-                                <Check checked={ficha.derechosRestituidos?.identidad} /> IDENTIDAD
-                                <Check checked={ficha.derechosRestituidos?.salud} /> SALUD
-                                <Check checked={ficha.derechosRestituidos?.educacion} /> EDUCACIÓN
-                                <Check checked={ficha.derechosRestituidos?.recreacion} /> RECREACIÓN
+                                <Check checked={ficha.derechosIdentidad} /> IDENTIDAD
+                                <Check checked={ficha.derechosSalud} /> SALUD
+                                <Check checked={ficha.derechosEducacion} /> EDUCACIÓN
+                                <Check checked={ficha.derechosRecreacion} /> RECREACIÓN
                                 <br />
-                                ¿SE ENTREGA DIRECTORIO? SI <Check checked={ficha.seEntregoDirectorio === 'SI'} /> NO <Check checked={ficha.seEntregoDirectorio === 'NO'} />
+                                ¿SE ENTREGA DIRECTORIO? SI <Check checked={ficha.entregaDirectorio === 'SI'} /> NO <Check checked={ficha.entregaDirectorio === 'NO'} />
                             </div>
                         </td>
                     </tr>
@@ -306,13 +249,13 @@ export const Formato13Print = ({ nna, ficha, id = 'formato-13-print' }: Formato1
                         <td style={styles.th}>EGRESO CON DERIVACIÓN</td>
                         <td style={styles.td} colSpan={2}>
                             Institución: {ficha.institucionDerivada || '____________________'} <br />
-                            (ADJUNTAR EVIDENCIA DE DERIVACIÓN)
+                            Observaciones: {ficha.observacionesDerivacion || '____________________'}
                         </td>
                     </tr>
                     <tr>
-                        <td style={styles.th}>NO UBICADO (3 MESES O MAS)</td>
+                        <td style={styles.th}>NO UBICADO / RETIRO</td>
                         <td style={styles.td} colSpan={2}>
-                            Acciones Realizadas: {ficha.accionesBusqueda || '____________________'}
+                            Acciones Realizadas: {ficha.accionesBusqueda || ficha.retiInterSuperiorAcciones || ficha.motivoNoDesea || '____________________'}
                         </td>
                     </tr>
                 </tbody>
@@ -322,11 +265,13 @@ export const Formato13Print = ({ nna, ficha, id = 'formato-13-print' }: Formato1
             <div style={{ marginTop: '40px', display: 'flex', justifyContent: 'space-around' }}>
                 <div style={{ textAlign: 'center', borderTop: '1px solid #000', width: '200px' }}>
                     Firma del Educador/a <br />
-                    DNI: {ficha.datosEducador?.dni}
+                    Nombre: {ficha.educadorNombres} {ficha.educadorApellidoPaterno}<br />
+                    DNI: {ficha.educadorDNI}
                 </div>
                 <div style={{ textAlign: 'center', borderTop: '1px solid #000', width: '200px' }}>
                     Firma del Coordinador/a <br />
-                    DNI: {ficha.datosCoordinador?.dni}
+                    Nombre: {ficha.coordinadorNombres} {ficha.coordinadorApellidoPaterno}<br />
+                    DNI: {ficha.coordinadorDNI}
                 </div>
             </div>
 
