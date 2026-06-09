@@ -12,6 +12,16 @@ class PlanificarTallerUseCase:
             tema=data.tema,
             fecha_programada=data.fecha_programada,
             objetivos=data.objetivos,
-            metodologia=data.metodologia
+            metodologia=data.metodologia,
+            lugar=data.lugar,
+            dirigido_a=data.dirigido_a,
+            num_personas_planificadas=data.num_personas_planificadas,
+            acciones_previas=data.acciones_previas,
+            inicio_tiempo=data.inicio_tiempo,
+            inicio_materiales=data.inicio_materiales,
+            proceso_tiempo=data.proceso_tiempo,
+            proceso_materiales=data.proceso_materiales,
+            cierre_tiempo=data.cierre_tiempo,
+            cierre_materiales=data.cierre_materiales,
         )
         return await self.repository.create_taller(taller_base)

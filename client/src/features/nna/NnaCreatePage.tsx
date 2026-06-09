@@ -468,6 +468,98 @@ export const NnaCreatePage = () => {
     const { id } = useParams();
     const { createNna, updateExpediente, fetchExpediente, selectedExpediente, error: storeError, parametros, fetchParametros, checkNnaDuplicates } = useNnaStore();
 
+    // Hook para prellenado desde F15
+    useEffect(() => {
+        const queryParams = new URLSearchParams(window.location.search);
+        const prefillId = queryParams.get('prefillFromUrgencia');
+        if (prefillId && !id) {
+            const loadPrefillData = async () => {
+                try {
+                    const { getPrefillF03 } = await import('../../api/urgencia.api');
+                    const prefill = await getPrefillF03(Number(prefillId)) as any;
+                    
+                    const familiaresList: any[] = [];
+                    if (prefill.tutor_nombre) {
+                        familiaresList.push({
+                            nombres: prefill.tutor_nombre,
+                            priApeTutApo: '',
+                            segApeTutApo: '',
+                            nomApeTutApo: prefill.tutor_nombre,
+                            tipDocTutApo: 'DNI',
+                            nroDocTutApo: prefill.tutor_dni || '',
+                            vinTutUsu: prefill.tutor_parentesco || '',
+                            telefonoReferencia: prefill.tutor_telefono || '',
+                            esTutorPrincipal: true
+                        });
+                    }
+
+                    // Resetear formulario con los valores importados de F15
+                    reset({
+                        zonaIntervencion: prefill.lugar_pernocte || '',
+                        perfil: prefill.perfil || '',
+                        situacionCalle: prefill.situacion_calle || '',
+                        actividadRealizada: prefill.caracteristicas || '',
+                        domicilioActual: prefill.domicilio_actual || '',
+                        departamentoDom: prefill.departamento_dom || '',
+                        provinciaDom: prefill.provincia_dom || '',
+                        distritoDom: prefill.distrito_dom || '',
+                        lugarPernocte: prefill.lugar_pernocte || '',
+                        detalleLugarPernocte: prefill.detalle_lugar_pernocte || '',
+                        diasTrabajo: prefill.dias_trabajo || '',
+                        
+                        tieneTutorApo: prefill.tutor_nombre ? 'true' : 'false',
+                        nomApeTutApo: prefill.tutor_nombre || '',
+                        nombreTutor: prefill.tutor_nombre || '',
+                        vinTutUsu: prefill.tutor_parentesco || '',
+                        nroDocTutApo: prefill.tutor_dni || '',
+                        tipDocTutApo: prefill.tutor_dni ? 'DNI' : '',
+                        viveCon: prefill.vive_con || '3',
+                        detalleViveCon: prefill.detalle_vive_con || '',
+                        
+                        familiares: familiaresList,
+                        nnas: [{
+                            nombres: prefill.nombres || '',
+                            apellidoPaterno: prefill.apellido_paterno || '',
+                            apellidoMaterno: prefill.apellido_materno || '',
+                            tipoDoc: prefill.tipo_doc || '7',
+                            numeroDoc: prefill.numero_doc || '',
+                            fechaNacimiento: prefill.fecha_nacimiento || '',
+                            sexo: prefill.sexo || '',
+                            edad: prefill.edad || '',
+                            unidadEdad: prefill.unidad_edad || 'ANIOS',
+                            tienePartidaNacimiento: prefill.tiene_partida_nacimiento ? "true" : "false",
+                            estudiaActualmente: prefill.estudia_actualmente !== undefined ? prefill.estudia_actualmente : 0,
+                            nivelEducativo: prefill.nivel_educativo || '',
+                            gradoEstudio: prefill.grado_estudio || '',
+                            institucionEducativa: prefill.institucion_educativa || '',
+                            modalidadEstudio: prefill.modalidad_estudio || '',
+                            detalleNoEstudia: prefill.detalle_no_estudia || '',
+                            afiliadoSIS: prefill.afiliado_sis || 'NO_SABE',
+                            afiliadoOtroSeguro: prefill.afiliado_otro_seguro || 'NO',
+                            detalleOtroSeguro: prefill.detalle_otro_seguro || '',
+                            observacionesSalud: prefill.observaciones_salud || '',
+                            usoTiempo: {} as any,
+                            actividadesTiempoLibreLista: []
+                        }],
+                        // Almacenamos el urgencia_id para asociarlo luego de registrar
+                        urgencia_id: prefill.urgencia_id,
+                        actividadesCalle: prefill.datos_extra?.actividadesCalle || []
+                    });
+                    
+                    if (prefill.datos_extra?.actividadesCalle && prefill.datos_extra.actividadesCalle.length > 0) {
+                        replaceActividadesCalle(prefill.datos_extra.actividadesCalle);
+                    }
+                    
+                    // Mapear sección actual
+                    setActiveSection('paso2_personales');
+                } catch (err) {
+                    console.error("Error al prellenar desde Urgencia:", err);
+                }
+            };
+            loadPrefillData();
+        }
+    }, [id]);
+
     useEffect(() => {
         fetchParametros();
     }, [fetchParametros]);
@@ -1584,6 +1676,17 @@ export const NnaCreatePage = () => {
                         showAlert("Borrador Guardado", "Borrador guardado con éxito.", "success", () => navigate('/nna'));
                     }
                 } else {
+                    const createdNnaId = result?.[0]?.nna?.id;
+                    const urgenciaId = getValues('urgencia_id' as any);
+                    if (urgenciaId && createdNnaId) {
+                        try {
+                            const { updateEstadoUrgencia } = await import('../../api/urgencia.api');
+                            await updateEstadoUrgencia(Number(urgenciaId), 'PROMOVIDO_F03', createdNnaId);
+                        } catch (err) {
+                            console.error("Error al actualizar estado de la urgencia:", err);
+                        }
+                    }
+
                     const codigoF03 = result?.[0]?.nna?.codigo_ficha03 || result?.[0]?.nna?.codigoFicha03;
                     const msgCodigo = codigoF03 ? ` Código asignado: ${codigoF03}.` : '';
                     showAlert("Registro Creado", `El expediente ha sido registrado de manera exitosa.${msgCodigo}`, "success", () => navigate('/nna'));

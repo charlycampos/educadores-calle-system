@@ -78,8 +78,16 @@ export const TalleresPage = () => {
             fecha: prefilledDate || new Date().toISOString().split('T')[0],
             hora: '09:00',
             inicioActividad: '',
+            inicioTiempo: '',
+            inicioMateriales: '',
             procesoActividad: '',
+            procesoTiempo: '',
+            procesoMateriales: '',
             cierreActividad: '',
+            cierreTiempo: '',
+            cierreMateriales: '',
+            numeroPersonasPlanificadas: undefined,
+            accionesPrevias: '',
             estado: 'PLANIFICADO',
             participantes: [],
             incidenciasLogisticas: ''
@@ -589,10 +597,11 @@ export const TalleresPage = () => {
                 <div className="bg-surface rounded-b-xl border border-t-0 border-border shadow-sm p-6 min-h-[500px]">
                     {activeTab === 'planificacion' && (
                         <div className="space-y-8 max-w-5xl mx-auto animate-in fade-in duration-200">
+                            {/* Fila 1: Datos principales */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                <div className="space-y-6">
+                                <div className="space-y-4">
                                     <div>
-                                        <label className="block text-[11px] font-semibold text-fg-muted uppercase mb-1.5 tracking-wider">Nombre del Taller</label>
+                                        <label className="block text-[11px] font-semibold text-fg-muted uppercase mb-1.5 tracking-wider">1. Nombre del Taller</label>
                                         <input
                                             value={currentTaller.nombre}
                                             onChange={e => setCurrentTaller({ ...currentTaller, nombre: e.target.value })}
@@ -601,23 +610,49 @@ export const TalleresPage = () => {
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-[11px] font-semibold text-fg-muted uppercase mb-1.5 tracking-wider">Objetivo General</label>
+                                        <label className="block text-[11px] font-semibold text-fg-muted uppercase mb-1.5 tracking-wider">2. Dirigido a</label>
+                                        <div className="flex gap-3">
+                                            {['Niños y niñas', 'Adolescentes', 'Padres de Familia'].map(opt => (
+                                                <button
+                                                    key={opt}
+                                                    type="button"
+                                                    onClick={() => setCurrentTaller({ ...currentTaller, dirigidoA: opt })}
+                                                    className={`flex-1 py-2 rounded-lg text-[12px] font-semibold border transition-all ${currentTaller.dirigidoA === opt ? 'bg-primary text-white border-primary' : 'bg-surface border-border text-fg-muted hover:border-primary/40'}`}
+                                                >
+                                                    {opt}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-[11px] font-semibold text-fg-muted uppercase mb-1.5 tracking-wider">3. Objetivo General</label>
                                         <textarea
-                                            value={currentTaller.objetivo}
+                                            value={currentTaller.objetivo || ''}
                                             onChange={e => setCurrentTaller({ ...currentTaller, objetivo: e.target.value })}
                                             rows={3}
                                             className="w-full p-3.5 bg-surface rounded-xl border border-border resize-none focus:ring-2 focus:ring-primary/10 focus:border-primary text-[14px] text-fg placeholder-fg-muted shadow-sm transition-all"
                                             placeholder="¿Qué queremos lograr con el grupo?"
                                         />
                                     </div>
+                                    <div>
+                                        <label className="block text-[11px] font-semibold text-fg-muted uppercase mb-1.5 tracking-wider">4. N° de Personas Planificadas</label>
+                                        <input
+                                            type="number"
+                                            min={1}
+                                            value={currentTaller.numeroPersonasPlanificadas ?? ''}
+                                            onChange={e => setCurrentTaller({ ...currentTaller, numeroPersonasPlanificadas: e.target.value ? parseInt(e.target.value) : undefined })}
+                                            className="w-full p-2.5 bg-surface border border-border rounded-xl text-[13px] text-fg focus:ring-2 focus:ring-primary/10 focus:border-primary outline-none shadow-sm transition-all"
+                                            placeholder="Ej. 15"
+                                        />
+                                    </div>
                                 </div>
-                                <div className="space-y-6">
+                                <div className="space-y-4">
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
                                             <label className="block text-[11px] font-semibold text-fg-muted uppercase mb-1.5 tracking-wider">Fecha</label>
                                             <input
                                                 type="date"
-                                                value={currentTaller.fecha ? new Date(currentTaller.fecha).toISOString().split('T')[0] : ''}
+                                                value={currentTaller.fecha ? (currentTaller.fecha.includes('T') ? currentTaller.fecha.split('T')[0] : currentTaller.fecha) : ''}
                                                 onChange={e => setCurrentTaller({ ...currentTaller, fecha: e.target.value })}
                                                 className="w-full p-2 bg-surface border border-border rounded-lg text-[13px] text-fg focus:ring-1 focus:ring-primary"
                                             />
@@ -633,44 +668,122 @@ export const TalleresPage = () => {
                                         </div>
                                     </div>
                                     <div>
-                                        <label className="block text-[11px] font-semibold text-fg-muted uppercase mb-1.5 tracking-wider">Lugar</label>
+                                        <label className="block text-[11px] font-semibold text-fg-muted uppercase mb-1.5 tracking-wider">7. Lugar</label>
                                         <input
-                                            value={currentTaller.lugar}
+                                            value={currentTaller.lugar || ''}
                                             onChange={e => setCurrentTaller({ ...currentTaller, lugar: e.target.value })}
                                             className="w-full p-2.5 bg-surface border border-border rounded-xl text-[13px] text-fg focus:ring-2 focus:ring-primary/10 focus:border-primary outline-none shadow-sm transition-all"
                                             placeholder="Ej. Loza Deportiva"
                                         />
                                     </div>
+                                    <div>
+                                        <label className="block text-[11px] font-semibold text-fg-muted uppercase mb-1.5 tracking-wider">5. Acciones Previas al Taller</label>
+                                        <textarea
+                                            value={currentTaller.accionesPrevias || ''}
+                                            onChange={e => setCurrentTaller({ ...currentTaller, accionesPrevias: e.target.value })}
+                                            rows={4}
+                                            className="w-full p-3 bg-surface border border-border rounded-xl resize-none text-[13px] text-fg focus:ring-2 focus:ring-primary/10 focus:border-primary outline-none shadow-sm transition-all"
+                                            placeholder="Acciones de coordinación, preparación de materiales, convocatoria..."
+                                        />
+                                    </div>
                                 </div>
                             </div>
+
+                            {/* Esquema metodológico */}
                             <div className="border-t border-dashed border-border pt-6">
                                 <h3 className="font-bold text-fg mb-4 flex items-center gap-2">
-                                    <BookOpen size={18} className="text-fg-muted" /> Esquema Metodológico
+                                    <BookOpen size={18} className="text-fg-muted" /> 6. Esquema del Taller
                                 </h3>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <div className="bg-success-soft/30 p-4 rounded-xl border border-success/20 shadow-sm hover:shadow transition-shadow">
+                                    {/* INICIO */}
+                                    <div className="bg-success-soft/30 p-4 rounded-xl border border-success/20 shadow-sm space-y-3">
                                         <span className="text-[11px] font-bold text-success tracking-widest uppercase">INICIO</span>
-                                        <textarea
-                                            value={currentTaller.inicioActividad || ''}
-                                            onChange={e => setCurrentTaller({ ...currentTaller, inicioActividad: e.target.value })}
-                                            className="w-full mt-2 bg-surface border border-success/20 focus:border-success focus:ring-2 focus:ring-success/10 rounded-lg text-[13px] p-2.5 outline-none shadow-sm transition-all" rows={3} placeholder="Actividad..."
-                                        />
+                                        <div>
+                                            <label className="block text-[10px] font-semibold text-fg-muted uppercase mb-1">Tiempo</label>
+                                            <input
+                                                value={currentTaller.inicioTiempo || ''}
+                                                onChange={e => setCurrentTaller({ ...currentTaller, inicioTiempo: e.target.value })}
+                                                className="w-full p-2 bg-surface border border-success/20 focus:border-success focus:ring-1 focus:ring-success/10 rounded-lg text-[12px] outline-none"
+                                                placeholder="Ej. 10 min"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-semibold text-fg-muted uppercase mb-1">Actividad</label>
+                                            <textarea
+                                                value={currentTaller.inicioActividad || ''}
+                                                onChange={e => setCurrentTaller({ ...currentTaller, inicioActividad: e.target.value })}
+                                                className="w-full bg-surface border border-success/20 focus:border-success focus:ring-1 focus:ring-success/10 rounded-lg text-[13px] p-2.5 outline-none resize-none" rows={3} placeholder="Describe la actividad..."
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-semibold text-fg-muted uppercase mb-1">Materiales</label>
+                                            <input
+                                                value={currentTaller.inicioMateriales || ''}
+                                                onChange={e => setCurrentTaller({ ...currentTaller, inicioMateriales: e.target.value })}
+                                                className="w-full p-2 bg-surface border border-success/20 focus:border-success focus:ring-1 focus:ring-success/10 rounded-lg text-[12px] outline-none"
+                                                placeholder="Ej. Papelotes, plumones"
+                                            />
+                                        </div>
                                     </div>
-                                    <div className="bg-info-soft/30 p-4 rounded-xl border border-info/20 shadow-sm hover:shadow transition-shadow">
+                                    {/* PROCESO */}
+                                    <div className="bg-info-soft/30 p-4 rounded-xl border border-info/20 shadow-sm space-y-3">
                                         <span className="text-[11px] font-bold text-info tracking-widest uppercase">PROCESO</span>
-                                        <textarea
-                                            value={currentTaller.procesoActividad || ''}
-                                            onChange={e => setCurrentTaller({ ...currentTaller, procesoActividad: e.target.value })}
-                                            className="w-full mt-2 bg-surface border border-info/20 focus:border-info focus:ring-2 focus:ring-info/10 rounded-lg text-[13px] p-2.5 outline-none shadow-sm transition-all" rows={3} placeholder="Actividad..."
-                                        />
+                                        <div>
+                                            <label className="block text-[10px] font-semibold text-fg-muted uppercase mb-1">Tiempo</label>
+                                            <input
+                                                value={currentTaller.procesoTiempo || ''}
+                                                onChange={e => setCurrentTaller({ ...currentTaller, procesoTiempo: e.target.value })}
+                                                className="w-full p-2 bg-surface border border-info/20 focus:border-info focus:ring-1 focus:ring-info/10 rounded-lg text-[12px] outline-none"
+                                                placeholder="Ej. 30 min"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-semibold text-fg-muted uppercase mb-1">Actividad</label>
+                                            <textarea
+                                                value={currentTaller.procesoActividad || ''}
+                                                onChange={e => setCurrentTaller({ ...currentTaller, procesoActividad: e.target.value })}
+                                                className="w-full bg-surface border border-info/20 focus:border-info focus:ring-1 focus:ring-info/10 rounded-lg text-[13px] p-2.5 outline-none resize-none" rows={3} placeholder="Describe la actividad..."
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-semibold text-fg-muted uppercase mb-1">Materiales</label>
+                                            <input
+                                                value={currentTaller.procesoMateriales || ''}
+                                                onChange={e => setCurrentTaller({ ...currentTaller, procesoMateriales: e.target.value })}
+                                                className="w-full p-2 bg-surface border border-info/20 focus:border-info focus:ring-1 focus:ring-info/10 rounded-lg text-[12px] outline-none"
+                                                placeholder="Ej. Cartulinas, tijeras"
+                                            />
+                                        </div>
                                     </div>
-                                    <div className="bg-primary-soft/30 p-4 rounded-xl border border-primary/20 shadow-sm hover:shadow transition-shadow">
+                                    {/* CIERRE */}
+                                    <div className="bg-primary-soft/30 p-4 rounded-xl border border-primary/20 shadow-sm space-y-3">
                                         <span className="text-[11px] font-bold text-primary tracking-widest uppercase">CIERRE</span>
-                                        <textarea
-                                            value={currentTaller.cierreActividad || ''}
-                                            onChange={e => setCurrentTaller({ ...currentTaller, cierreActividad: e.target.value })}
-                                            className="w-full mt-2 bg-surface border border-primary/20 focus:border-primary focus:ring-2 focus:ring-primary/10 rounded-lg text-[13px] p-2.5 outline-none shadow-sm transition-all" rows={3} placeholder="Actividad..."
-                                        />
+                                        <div>
+                                            <label className="block text-[10px] font-semibold text-fg-muted uppercase mb-1">Tiempo</label>
+                                            <input
+                                                value={currentTaller.cierreTiempo || ''}
+                                                onChange={e => setCurrentTaller({ ...currentTaller, cierreTiempo: e.target.value })}
+                                                className="w-full p-2 bg-surface border border-primary/20 focus:border-primary focus:ring-1 focus:ring-primary/10 rounded-lg text-[12px] outline-none"
+                                                placeholder="Ej. 10 min"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-semibold text-fg-muted uppercase mb-1">Actividad</label>
+                                            <textarea
+                                                value={currentTaller.cierreActividad || ''}
+                                                onChange={e => setCurrentTaller({ ...currentTaller, cierreActividad: e.target.value })}
+                                                className="w-full bg-surface border border-primary/20 focus:border-primary focus:ring-1 focus:ring-primary/10 rounded-lg text-[13px] p-2.5 outline-none resize-none" rows={3} placeholder="Describe la actividad..."
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-semibold text-fg-muted uppercase mb-1">Materiales</label>
+                                            <input
+                                                value={currentTaller.cierreMateriales || ''}
+                                                onChange={e => setCurrentTaller({ ...currentTaller, cierreMateriales: e.target.value })}
+                                                className="w-full p-2 bg-surface border border-primary/20 focus:border-primary focus:ring-1 focus:ring-primary/10 rounded-lg text-[12px] outline-none"
+                                                placeholder="Ej. Fichas de evaluación"
+                                            />
+                                        </div>
                                     </div>
                                 </div>
                             </div>

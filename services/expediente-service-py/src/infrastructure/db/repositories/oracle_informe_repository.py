@@ -95,6 +95,14 @@ class OracleInformeRepository:
                 }
                 return mapping.get(nom, nom[:3])
 
+    async def get_caso_sede_id(self, caso_id: int) -> int | None:
+        pool = get_pool()
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute("SELECT SEDE_ID FROM NNA_CASO WHERE ID = :1", [caso_id])
+                row = await cur.fetchone()
+                return row[0] if row else None
+
     async def get_next_correlativo(self, anio: int, sede_id: int) -> int:
         pool = get_pool()
         async with pool.acquire() as conn:

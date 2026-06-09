@@ -100,7 +100,7 @@ async def list_usuarios(current_user: dict = Depends(get_current_user)):
                 await cur.execute("""
                     SELECT u.ID, u.NOMBRE_COMPLETO, u.EMAIL, u.PASSWORD_HASH,
                            u.ROL_ID, r.NOMBRE, u.SEDE_ID, s.CODIGO,
-                           s.REGION_ID, u.ZONA_ASIGNADA, u.ACTIVO
+                           s.NOMBRE, s.REGION_ID, u.ZONA_ASIGNADA, u.ACTIVO
                     FROM SEC_USUARIO u
                     JOIN      SEC_ROL  r ON r.ID = u.ROL_ID
                     LEFT JOIN SEC_SEDE s ON s.ID = u.SEDE_ID

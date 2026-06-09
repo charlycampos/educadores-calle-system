@@ -18,13 +18,14 @@ from src.infrastructure.http.routers.pti_router import router as pti_router
 from src.infrastructure.http.routers.diagnostico_router import router as diagnostico_router
 from src.infrastructure.http.routers.seguimiento_router import router as seguimiento_router
 from src.infrastructure.http.routers.proceso_logros_router import router as proceso_logros_router
+from src.infrastructure.http.routers.urgencia_router import router as urgencia_router
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_pool()
     print(f"intervencion-service corriendo en http://localhost:{settings.port}")
-    print("Módulos activos: Diario, PTI, F04 Diagnostico, F05 Logros, F10 Seguimiento")
+    print("Módulos activos: Diario, PTI, F04 Diagnostico, F05 Logros, F10 Seguimiento, F15 Urgencia")
     yield
     await close_pool()
 
@@ -51,6 +52,7 @@ app.include_router(pti_router)
 app.include_router(diagnostico_router)
 app.include_router(seguimiento_router)
 app.include_router(proceso_logros_router)
+app.include_router(urgencia_router)
 
 
 @app.get("/health")

@@ -3,11 +3,12 @@ from datetime import datetime
 from pydantic import BaseModel
 
 class SeguimientoFamiliarBase(BaseModel):
-    caso_id: int
+    caso_id: Optional[int] = None
     tema_tratado: Optional[str] = None
     acuerdos: Optional[str] = None
     evaluacion: Optional[str] = None
     proxima_visita: Optional[datetime] = None
+    fecha_termino: Optional[datetime] = None
     zona: Optional[str] = None
     entrevistado: Optional[str] = None
     parentesco: Optional[str] = None
@@ -21,6 +22,9 @@ class SeguimientoFamiliarBase(BaseModel):
     nombre_educador: Optional[str] = None
 
 class SeguimientoFamiliarCreate(SeguimientoFamiliarBase):
+    pass
+
+class SeguimientoFamiliarUpdate(SeguimientoFamiliarBase):
     pass
 
 class SeguimientoFamiliarResponse(SeguimientoFamiliarBase):

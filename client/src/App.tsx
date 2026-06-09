@@ -10,6 +10,8 @@ import { TalleresPage } from './features/talleres/TalleresPage';
 import { MainLayout } from './components/layout/MainLayout';
 import { useAuthStore } from './store/auth.store';
 import React, { useEffect } from 'react';
+import { UrgenciasListPage } from './features/nna/UrgenciasListPage';
+import { FormularioF15Page } from './features/nna/FormularioF15Page';
 
 // Rutas protegidas CON sidebar (páginas internas)
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -126,6 +128,24 @@ function App() {
         <Route path="/nna" element={
           <ProtectedRoute>
             <NnaListPage />
+          </ProtectedRoute>
+        } />
+
+        <Route path="/urgencias" element={
+          <ProtectedRoute>
+            <UrgenciasListPage />
+          </ProtectedRoute>
+        } />
+
+        <Route path="/urgencias/nueva" element={
+          <ProtectedRoute>
+            <FormularioF15Page />
+          </ProtectedRoute>
+        } />
+
+        <Route path="/urgencias/editar/:id" element={
+          <ProtectedRoute>
+            <FormularioF15Page />
           </ProtectedRoute>
         } />
 

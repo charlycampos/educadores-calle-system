@@ -6,6 +6,7 @@ from fastapi.responses import FileResponse
 from src.domain.entities.diagnostico import DiagnosticoSocialCreate
 from src.infrastructure.db.repositories.oracle_diagnostico_repository import OracleDiagnosticoRepository
 from src.domain.use_cases.diagnostico_use_case import DiagnosticoUseCase
+from src.infrastructure.http.middleware.jwt_middleware import get_current_user
 
 logger = logging.getLogger("diagnostico_router")
 
@@ -90,6 +91,7 @@ async def guardar_diagnostico(
     data: DiagnosticoSocialCreate,
     background_tasks: BackgroundTasks,
     repo: OracleDiagnosticoRepository = Depends(get_repository),
+    current_user: dict = Depends(get_current_user),
 ):
     from src.infrastructure.services.expediente_service import trigger_apertura_expediente
     use_case = DiagnosticoUseCase(repo)

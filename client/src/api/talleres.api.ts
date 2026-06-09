@@ -9,26 +9,6 @@ const getHeaders = () => {
     };
 };
 
-export interface Taller {
-    id: number;
-    nombre: string;
-    fecha: string; // ISO date string
-    hora: string;
-    lugar: string;
-    objetivo: string;
-    estado: 'PLANIFICADO' | 'EJECUTADO' | 'EVALUADO';
-    dirigidoA?: string;
-    esIndividual?: boolean;     // Nuevo: indica si es taller individual
-    nnaAsociadoId?: number;     // Nuevo: ID del NNA si es individual
-    educadorResponsableId?: number; // Nuevo: ID del educador que crea el taller
-    incidenciasLogisticas?: string;
-    participantes: ParticipanteTaller[];
-    // Planificación Method fields...
-    inicioActividad?: string;
-    procesoActividad?: string;
-    cierreActividad?: string;
-}
-
 export interface ParticipanteTaller {
     id: number;
     tallerId: number;
@@ -44,6 +24,71 @@ export interface ParticipanteTaller {
     };
 }
 
+export interface Taller {
+    id: number;
+    nombre: string;
+    fecha: string;
+    hora: string;
+    lugar?: string;
+    objetivo?: string;
+    estado: 'PLANIFICADO' | 'EJECUTADO' | 'EVALUADO';
+    dirigidoA?: string;
+    esIndividual?: boolean;
+    nnaAsociadoId?: number;
+    educadorResponsableId?: number;
+    educadorResponsable?: { nombreCompleto?: string };
+    incidenciasLogisticas?: string;
+    participantes: ParticipanteTaller[];
+    // Esquema metodológico
+    inicioActividad?: string;
+    inicioTiempo?: string;
+    inicioMateriales?: string;
+    procesoActividad?: string;
+    procesoTiempo?: string;
+    procesoMateriales?: string;
+    cierreActividad?: string;
+    cierreTiempo?: string;
+    cierreMateriales?: string;
+    // Otros campos F7
+    numeroPersonasPlanificadas?: number;
+    accionesPrevias?: string;
+}
+
+const buildFechaHora = (fecha?: string, hora?: string, fallback = true): string | undefined => {
+    const fechaPart = fecha
+        ? (fecha.includes('T') ? fecha.split('T')[0] : fecha)
+        : null;
+    if (fechaPart && hora) return `${fechaPart}T${hora}:00`;
+    if (fechaPart) return `${fechaPart}T09:00:00`;
+    return fallback ? new Date().toISOString() : undefined;
+};
+
+const buildMetodologia = (data: Partial<Taller>): string | undefined => {
+    const parts = [
+        data.inicioActividad ? `INICIO: ${data.inicioActividad}` : '',
+        data.procesoActividad ? `PROCESO: ${data.procesoActividad}` : '',
+        data.cierreActividad ? `CIERRE: ${data.cierreActividad}` : '',
+    ].filter(Boolean);
+    return parts.length ? parts.join('\n\n') : undefined;
+};
+
+const buildPlanificacionPayload = (data: Partial<Taller>, fechaHora?: string) => ({
+    tema: data.nombre || 'Sin nombre',
+    fecha_programada: fechaHora,
+    objetivos: data.objetivo || undefined,
+    metodologia: buildMetodologia(data),
+    lugar: data.lugar || undefined,
+    dirigido_a: data.dirigidoA || undefined,
+    num_personas_planificadas: data.numeroPersonasPlanificadas || undefined,
+    acciones_previas: data.accionesPrevias || undefined,
+    inicio_tiempo: data.inicioTiempo || undefined,
+    inicio_materiales: data.inicioMateriales || undefined,
+    proceso_tiempo: data.procesoTiempo || undefined,
+    proceso_materiales: data.procesoMateriales || undefined,
+    cierre_tiempo: data.cierreTiempo || undefined,
+    cierre_materiales: data.cierreMateriales || undefined,
+});
+
 export const getTalleres = async (): Promise<Taller[]> => {
     const response = await fetch(`${API_URL}/talleres`, { headers: getHeaders() });
     if (!response.ok) throw new Error('Error fetching talleres');
@@ -51,27 +96,8 @@ export const getTalleres = async (): Promise<Taller[]> => {
 };
 
 export const createTaller = async (data: Partial<Taller>) => {
-    // Backend PlanificarTallerRequest: { tema, fecha_programada, objetivos?, metodologia? }
-    // El frontend usa: { nombre, fecha, hora, objetivo, inicioActividad, procesoActividad, cierreActividad }
-    const fechaHora = data.fecha && data.hora
-        ? `${data.fecha}T${data.hora}:00`
-        : data.fecha
-            ? `${data.fecha}T09:00:00`
-            : new Date().toISOString();
-
-    const metodologia = [
-        data.inicioActividad ? `INICIO: ${data.inicioActividad}` : '',
-        data.procesoActividad ? `PROCESO: ${data.procesoActividad}` : '',
-        data.cierreActividad ? `CIERRE: ${data.cierreActividad}` : '',
-    ].filter(Boolean).join('\n\n') || undefined;
-
-    const payload = {
-        tema:             data.nombre || 'Sin nombre',
-        fecha_programada: fechaHora,
-        objetivos:        data.objetivo || undefined,
-        metodologia:      metodologia,
-    };
-
+    const fechaHora = buildFechaHora(data.fecha, data.hora, false) ?? new Date().toISOString();
+    const payload = buildPlanificacionPayload(data, fechaHora);
     const response = await fetch(`${API_URL}/talleres/planificar`, {
         method: 'POST',
         headers: getHeaders(),
@@ -86,28 +112,11 @@ export const getTallerById = async (id: number): Promise<Taller> => {
     if (!response.ok) throw new Error('Error fetching taller detail');
     return response.json();
 };
+
 export const updateTaller = async (id: number, data: Partial<Taller>) => {
-    // Si el taller está en PLANIFICADO y no estamos enviando participantes (es decir, solo editando la planeación)
     if (data.estado === 'PLANIFICADO' && (!data.participantes || data.participantes.length === 0)) {
-        const fechaHora = data.fecha && data.hora
-            ? `${data.fecha}T${data.hora}:00`
-            : data.fecha
-                ? `${data.fecha}T09:00:00`
-                : undefined;
-
-        const metodologia = [
-            data.inicioActividad ? `INICIO: ${data.inicioActividad}` : '',
-            data.procesoActividad ? `PROCESO: ${data.procesoActividad}` : '',
-            data.cierreActividad ? `CIERRE: ${data.cierreActividad}` : '',
-        ].filter(Boolean).join('\n\n') || undefined;
-
-        const payload = {
-            tema:             data.nombre,
-            fecha_programada: fechaHora,
-            objetivos:        data.objetivo,
-            metodologia:      metodologia,
-        };
-
+        const fechaHora = buildFechaHora(data.fecha, data.hora, false);
+        const payload = buildPlanificacionPayload(data, fechaHora);
         const response = await fetch(`${API_URL}/talleres/${id}`, {
             method: 'PUT',
             headers: getHeaders(),
@@ -117,14 +126,12 @@ export const updateTaller = async (id: number, data: Partial<Taller>) => {
         return response.json();
     }
 
-    // Backend EjecutarTallerRequest: { fecha_ejecucion, participantes: [{nna_id, asiste, evaluacion}] }
+    // Ejecución: POST /{id}/ejecutar
     const payload = {
-        fecha_ejecucion: data.fecha && data.hora
-            ? `${data.fecha}T${data.hora}:00`
-            : new Date().toISOString(),
+        fecha_ejecucion: buildFechaHora(data.fecha, data.hora) ?? new Date().toISOString(),
         participantes: (data.participantes || []).map(p => ({
-            nna_id:     p.nnaId,
-            asiste:     p.asistio,
+            nna_id: p.nnaId,
+            asiste: p.asistio,
             evaluacion: p.logros || p.limitaciones || p.sugerencias
                 ? `Logros: ${p.logros || '—'}\nLimitaciones: ${p.limitaciones || '—'}\nSugerencias: ${p.sugerencias || '—'}`
                 : undefined,

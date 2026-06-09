@@ -273,6 +273,7 @@ export interface NnaFormData {
 
     familiares?: FamiliarFormDataItem[];
     actividadesCalle?: ActividadPerfil[];
+    urgencia_id?: number;
 }
 
 export interface DuplicateCheckResult {

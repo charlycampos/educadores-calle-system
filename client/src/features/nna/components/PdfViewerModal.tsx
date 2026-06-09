@@ -24,7 +24,7 @@ export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({ isOpen, onClose,
     // Direct stream URL using the query parameter token for authentication
     const pdfUrl = pdfUrlProp
         ?? (documentFilename
-            ? `${EXPEDIENTE_API_URL}/expediente/documento/${documentFilename}?token=${token}`
+            ? `${EXPEDIENTE_API_URL}/expediente/documento/${encodeURIComponent(documentFilename)}?token=${token}`
             : `${NNA_API_URL}/nna/${nnaId}/pdf?token=${token}`);
 
     return (

@@ -41,6 +41,42 @@ class OraclePTIRepository:
                 columns = [col[0].lower() for col in cur.description]
                 return self._row_to_dict(row, columns)
 
+    async def update_pti(self, pti_id: int, objetivo_general: str, acciones: list) -> dict | None:
+        pool = get_pool()
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    "UPDATE PLAN_TRABAJO SET OBJETIVO_GENERAL = :1, UPDATED_AT = SYSDATE WHERE ID = :2",
+                    [objetivo_general, pti_id]
+                )
+                if cur.rowcount == 0:
+                    return None
+                await cur.execute("DELETE FROM ACCION_PTI WHERE PLAN_TRABAJO_ID = :1", [pti_id])
+                if acciones:
+                    sql_accion = """
+                        INSERT INTO ACCION_PTI (PLAN_TRABAJO_ID, DESCRIPCION, META, PLAZO, RESPONSABLE, ESTADO)
+                        VALUES (:1, :2, :3, :4, :5, :6)
+                    """
+                    await cur.executemany(sql_accion, [
+                        (pti_id, a.get("descripcion"), a.get("meta"), a.get("plazo"),
+                         a.get("responsable"), a.get("estado", "PENDIENTE"))
+                        for a in acciones
+                    ])
+                await conn.commit()
+        pool2 = get_pool()
+        async with pool2.acquire() as conn2:
+            async with conn2.cursor() as cur2:
+                await cur2.execute("SELECT * FROM PLAN_TRABAJO WHERE ID = :1", [pti_id])
+                row = await cur2.fetchone()
+                if not row:
+                    return None
+                columns = [col[0].lower() for col in cur2.description]
+                pti = self._row_to_dict(row, columns)
+                await cur2.execute("SELECT * FROM ACCION_PTI WHERE PLAN_TRABAJO_ID = :1 ORDER BY CREATED_AT ASC", [pti_id])
+                acc_columns = [col[0].lower() for col in cur2.description]
+                pti["acciones"] = [self._row_to_dict(r, acc_columns) for r in await cur2.fetchall()]
+                return pti
+
     async def create_pti(self, caso_id: int, data: PlanTrabajoCreate) -> dict:
         pool = get_pool()
         async with pool.acquire() as conn:

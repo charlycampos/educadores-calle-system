@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, status, Depends
 from pydantic import BaseModel
 
 from src.domain.use_cases.cerrar_caso_use_case import (
-    CerrarCasoUseCase, CerrarCasoInput, CasoYaCerradoError
+    CerrarCasoUseCase, CerrarCasoInput, CasoYaCerradoError, AccesoNoAutorizadoError
 )
 from src.infrastructure.db.repositories.oracle_folio_repository import OracleFolioRepository
 from src.infrastructure.db.repositories.oracle_informe_repository import OracleInformeRepository
@@ -60,6 +60,8 @@ async def cerrar_caso(
             "estado":           informe.estado,
             "detalles":         informe.detalles,
         }
+    except AccesoNoAutorizadoError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
     except CasoYaCerradoError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
 
@@ -69,7 +71,7 @@ async def get_informe_cierre(caso_id: int, user: dict = Depends(get_current_user
     repo = OracleInformeRepository()
     informe = await repo.find_by_caso(caso_id)
     if not informe:
-        raise HTTPException(status_code=404, detail="No existe informe de cierre para este caso")
+        return None
     return {
         "id":                 informe.id,
         "codigo_informe":     informe.codigo_informe,

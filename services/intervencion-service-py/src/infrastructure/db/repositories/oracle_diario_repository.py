@@ -47,3 +47,11 @@ class OracleDiarioRepository:
                 await cur.execute("SELECT * FROM DIARIO_CAMPO WHERE CASO_ID = :1 ORDER BY FECHA DESC", [caso_id])
                 columns = [col[0].lower() for col in cur.description]
                 return [self._row_to_dict(row, columns) for row in await cur.fetchall()]
+
+    async def delete_diario(self, entrada_id: int) -> bool:
+        pool = get_pool()
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute("DELETE FROM DIARIO_CAMPO WHERE ID = :1", [entrada_id])
+                await conn.commit()
+                return cur.rowcount > 0

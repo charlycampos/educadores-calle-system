@@ -200,9 +200,6 @@ async def cerrar_fase(
         caso_id = logros.get("caso_id")
         if caso_id:
             try:
-                pool = get_repo() # Wait, repo is connection pool or repository?
-                # Wait! Let's check how get_pool is imported or used in the repository.
-                # In oracle_proceso_logros_repository.py, it imports get_pool from src.infrastructure.db.connection
                 from src.infrastructure.db.connection import get_pool
                 db_pool = get_pool()
                 async with db_pool.acquire() as conn:

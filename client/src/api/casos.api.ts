@@ -52,6 +52,7 @@ export const getInformeCierre = async (casoId: number): Promise<any> => {
     const response = await fetch(`${API_URL}/cierre/caso/${casoId}`, { headers: getHeaders() });
     if (!response.ok) throw new Error('Error fetching informe cierre');
     const data = await response.json();
+    if (!data) return null;
     // Return mapped object
     return {
         id: data.id,

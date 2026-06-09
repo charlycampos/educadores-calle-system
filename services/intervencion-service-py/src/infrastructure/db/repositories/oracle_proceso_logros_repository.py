@@ -1,3 +1,4 @@
+import inspect
 import oracledb
 import uuid
 from datetime import datetime
@@ -7,14 +8,33 @@ from src.domain.entities.proceso_logros import ProcesoLogrosCreate
 
 class OracleProcesoLogrosRepository:
 
-    def _row_to_dict(self, row, columns) -> dict:
+    async def _row_to_dict(self, row, columns) -> dict:
         d = dict(zip(columns, row))
         for key in ('f1_obs', 'f2_obs', 'f3_obs'):
             if key in d and d[key] and hasattr(d[key], 'read'):
-                d[key] = d[key].read()
+                raw = d[key].read()
+                if inspect.isawaitable(raw):
+                    raw = await raw
+                d[key] = raw
         for key in ('f1_fecha', 'f2_fecha', 'f3_fecha', 'fecha_ingreso', 'created_at', 'updated_at'):
             if key in d and d[key] and hasattr(d[key], 'isoformat'):
                 d[key] = d[key].isoformat()
+        _aliases = {
+            'nna_id': 'nnaId', 'caso_id': 'casoId', 'codigo_f05': 'codigoF05',
+            'perfil_usuario': 'perfilUsuario', 'fecha_ingreso': 'fechaIngreso',
+            'educador_responsable': 'educadorResponsable',
+            'f1_fecha': 'f1Fecha', 'f1_i1': 'f1I1', 'f1_i2': 'f1I2', 'f1_i3': 'f1I3',
+            'f1_i4': 'f1I4', 'f1_i5': 'f1I5', 'f1_obs': 'f1Obs',
+            'f2_fecha': 'f2Fecha', 'f2_i1': 'f2I1', 'f2_i2': 'f2I2', 'f2_i3': 'f2I3',
+            'f2_i4': 'f2I4', 'f2_i5': 'f2I5', 'f2_i6': 'f2I6', 'f2_i7': 'f2I7',
+            'f2_i8': 'f2I8', 'f2_i9': 'f2I9', 'f2_i10': 'f2I10', 'f2_obs': 'f2Obs',
+            'f3_fecha': 'f3Fecha', 'f3_i1': 'f3I1', 'f3_i2': 'f3I2', 'f3_i3': 'f3I3',
+            'f3_i4': 'f3I4', 'f3_i5': 'f3I5', 'f3_obs': 'f3Obs',
+            'created_at': 'createdAt', 'updated_at': 'updatedAt',
+        }
+        for snake, camel in _aliases.items():
+            if snake in d:
+                d[camel] = d[snake]
         return d
 
     async def create(self, nna_id: int, data: ProcesoLogrosCreate) -> dict:
@@ -75,7 +95,10 @@ class OracleProcesoLogrosRepository:
                 if not rows:
                     return []
                 columns = [col[0].lower() for col in cur.description]
-                return [self._row_to_dict(r, columns) for r in rows]
+                result = []
+                for r in rows:
+                    result.append(await self._row_to_dict(r, columns))
+                return result
 
     async def get_by_id(self, logros_id: int) -> dict | None:
         pool = get_pool()
@@ -88,7 +111,7 @@ class OracleProcesoLogrosRepository:
                 if not row:
                     return None
                 columns = [col[0].lower() for col in cur.description]
-                return self._row_to_dict(row, columns)
+                return await self._row_to_dict(row, columns)
 
     async def update(self, logros_id: int, data: ProcesoLogrosCreate) -> dict:
         pool = get_pool()

@@ -34,11 +34,17 @@ export const getDiarioByCaso = async (casoId: number): Promise<EntradaDiario[]> 
 };
 
 export const createEntradaDiario = async (casoId: number, data: Partial<EntradaDiario>) => {
-    // Backend: POST /api/diario (el caso_id va en el body, no en la URL)
     const response = await fetch(`${API_URL}/diario`, {
         method: 'POST',
         headers: getHeaders(),
-        body: JSON.stringify({ ...data, casoId })
+        body: JSON.stringify({
+            caso_id: casoId,
+            ubicacion: data.ubicacion,
+            actividad: data.actividad,
+            estado_fisico: data.estadoFisico,
+            estado_animo: data.estadoAnimo,
+            observaciones: data.observaciones,
+        })
     });
     if (!response.ok) throw new Error('Error creating entrada');
     return response.json();

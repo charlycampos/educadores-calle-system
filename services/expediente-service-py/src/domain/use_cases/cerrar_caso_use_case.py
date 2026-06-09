@@ -27,12 +27,24 @@ class CasoYaCerradoError(Exception):
     pass
 
 
+class AccesoNoAutorizadoError(Exception):
+    pass
+
+
 class CerrarCasoUseCase:
     def __init__(self, informe_repo, folio_repo):
         self._informe_repo = informe_repo
         self._folio_repo = folio_repo
 
     async def execute(self, input: CerrarCasoInput):
+        caso_sede_id = await self._informe_repo.get_caso_sede_id(input.caso_id)
+        if caso_sede_id is None:
+            raise ValueError(f"El caso {input.caso_id} no existe")
+        if caso_sede_id != input.sede_id:
+            raise AccesoNoAutorizadoError(
+                f"El caso {input.caso_id} no pertenece a su sede"
+            )
+
         # Verificar que no exista ya un informe de cierre
         existente = await self._informe_repo.find_by_caso(input.caso_id)
         if existente:

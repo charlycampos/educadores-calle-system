@@ -1,10 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Calendar, FileDown, Users, MapPin, X, Home, ClipboardCheck } from 'lucide-react';
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
-import { Formato12Print } from './Formato12Print';
+import { Plus, Calendar, Users, MapPin, X, Home, ClipboardCheck, Pencil, FolderInput, CheckCheck } from 'lucide-react';
 import { useNnaStore } from '../../../store/nna.store';
-import { INTERVENCION_API_URL } from '../../../config/api';
+import { INTERVENCION_API_URL, EXPEDIENTE_API_URL } from '../../../config/api';
 
 const LUGAR_OPTIONS = [
     { value: 'DOMICILIO',         label: 'Domicilio',       icon: '🏠' },
@@ -14,12 +11,11 @@ const LUGAR_OPTIONS = [
 ];
 
 const EVALUACION_OPTIONS = [
-    { value: 'FAVORABLE',    label: 'Favorable',    color: '#10b981', bgSoft: 'rgba(16, 185, 129, 0.1)', borderCol: 'border-emerald-500/30', description: 'Progreso positivo detectado', icon: '✓' },
-    { value: 'EN_PROCESO',   label: 'En Proceso',   color: '#f59e0b', bgSoft: 'rgba(245, 158, 11, 0.1)', borderCol: 'border-amber-500/30', description: 'Visita de seguimiento regular', icon: '⚡' },
-    { value: 'DESFAVORABLE', label: 'Desfavorable', color: '#f43f5e', bgSoft: 'rgba(244, 63, 94, 0.1)', borderCol: 'border-rose-500/30', description: 'Retroceso o alertas críticas', icon: '⚠' },
-    { value: 'SIN_CAMBIOS',  label: 'Sin Cambios',  color: '#64748b', bgSoft: 'rgba(100, 116, 139, 0.1)', borderCol: 'border-slate-500/30', description: 'Estable sin cambios reportados', icon: '•' },
+    { value: 'FAVORABLE',    label: 'Favorable',    color: '#10b981', bgSoft: 'rgba(16, 185, 129, 0.1)', description: 'Progreso positivo detectado', icon: '✓' },
+    { value: 'EN_PROCESO',   label: 'En Proceso',   color: '#f59e0b', bgSoft: 'rgba(245, 158, 11, 0.1)', description: 'Visita de seguimiento regular', icon: '⚡' },
+    { value: 'DESFAVORABLE', label: 'Desfavorable', color: '#f43f5e', bgSoft: 'rgba(244, 63, 94, 0.1)', description: 'Retroceso o alertas críticas', icon: '⚠' },
+    { value: 'SIN_CAMBIOS',  label: 'Sin Cambios',  color: '#64748b', bgSoft: 'rgba(100, 116, 139, 0.1)', description: 'Estable sin cambios reportados', icon: '•' },
 ];
-
 
 const blankFicha = (nna: any) => ({
     zona:               '',
@@ -36,6 +32,7 @@ const blankFicha = (nna: any) => ({
     observaciones:      '',
     evaluacion:         'EN_PROCESO',
     proximaVisita:      '',
+    fechaTermino:       '',
     nombreUsuario:      `${nna?.nombres ?? ''} ${nna?.apellidoPaterno ?? ''}`.trim(),
     nombreEducador:     'Usuario Actual',
 });
@@ -60,15 +57,15 @@ const textareaCls = "w-full px-3 py-2 text-[13px] bg-surface border border-borde
 export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any }) => {
     const { registerDocument } = useNnaStore();
     const [expandedFichaId, setExpandedFichaId] = useState<any>(null);
-    const [isGenerating, setIsGenerating]       = useState(false);
+    const [isRegistering, setIsRegistering]     = useState(false);
     const [isLoading, setIsLoading]             = useState(false);
     const [isSaving, setIsSaving]               = useState(false);
     const [showModal, setShowModal]             = useState(false);
     const [fichas, setFichas]                   = useState<any[]>([]);
     const [currentFicha, setCurrentFicha]       = useState<any>(blankFicha(nna));
-    const [currentPrintFicha, setCurrentPrintFicha] = useState<any>(null);
+    const [editingFicha, setEditingFicha]       = useState<any>(null);
+    const [registeredIds, setRegisteredIds]     = useState<Set<number>>(new Set());
 
-    // Cargar fichas existentes del backend
     useEffect(() => {
         if (!caso?.id) return;
         const token = localStorage.getItem('token');
@@ -82,7 +79,42 @@ export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any })
             .finally(() => setIsLoading(false));
     }, [caso?.id]);
 
-    // Auto-rellenar dirección cuando cambia lugar de seguimiento
+    const openCreate = () => {
+        setEditingFicha(null);
+        setCurrentFicha(blankFicha(nna));
+        setShowModal(true);
+    };
+
+    const openEdit = (ficha: any) => {
+        setEditingFicha(ficha);
+        const raw = (v: any) => (v ?? '').toString().split('T')[0].replace('undefined', '');
+        setCurrentFicha({
+            zona:             ficha.zona              || ficha.ZONA              || '',
+            entrevistado:     ficha.entrevistado      || ficha.ENTREVISTADO      || '',
+            parentesco:       ficha.parentesco        || ficha.PARENTESCO        || '',
+            telefono:         ficha.telefono          || ficha.TELEFONO          || '',
+            lugarSeguimiento: ficha.lugar_seguimiento || ficha.lugarSeguimiento  || ficha.LUGAR_SEGUIMIENTO || 'DOMICILIO',
+            direccion:        ficha.direccion         || ficha.DIRECCION         || '',
+            fecha:            raw(ficha.fecha         || ficha.FECHA),
+            hora:             ficha.hora              || ficha.HORA              || '',
+            antecedentes:     ficha.antecedentes      || ficha.ANTECEDENTES      || '',
+            descripcion:      ficha.descripcion       || ficha.DESCRIPCION       || '',
+            acuerdos:         ficha.acuerdos          || ficha.ACUERDOS          || '',
+            observaciones:    ficha.observaciones     || ficha.OBSERVACIONES     || '',
+            evaluacion:       ficha.evaluacion        || ficha.EVALUACION        || 'EN_PROCESO',
+            proximaVisita:    raw(ficha.proxima_visita || ficha.proximaVisita    || ficha.PROXIMA_VISITA),
+            fechaTermino:     raw(ficha.fecha_termino  || ficha.fechaTermino     || ficha.FECHA_TERMINO),
+            nombreEducador:   ficha.nombre_educador   || ficha.nombreEducador    || 'Usuario Actual',
+        });
+        setShowModal(true);
+    };
+
+    const closeModal = () => {
+        setShowModal(false);
+        setEditingFicha(null);
+        setCurrentFicha(blankFicha(nna));
+    };
+
     const handleLugarChange = (value: string) => {
         setCurrentFicha((prev: any) => ({
             ...prev,
@@ -96,88 +128,101 @@ export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any })
 
     const handleSave = async () => {
         const token = localStorage.getItem('token');
+        if (!token) return;
 
-        if (caso?.id && token) {
-            setIsSaving(true);
-            try {
-                const payload = {
-                    zona:              currentFicha.zona,
-                    entrevistado:      currentFicha.entrevistado,
-                    parentesco:        currentFicha.parentesco,
-                    telefono:          currentFicha.telefono,
-                    lugar_seguimiento: currentFicha.lugarSeguimiento,
-                    direccion:         currentFicha.direccion,
-                    fecha:             currentFicha.fecha,
-                    hora:              currentFicha.hora,
-                    antecedentes:      currentFicha.antecedentes,
-                    descripcion:       currentFicha.descripcion,
-                    acuerdos:          currentFicha.acuerdos,
-                    observaciones:     currentFicha.observaciones,
-                    evaluacion:        currentFicha.evaluacion,
-                    proxima_visita:    currentFicha.proximaVisita || null,
-                    nombre_educador:   currentFicha.nombreEducador,
-                };
+        const payload = {
+            caso_id:           caso?.id,
+            zona:              currentFicha.zona,
+            entrevistado:      currentFicha.entrevistado,
+            parentesco:        currentFicha.parentesco,
+            telefono:          currentFicha.telefono,
+            lugar_seguimiento: currentFicha.lugarSeguimiento,
+            direccion:         currentFicha.direccion,
+            fecha:             currentFicha.fecha,
+            hora:              currentFicha.hora,
+            antecedentes:      currentFicha.antecedentes,
+            descripcion:       currentFicha.descripcion,
+            acuerdos:          currentFicha.acuerdos,
+            observaciones:     currentFicha.observaciones,
+            evaluacion:        currentFicha.evaluacion,
+            proxima_visita:    currentFicha.proximaVisita || null,
+            fecha_termino:     currentFicha.fechaTermino  || null,
+            nombre_educador:   currentFicha.nombreEducador,
+        };
 
-                const res = await fetch(`${INTERVENCION_API_URL}/seguimiento/caso/${caso.id}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        Authorization: `Bearer ${token}`,
-                    },
-                    body: JSON.stringify(payload),
-                });
+        setIsSaving(true);
+        try {
+            const isEdit = !!editingFicha;
+            const url    = isEdit
+                ? `${INTERVENCION_API_URL}/seguimiento/${editingFicha.id}`
+                : `${INTERVENCION_API_URL}/seguimiento/caso/${caso?.id}`;
 
-                if (res.ok) {
-                    const saved = await res.json();
-                    setFichas(prev => [saved, ...prev]);
-                } else {
-                    // Fallback local si el backend falla
-                    setFichas(prev => [{ ...currentFicha, id: Date.now(), fechaRegistro: new Date() }, ...prev]);
-                }
-            } catch {
-                setFichas(prev => [{ ...currentFicha, id: Date.now(), fechaRegistro: new Date() }, ...prev]);
-            } finally {
-                setIsSaving(false);
+            const res = await fetch(url, {
+                method: isEdit ? 'PUT' : 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify(payload),
+            });
+
+            if (res.ok) {
+                const saved = await res.json();
+                setFichas(prev => isEdit
+                    ? prev.map(f => f.id === saved.id ? saved : f)
+                    : [saved, ...prev]
+                );
             }
-        } else {
-            // Sin caso conectado: guardar localmente
-            setFichas(prev => [{ ...currentFicha, id: Date.now(), fechaRegistro: new Date() }, ...prev]);
+        } catch {
+            // silently ignore
+        } finally {
+            setIsSaving(false);
         }
 
-        setShowModal(false);
-        setCurrentFicha(blankFicha(nna));
+        closeModal();
     };
 
-    const handleDownloadPDF = async (ficha: any) => {
-        setCurrentPrintFicha(ficha);
-        await new Promise(r => setTimeout(r, 500));
-        const element = document.getElementById('formato-12-hidden-print');
-        if (!element) return;
+    const handleRegistrarExpediente = async (ficha: any) => {
+        if (registeredIds.has(ficha.id) || !caso?.id) return;
+        const token = localStorage.getItem('token');
+        if (!token) return;
 
-        setIsGenerating(true);
+        setIsRegistering(true);
         try {
-            const canvas = await html2canvas(element, { scale: 2, useCORS: true, logging: false });
-            const imgData = canvas.toDataURL('image/png');
-            const pdf = new jsPDF('p', 'mm', 'a4');
-            const w = pdf.internal.pageSize.getWidth();
-            pdf.addImage(imgData, 'PNG', 0, 0, w, (canvas.height * w) / canvas.width);
-            pdf.save(`F12_Seguimiento_${nna.nombres}_${ficha.fecha}.pdf`);
+            // 1. Trigger PDF generation on the server (waits until the file is ready)
+            const pdfRes = await fetch(`${INTERVENCION_API_URL}/seguimiento/${ficha.id}/pdf?token=${token}`);
+            if (!pdfRes.ok) throw new Error('Error al generar el PDF en el servidor');
 
+            const pdfUrl = `${INTERVENCION_API_URL}/seguimiento/${ficha.id}/pdf`;
+            const fechaStr = (ficha.fecha || ficha.FECHA || new Date().toISOString()).toString().split('T')[0];
+
+            // 2. Register folio in EXP_FOLIO
+            const folioRes = await fetch(`${EXPEDIENTE_API_URL}/expediente/caso/${caso.id}/folio`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({
+                    tipo_documento: 'SEG_F12',
+                    titulo: `FICHA DE SEGUIMIENTO FAMILIAR (F12) — ${fechaStr}`,
+                    archivo_url: pdfUrl,
+                    contenido_hash: `SEG-F12-${ficha.id}`.substring(0, 40),
+                }),
+            });
+            if (!folioRes.ok) throw new Error('Error al registrar el folio en el expediente');
+
+            // 3. Show immediately in the local document store
             registerDocument({
                 nnaId: nna.id,
                 type: 'FICHA DE SEGUIMIENTO FAMILIAR (FORMATO 12)',
-                code: `SEG-${new Date().getFullYear()}-${String(fichas.length + 1).padStart(3, '0')}`,
-                date: new Date().toISOString(),
+                code: `SEG-F12-${ficha.id}`,
                 pages: 1,
-                user: ficha.nombreEducador || ficha.nombre_educador || 'Usuario Actual',
-                status: 'GENERADO',
+                nombreResponsable: 'Educador Registrado',
+                pdfUrl: `${pdfUrl}?token=${token}`,
+                status: 'APROBADO',
             });
+
+            setRegisteredIds(prev => new Set(prev).add(ficha.id));
         } catch (e) {
             console.error(e);
-            alert('Error al generar PDF');
+            alert('Error al registrar en el expediente digital');
         } finally {
-            setIsGenerating(false);
-            setCurrentPrintFicha(null);
+            setIsRegistering(false);
         }
     };
 
@@ -188,7 +233,8 @@ export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any })
         return 'bg-surface-muted text-fg-muted border-border';
     };
 
-    const getAccentColor = (v: string) => {
+    const accentColor = (v: string, finalizada: boolean) => {
+        if (finalizada)           return 'bg-primary';
         if (v === 'FAVORABLE')    return 'bg-green-500';
         if (v === 'EN_PROCESO')   return 'bg-amber-500';
         if (v === 'DESFAVORABLE') return 'bg-red-500';
@@ -198,20 +244,20 @@ export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any })
     return (
         <div className="space-y-4">
             {/* Header */}
-            <div className="bg-surface border border-border rounded-[8px] shadow-1 px-5 py-4 flex items-center justify-between">
+            <div className="bg-surface border border-border rounded-[8px] shadow-[var(--shadow-1)] px-5 py-4 flex items-center justify-between">
                 <div>
                     <h3 className="text-[15px] font-semibold text-fg">Seguimiento Familiar</h3>
-                    <p className="text-[12px] text-fg-2 mt-0.5">Formato 12 · Fase 3 — Registro de visitas y consejerías</p>
+                    <p className="text-[12px] text-fg-secondary mt-0.5">Formato 12 · Fase 3 — Registro de visitas y consejerías</p>
                 </div>
                 <button
-                    onClick={() => setShowModal(true)}
+                    onClick={openCreate}
                     className="flex items-center gap-1.5 bg-primary text-primary-fg px-3 py-1.5 rounded-[6px] text-[13px] font-medium hover:bg-primary/90 transition-colors"
                 >
                     <Plus size={15} /> Nueva Ficha (F12)
                 </button>
             </div>
 
-            {/* Lista de fichas */}
+            {/* Lista */}
             {isLoading ? (
                 <div className="bg-surface border border-border rounded-[8px] py-10 text-center">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-3" />
@@ -228,42 +274,64 @@ export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any })
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {fichas.map(ficha => {
-                        const evalVal = ficha.evaluacion || ficha.EVALUACION || 'SIN_CAMBIOS';
-                        const lugar   = ficha.lugarSeguimiento || ficha.lugar_seguimiento || '';
-                        const acuerdos = ficha.acuerdos || ficha.ACUERDOS || '';
-                        const proxima  = ficha.proximaVisita || ficha.proxima_visita || ficha.PROXIMA_VISITA || '';
+                        const evalVal    = ficha.evaluacion        || ficha.EVALUACION        || 'SIN_CAMBIOS';
+                        const lugar      = ficha.lugar_seguimiento || ficha.lugarSeguimiento  || ficha.LUGAR_SEGUIMIENTO || '';
+                        const acuerdos   = ficha.acuerdos          || ficha.ACUERDOS          || '';
+                        const proxima    = ficha.proxima_visita    || ficha.proximaVisita      || ficha.PROXIMA_VISITA   || '';
+                        const termino    = ficha.fecha_termino     || ficha.fechaTermino       || ficha.FECHA_TERMINO    || '';
+                        const finalizada = !!termino;
                         const isExpanded = expandedFichaId === ficha.id;
+                        const alreadyReg = registeredIds.has(ficha.id);
+
                         return (
                             <div
                                 key={ficha.id}
                                 onClick={() => setExpandedFichaId(isExpanded ? null : ficha.id)}
                                 className="relative bg-surface border border-border rounded-[8px] p-4 pl-6 cursor-pointer hover:shadow-lg hover:-translate-y-0.5 transform transition-all duration-300"
                             >
-                                <div className={`absolute left-0 top-0 bottom-0 w-1.5 rounded-l-[8px] ${getAccentColor(evalVal)}`} />
+                                <div className={`absolute left-0 top-0 bottom-0 w-1.5 rounded-l-[8px] ${accentColor(evalVal, finalizada)}`} />
+
                                 <div className="flex justify-between items-start mb-3">
-                                    <span className="bg-primary-soft text-primary px-2.5 py-0.5 rounded text-[11px] font-bold">
-                                        {new Date(ficha.fecha || ficha.FECHA).toLocaleDateString('es-PE')}
-                                    </span>
-                                    <div className="flex items-center gap-1">
-                                        <span className={`px-2 py-0.5 rounded border text-[10px] font-bold ${evalColor(evalVal)}`}>
-                                            {evalVal.replace(/_/g, ' ')}
+                                    <div className="flex flex-col gap-1">
+                                        <span className="bg-primary-soft text-primary px-2.5 py-0.5 rounded text-[11px] font-bold">
+                                            {new Date(ficha.fecha || ficha.FECHA).toLocaleDateString('es-PE')}
                                         </span>
+                                        {finalizada && (
+                                            <span className="bg-primary-soft text-primary px-2.5 py-0.5 rounded text-[10px] font-bold flex items-center gap-1">
+                                                <CheckCheck size={10} /> Finalizada
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                                        {!finalizada && (
+                                            <span className={`px-2 py-0.5 rounded border text-[10px] font-bold ${evalColor(evalVal)}`}>
+                                                {evalVal.replace(/_/g, ' ')}
+                                            </span>
+                                        )}
                                         <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleDownloadPDF(ficha);
-                                            }}
-                                            disabled={isGenerating}
+                                            onClick={() => openEdit(ficha)}
                                             className="p-1.5 text-fg-muted hover:text-primary hover:bg-primary-soft rounded-[5px] transition-all"
-                                            title="Descargar PDF"
+                                            title="Editar ficha"
                                         >
-                                            <FileDown size={15} />
+                                            <Pencil size={13} />
+                                        </button>
+                                        <button
+                                            onClick={() => handleRegistrarExpediente(ficha)}
+                                            disabled={isRegistering || alreadyReg}
+                                            className={`p-1.5 rounded-[5px] transition-all ${
+                                                alreadyReg
+                                                    ? 'text-success bg-success-soft cursor-default'
+                                                    : 'text-fg-muted hover:text-primary hover:bg-primary-soft'
+                                            }`}
+                                            title={alreadyReg ? 'Ya registrada en expediente' : 'Registrar en expediente digital'}
+                                        >
+                                            {alreadyReg ? <CheckCheck size={14} /> : <FolderInput size={14} />}
                                         </button>
                                     </div>
                                 </div>
 
                                 <div className="space-y-1.5">
-                                    <div className="flex items-center gap-1.5 text-[12px] text-fg-2">
+                                    <div className="flex items-center gap-1.5 text-[12px] text-fg-secondary">
                                         <MapPin size={12} className="text-fg-muted flex-shrink-0" />
                                         <span className="font-medium">{lugar.replace(/_/g, ' ')}</span>
                                     </div>
@@ -275,13 +343,13 @@ export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any })
                                         {ficha.descripcion || ficha.DESCRIPCION || 'Sin descripción registrada.'}
                                     </p>
                                     {acuerdos && (
-                                        <p className={`text-[11px] text-fg-2 italic ${isExpanded ? '' : 'line-clamp-1'}`}>
+                                        <p className={`text-[11px] text-fg-secondary italic ${isExpanded ? '' : 'line-clamp-1'}`}>
                                             <span className="font-semibold not-italic">Acuerdos: </span>{acuerdos}
                                         </p>
                                     )}
 
                                     {isExpanded && (
-                                        <div className="mt-3 pt-3 border-t border-border space-y-2 text-[12px] text-fg-2">
+                                        <div className="mt-3 pt-3 border-t border-border space-y-2 text-[12px] text-fg-secondary">
                                             {(ficha.antecedentes || ficha.ANTECEDENTES) && (
                                                 <div>
                                                     <span className="font-semibold text-fg block">Antecedentes:</span>
@@ -306,10 +374,10 @@ export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any })
                                                     <p className="text-fg-muted">{ficha.observaciones || ficha.OBSERVACIONES}</p>
                                                 </div>
                                             )}
-                                            {(ficha.hora || ficha.HORA) && (
+                                            {termino && (
                                                 <div>
-                                                    <span className="font-semibold text-fg block">Hora de la visita:</span>
-                                                    <p className="text-fg-muted">{ficha.hora || ficha.HORA}</p>
+                                                    <span className="font-semibold text-fg block">Fecha de término:</span>
+                                                    <p className="text-fg-muted">{new Date(termino).toLocaleDateString('es-PE')}</p>
                                                 </div>
                                             )}
                                         </div>
@@ -334,39 +402,33 @@ export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any })
                 </div>
             )}
 
-            {/* ─── Modal Nueva Ficha ─── */}
+            {/* ─── Modal Crear / Editar ─── */}
             {showModal && (
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
                     <div className="bg-surface rounded-[10px] shadow-3 w-full max-w-[600px] max-h-[92vh] overflow-hidden flex flex-col border border-border">
 
-                        {/* Header modal */}
                         <div className="px-5 py-3.5 border-b border-border flex items-center justify-between bg-surface">
                             <div>
-                                <h3 className="text-[14px] font-semibold text-fg">Nueva Ficha de Seguimiento Familiar</h3>
-                                <p className="text-[11px] text-fg-muted mt-0.5">Formato F12 · {caso?.codigoCaso || caso?.codigo_caso || 'Sin caso vinculado'}</p>
+                                <h3 className="text-[14px] font-semibold text-fg">
+                                    {editingFicha ? 'Editar Ficha de Seguimiento' : 'Nueva Ficha de Seguimiento Familiar'}
+                                </h3>
+                                <p className="text-[11px] text-fg-muted mt-0.5">
+                                    Formato F12 · {caso?.codigoCaso || caso?.codigo_caso || 'Sin caso vinculado'}
+                                </p>
                             </div>
-                            <button
-                                onClick={() => { setShowModal(false); setCurrentFicha(blankFicha(nna)); }}
-                                className="p-1.5 text-fg-muted hover:text-fg hover:bg-surface-muted rounded-[5px] transition-all"
-                            >
+                            <button onClick={closeModal} className="p-1.5 text-fg-muted hover:text-fg hover:bg-surface-muted rounded-[5px] transition-all">
                                 <X size={16} />
                             </button>
                         </div>
 
-                        {/* Cuerpo scrollable */}
                         <div className="overflow-y-auto p-5 space-y-5 flex-1">
 
-                            {/* ── Sección 1: Datos de la Visita ── */}
+                            {/* Datos de la Visita */}
                             <div>
                                 <SectionTitle>Datos de la Visita</SectionTitle>
                                 <div className="grid grid-cols-2 gap-3">
                                     <FormField label="Zona de Intervención">
-                                        <input
-                                            className={inputCls}
-                                            value={currentFicha.zona}
-                                            onChange={up('zona')}
-                                            placeholder="Ej: Centro de Lima"
-                                        />
+                                        <input className={inputCls} value={currentFicha.zona} onChange={up('zona')} placeholder="Ej: Centro de Lima" />
                                     </FormField>
                                     <FormField label="Fecha">
                                         <input type="date" className={inputCls} value={currentFicha.fecha} onChange={up('fecha')} />
@@ -384,7 +446,7 @@ export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any })
                                                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] border text-[12px] font-medium transition-all ${
                                                         currentFicha.lugarSeguimiento === opt.value
                                                             ? 'border-primary bg-primary-soft text-primary'
-                                                            : 'border-border-strong text-fg-2 hover:border-primary hover:text-fg'
+                                                            : 'border-border-strong text-fg-secondary hover:border-primary hover:text-fg'
                                                     }`}
                                                 >
                                                     <span>{opt.icon}</span> {opt.label}
@@ -396,12 +458,7 @@ export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any })
 
                                 <div className="grid grid-cols-2 gap-3 mt-3">
                                     <FormField label="Dirección">
-                                        <input
-                                            className={inputCls}
-                                            value={currentFicha.direccion}
-                                            onChange={up('direccion')}
-                                            placeholder="Dirección del lugar visitado"
-                                        />
+                                        <input className={inputCls} value={currentFicha.direccion} onChange={up('direccion')} placeholder="Dirección del lugar visitado" />
                                     </FormField>
                                     <FormField label="Hora">
                                         <input type="time" className={inputCls} value={currentFicha.hora} onChange={up('hora')} />
@@ -409,81 +466,42 @@ export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any })
                                 </div>
                             </div>
 
-                            {/* ── Sección 2: Persona Entrevistada ── */}
+                            {/* Persona Entrevistada */}
                             <div>
                                 <SectionTitle>Persona Entrevistada</SectionTitle>
                                 <div className="grid grid-cols-3 gap-3">
                                     <FormField label="Nombre Completo">
-                                        <input
-                                            className={inputCls}
-                                            value={currentFicha.entrevistado}
-                                            onChange={up('entrevistado')}
-                                            placeholder="Nombre del entrevistado"
-                                        />
+                                        <input className={inputCls} value={currentFicha.entrevistado} onChange={up('entrevistado')} placeholder="Nombre del entrevistado" />
                                     </FormField>
                                     <FormField label="Parentesco">
-                                        <input
-                                            className={inputCls}
-                                            value={currentFicha.parentesco}
-                                            onChange={up('parentesco')}
-                                            placeholder="Ej: Madre, Tío"
-                                        />
+                                        <input className={inputCls} value={currentFicha.parentesco} onChange={up('parentesco')} placeholder="Ej: Madre, Tío" />
                                     </FormField>
                                     <FormField label="Teléfono">
-                                        <input
-                                            className={inputCls}
-                                            value={currentFicha.telefono}
-                                            onChange={up('telefono')}
-                                            placeholder="999 999 999"
-                                        />
+                                        <input className={inputCls} value={currentFicha.telefono} onChange={up('telefono')} placeholder="999 999 999" />
                                     </FormField>
                                 </div>
                             </div>
 
-                            {/* ── Sección 3: Contenido de la Visita ── */}
+                            {/* Contenido de la Visita */}
                             <div>
                                 <SectionTitle>Contenido de la Visita</SectionTitle>
                                 <div className="space-y-3">
                                     <FormField label="Antecedentes / Motivo de la Visita">
-                                        <textarea
-                                            className={textareaCls}
-                                            rows={2}
-                                            value={currentFicha.antecedentes}
-                                            onChange={up('antecedentes')}
-                                            placeholder="Motivo o contexto de la visita…"
-                                        />
+                                        <textarea className={textareaCls} rows={2} value={currentFicha.antecedentes} onChange={up('antecedentes')} placeholder="Motivo o contexto de la visita…" />
                                     </FormField>
                                     <FormField label="Descripción de la Visita">
-                                        <textarea
-                                            className={textareaCls}
-                                            rows={3}
-                                            value={currentFicha.descripcion}
-                                            onChange={up('descripcion')}
-                                            placeholder="Relato detallado de lo ocurrido en la visita…"
-                                        />
+                                        <textarea className={textareaCls} rows={3} value={currentFicha.descripcion} onChange={up('descripcion')} placeholder="Relato detallado de lo ocurrido en la visita…" />
                                     </FormField>
                                     <FormField label="Acuerdos / Compromisos">
-                                        <textarea
-                                            className={textareaCls}
-                                            rows={2}
-                                            value={currentFicha.acuerdos}
-                                            onChange={up('acuerdos')}
-                                            placeholder="Acuerdos y compromisos alcanzados con la familia…"
-                                        />
+                                        <textarea className={textareaCls} rows={2} value={currentFicha.acuerdos} onChange={up('acuerdos')} placeholder="Acuerdos y compromisos alcanzados con la familia…" />
                                     </FormField>
                                     <FormField label="Observaciones">
-                                        <textarea
-                                            className={textareaCls}
-                                            rows={2}
-                                            value={currentFicha.observaciones}
-                                            onChange={up('observaciones')}
-                                            placeholder="Observaciones adicionales…"
-                                        />
+                                        <textarea className={textareaCls} rows={2} value={currentFicha.observaciones} onChange={up('observaciones')} placeholder="Observaciones adicionales…" />
                                     </FormField>
                                 </div>
                             </div>
 
-                            {/* ── Sección 4: Cierre y Evaluación ── */}
+                            {/* Cierre y Evaluación */}
                             <div>
                                 <SectionTitle>Cierre y Evaluación</SectionTitle>
                                 <div className="grid grid-cols-2 gap-3">
@@ -517,35 +535,41 @@ export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any })
                                             ))}
                                         </div>
                                     </FormField>
-                                    <FormField label="Próxima Visita Programada">
-                                        <div className="space-y-2">
-                                            <input
-                                                type="date"
-                                                className={inputCls}
-                                                value={currentFicha.proximaVisita}
-                                                onChange={up('proximaVisita')}
-                                            />
-                                            <p className="text-[11px] text-fg-muted">
-                                                Deja vacío si no hay próxima visita agendada.
-                                            </p>
-                                            <FormField label="Educador Responsable">
-                                                <input
-                                                    className={inputCls}
-                                                    value={currentFicha.nombreEducador}
-                                                    onChange={up('nombreEducador')}
-                                                    placeholder="Nombre del educador"
-                                                />
-                                            </FormField>
-                                        </div>
+                                    <div className="space-y-3">
+                                        <FormField label="Próxima Visita Programada">
+                                            <input type="date" className={inputCls} value={currentFicha.proximaVisita} onChange={up('proximaVisita')} />
+                                            <p className="text-[11px] text-fg-muted mt-1">Deja vacío si no hay próxima visita agendada.</p>
+                                        </FormField>
+                                        <FormField label="Educador Responsable">
+                                            <input className={inputCls} value={currentFicha.nombreEducador} onChange={up('nombreEducador')} placeholder="Nombre del educador" />
+                                        </FormField>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Término del Seguimiento */}
+                            <div>
+                                <SectionTitle>Término del Seguimiento</SectionTitle>
+                                <div className="rounded-[8px] border border-border bg-surface-muted p-4">
+                                    <p className="text-[11px] text-fg-muted mb-3">
+                                        Completa este campo solo cuando el seguimiento familiar haya concluido.
+                                        La ficha quedará marcada como <strong className="text-fg">Finalizada</strong>.
+                                    </p>
+                                    <FormField label="Fecha de Término">
+                                        <input
+                                            type="date"
+                                            className={inputCls}
+                                            value={currentFicha.fechaTermino}
+                                            onChange={up('fechaTermino')}
+                                        />
                                     </FormField>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Footer */}
                         <div className="px-5 py-3 border-t border-border flex justify-end gap-2 bg-surface-muted">
                             <button
-                                onClick={() => { setShowModal(false); setCurrentFicha(blankFicha(nna)); }}
+                                onClick={closeModal}
                                 className="px-4 py-2 bg-surface border border-border-strong text-fg text-[13px] font-medium rounded-[6px] hover:bg-surface-muted transition-colors"
                             >
                                 Cancelar
@@ -557,19 +581,13 @@ export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any })
                             >
                                 {isSaving && <span className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-primary-fg" />}
                                 <ClipboardCheck size={14} />
-                                {isSaving ? 'Guardando…' : 'Guardar Ficha'}
+                                {isSaving ? 'Guardando…' : editingFicha ? 'Actualizar Ficha' : 'Guardar Ficha'}
                             </button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Hidden print */}
-            {currentPrintFicha && (
-                <div style={{ position: 'fixed', left: '-9999px', top: 0 }}>
-                    <Formato12Print id="formato-12-hidden-print" nna={nna} ficha={currentPrintFicha} />
-                </div>
-            )}
         </div>
     );
 };

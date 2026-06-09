@@ -10,3 +10,6 @@ class DiarioUseCase:
 
     async def listar_por_caso(self, caso_id: int) -> list:
         return await self.repository.list_by_caso(caso_id)
+
+    async def eliminar_diario(self, entrada_id: int) -> bool:
+        return await self.repository.delete_diario(entrada_id)

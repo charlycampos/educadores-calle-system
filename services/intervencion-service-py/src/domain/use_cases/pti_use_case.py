@@ -16,3 +16,6 @@ class PTIUseCase:
 
     async def actualizar_accion(self, accion_id: int, data: dict) -> dict:
         return await self.repository.update_accion(accion_id, data)
+
+    async def actualizar_pti(self, pti_id: int, objetivo_general: str, acciones: list) -> dict | None:
+        return await self.repository.update_pti(pti_id, objetivo_general, acciones)

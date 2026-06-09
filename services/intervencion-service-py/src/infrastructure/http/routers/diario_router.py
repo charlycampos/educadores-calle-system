@@ -18,3 +18,10 @@ async def registrar_diario(data: DiarioCampoCreate, request: Request, repo: Orac
 async def listar_por_caso(caso_id: int, repo: OracleDiarioRepository = Depends(get_repository)):
     use_case = DiarioUseCase(repo)
     return await use_case.listar_por_caso(caso_id)
+
+@router.delete("/{entrada_id}", status_code=204)
+async def eliminar_entrada(entrada_id: int, repo: OracleDiarioRepository = Depends(get_repository)):
+    use_case = DiarioUseCase(repo)
+    ok = await use_case.eliminar_diario(entrada_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Entrada de diario no encontrada")

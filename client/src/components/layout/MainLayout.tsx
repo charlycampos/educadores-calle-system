@@ -14,6 +14,7 @@ import {
     MapPin,
     ArrowLeftRight,
     BarChart3,
+    Siren,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import clsx from 'clsx';
@@ -51,6 +52,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(location.pathname.includes('/nna/expediente/'));
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setIsSidebarCollapsed(location.pathname.includes('/nna/expediente/'));
     }, [location.pathname]);
 
@@ -60,6 +62,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
     };
 
     const getSidebarItems = () => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const items: any[] = [];
         if (!user) return items;
 
@@ -82,6 +85,12 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
                 label: 'Casos NNA', 
                 icon: FileText, 
                 path: isSedeSupervisor ? '/coordinador/casos' : '/nna' 
+            });
+            // Opción para Atención de Urgencia F15 visible para Educador, Coordinador y Admin de Sede
+            items.push({
+                label: 'Urgencias (F15)',
+                icon: Siren,
+                path: '/urgencias'
             });
             if (isSedeSupervisor) {
                 items.push({ label: 'Bandeja Derivaciones', icon: Shield, path: '/coordinador/derivaciones' });

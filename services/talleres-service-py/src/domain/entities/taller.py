@@ -9,12 +9,32 @@ class TallerBase(BaseModel):
     fecha_programada: datetime
     objetivos: Optional[str] = None
     metodologia: Optional[str] = None
+    lugar: Optional[str] = None
+    dirigido_a: Optional[str] = None
+    num_personas_planificadas: Optional[int] = None
+    acciones_previas: Optional[str] = None
+    inicio_tiempo: Optional[str] = None
+    inicio_materiales: Optional[str] = None
+    proceso_tiempo: Optional[str] = None
+    proceso_materiales: Optional[str] = None
+    cierre_tiempo: Optional[str] = None
+    cierre_materiales: Optional[str] = None
 
 class PlanificarTallerRequest(BaseModel):
     tema: str
     fecha_programada: datetime
     objetivos: Optional[str] = None
     metodologia: Optional[str] = None
+    lugar: Optional[str] = None
+    dirigido_a: Optional[str] = None
+    num_personas_planificadas: Optional[int] = None
+    acciones_previas: Optional[str] = None
+    inicio_tiempo: Optional[str] = None
+    inicio_materiales: Optional[str] = None
+    proceso_tiempo: Optional[str] = None
+    proceso_materiales: Optional[str] = None
+    cierre_tiempo: Optional[str] = None
+    cierre_materiales: Optional[str] = None
 
 class ParticipanteEjecucion(BaseModel):
     nna_id: int
@@ -54,17 +74,33 @@ class ActualizarParticipanteRequest(BaseModel):
     limitaciones: Optional[str] = None
     sugerencias: Optional[str] = None
 
+class EducadorResponsable(BaseModel):
+    nombreCompleto: Optional[str] = None
+
 class TallerResponse(TallerBase):
     id: int
     fecha_ejecucion: Optional[datetime] = None
     estado: str
     fecha_registro: datetime
     participantes: Optional[List[ParticipanteResponse]] = None
-    
-    # Campos adicionales para compatibilidad con el frontend
+
+    # Campos camelCase para compatibilidad con el frontend
     nombre: Optional[str] = None
     fecha: Optional[str] = None
     hora: Optional[str] = None
+    dirigidoA: Optional[str] = None
+    numeroPersonasPlanificadas: Optional[int] = None
+    accionesPrevias: Optional[str] = None
+    inicioActividad: Optional[str] = None
+    inicioTiempo: Optional[str] = None
+    inicioMateriales: Optional[str] = None
+    procesoActividad: Optional[str] = None
+    procesoTiempo: Optional[str] = None
+    procesoMateriales: Optional[str] = None
+    cierreActividad: Optional[str] = None
+    cierreTiempo: Optional[str] = None
+    cierreMateriales: Optional[str] = None
+    educadorResponsable: Optional[EducadorResponsable] = None
 
     class Config:
         from_attributes = True

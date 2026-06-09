@@ -1,8 +1,40 @@
-from fastapi import Request
-from jose import jwt, JWTError
+from typing import Any, Optional
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from jose import jwt, JWTError
 from starlette.middleware.base import BaseHTTPMiddleware
 from src.config import settings
+
+bearer_scheme = HTTPBearer(auto_error=False)
+
+
+def _verificar_token(token: str) -> dict[str, Any]:
+    try:
+        return jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+    except JWTError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido o expirado")
+
+
+def get_current_user(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
+) -> Optional[dict[str, Any]]:
+    if credentials:
+        return _verificar_token(credentials.credentials)
+    auth_header = request.headers.get("authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        try:
+            return _verificar_token(auth_header.split(" ")[1])
+        except Exception:
+            pass
+    token_param = request.query_params.get("token")
+    if token_param:
+        try:
+            return _verificar_token(token_param)
+        except Exception:
+            pass
+    return None
 
 class JWTMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):

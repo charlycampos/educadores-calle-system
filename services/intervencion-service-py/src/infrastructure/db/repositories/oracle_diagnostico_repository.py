@@ -1,3 +1,4 @@
+import inspect
 import oracledb
 import json
 import uuid
@@ -6,13 +7,15 @@ from src.infrastructure.db.connection import get_pool
 from src.domain.entities.diagnostico import DiagnosticoSocialCreate
 
 class OracleDiagnosticoRepository:
-    def _row_to_dict(self, row, columns) -> dict:
+    async def _row_to_dict(self, row, columns) -> dict:
         d = dict(zip(columns, row))
         if 'datos_extra' in d and d['datos_extra']:
             try:
-                # Si es un LOB, hay que leerlo
                 if hasattr(d['datos_extra'], 'read'):
-                    extra_data = json.loads(d['datos_extra'].read())
+                    raw = d['datos_extra'].read()
+                    if inspect.isawaitable(raw):
+                        raw = await raw
+                    extra_data = json.loads(raw)
                 else:
                     extra_data = json.loads(d['datos_extra'])
             except:
@@ -121,7 +124,7 @@ class OracleDiagnosticoRepository:
                 if not row:
                     return None
                 columns = [col[0].lower() for col in cur.description]
-                return self._row_to_dict(row, columns)
+                return await self._row_to_dict(row, columns)
 
     async def get_by_nna(self, nna_id: int) -> list[dict]:
         pool = get_pool()
@@ -132,7 +135,10 @@ class OracleDiagnosticoRepository:
                 rows = await cur.fetchall()
                 if rows:
                     columns = [col[0].lower() for col in cur.description]
-                    return [self._row_to_dict(r, columns) for r in rows]
+                    result = []
+                    for r in rows:
+                        result.append(await self._row_to_dict(r, columns))
+                    return result
                 return []
 
     async def get_prefilled_by_nna(self, nna_id: int) -> dict:

@@ -78,6 +78,16 @@ export const deleteAccion = async (accionId: number) => {
     if (!response.ok) throw new Error('Error deleting action');
 };
 
+export const updatePti = async (ptiId: number, data: { objetivo_general: string; acciones: AccionPTI[] }) => {
+    const response = await fetch(`${API_URL}/pti/${ptiId}`, {
+        method: 'PUT',
+        headers: getHeaders(),
+        body: JSON.stringify(data)
+    });
+    if (!response.ok) throw new Error('Error updating PTI');
+    return response.json();
+};
+
 export const getAllPtisByCaso = async (casoId: number): Promise<PlanTrabajo[]> => {
     const response = await fetch(`${API_URL}/pti/caso/${casoId}/all`, {
         method: 'GET',

@@ -30,6 +30,8 @@ SQL_FILES = [
     "expediente-service-py/src/infrastructure/db/migrations/002_create_informe_situacional.sql",
     "expediente-service-py/src/infrastructure/db/migrations/003_add_estado_informe_situacional.sql",
     "intervencion-service-py/src/infrastructure/db/migrations/001_create_intervencion_tables.sql",
+    "intervencion-service-py/src/infrastructure/db/migrations/002_create_urgencias_f15.sql",
+    "intervencion-service-py/src/infrastructure/db/migrations/003_add_datos_extra_urgencia.sql",
     "talleres-service-py/src/infrastructure/db/migrations/001_create_taller_tables.sql",
     "derivacion-service-py/src/infrastructure/db/migrations/001_create_derivacion.sql"
 ]

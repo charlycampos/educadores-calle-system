@@ -449,11 +449,20 @@ export const useNnaStore = create<NnaState>((set, get) => ({
                         'F05-FASE-2': 'FICHA DE LOGROS — FASE II · Desarrollo e Intervención (F05)',
                         'F05-FASE-3': 'FICHA DE LOGROS — FASE III · Seguimiento y Egreso (F05)',
                     };
+                    // Mapeo de tipos guardados en DB (máx 30 chars) a nombre completo para display
+                    const TIPO_FULL_LABELS: Record<string, string> = {
+                        'FICHA DE SEGUIMIENTO FAMILIAR ': 'FICHA DE SEGUIMIENTO FAMILIAR (FORMATO 12)',
+                        'FICHA DE EGRESO (FORMATO 13)': 'FICHA DE EGRESO (FORMATO 13)',
+                        'FICHA DE DERIVACIÓN (FORMATO 0': 'FICHA DE DERIVACIÓN (FORMATO 06)',
+                        'FICHA DE INSCRIPCIÓN (FORMATO ': 'FICHA DE INSCRIPCIÓN (FORMATO 3)',
+                        'ACTA DE COMPROMISO (FORMATO 09': 'ACTA DE COMPROMISO (FORMATO 09)',
+                    };
                     backendDocs = await Promise.all(folios.map(async (f: any) => {
                         const isF05Full  = f.tipo_documento === 'F05';
                         const isF05Fase  = Object.prototype.hasOwnProperty.call(F05_FASE_LABELS, f.tipo_documento);
                         const isInformeSituacional = f.tipo_documento === 'F09' || f.tipo_documento === 'INFORME_SITUACIONAL';
-                        const usePdfUrl  = isF05Full || isF05Fase || isInformeSituacional;
+                        const isSeguimientoF12 = f.tipo_documento === 'SEG_F12';
+                        const usePdfUrl  = isF05Full || isF05Fase || isInformeSituacional || isSeguimientoF12;
 
                         const resolvedArchivoUrl = f.archivo_url.startsWith('/api/')
                             ? EXPEDIENTE_API_URL + f.archivo_url.substring(4)
@@ -481,7 +490,9 @@ export const useNnaStore = create<NnaState>((set, get) => ({
                                     ? 'FICHA DE LOGROS (FORMATO 5)'
                                     : isInformeSituacional
                                         ? 'INFORME SITUACIONAL'
-                                        : (f.tipo_documento || 'DOCUMENTO SUBIDO'),
+                                        : isSeguimientoF12
+                                            ? 'FICHA DE SEGUIMIENTO FAMILIAR (FORMATO 12)'
+                                            : (TIPO_FULL_LABELS[f.tipo_documento] || f.tipo_documento || 'DOCUMENTO SUBIDO'),
                             code: f.hash_documento ? f.hash_documento.toUpperCase() : `FOLIO-${f.numero_folio}`,
                             date: f.fecha_creacion || new Date().toISOString(),
                             pages,
@@ -502,7 +513,12 @@ export const useNnaStore = create<NnaState>((set, get) => ({
         // Combinar con localStorage (evitando duplicar archivos si se subieron en esta sesión antes de refrescar)
         const combined = [...baseDocs, ...backendDocs];
         storedDocs.forEach((localDoc: any) => {
-            if (!combined.some((d: any) => d.filename === localDoc.filename)) {
+            // Para docs con filename (subidos): deduplicar por filename.
+            // Para docs generados sin filename (ej. seguimiento): deduplicar por id.
+            const isDuplicate = localDoc.filename
+                ? combined.some((d: any) => d.filename === localDoc.filename)
+                : combined.some((d: any) => d.id === localDoc.id);
+            if (!isDuplicate) {
                 combined.push(localDoc);
             }
         });
@@ -561,7 +577,7 @@ export const useNnaStore = create<NnaState>((set, get) => ({
                         'Authorization': `Bearer ${token}`
                     },
                     body: JSON.stringify({
-                        tipo_documento: docType.substring(0, 10).toUpperCase(),
+                        tipo_documento: docType.substring(0, 30).toUpperCase(),
                         titulo: file.name,
                         archivo_url: `${EXPEDIENTE_API_URL}/expediente/documento/${metadata.filename}`,
                         contenido_hash: metadata.filename.substring(0, 20)

@@ -1,4 +1,4 @@
-from src.domain.entities.seguimiento import SeguimientoFamiliarCreate
+from src.domain.entities.seguimiento import SeguimientoFamiliarCreate, SeguimientoFamiliarUpdate
 from src.infrastructure.db.repositories.oracle_seguimiento_repository import OracleSeguimientoRepository
 
 class SeguimientoUseCase:
@@ -8,5 +8,11 @@ class SeguimientoUseCase:
     async def registrar_seguimiento(self, caso_id: int, data: SeguimientoFamiliarCreate, educador_id: int) -> dict:
         return await self.repository.create_seguimiento(caso_id, data, educador_id)
 
+    async def actualizar_seguimiento(self, seguimiento_id: int, data: SeguimientoFamiliarUpdate) -> dict:
+        return await self.repository.update_seguimiento(seguimiento_id, data)
+
     async def listar_por_caso(self, caso_id: int) -> list:
         return await self.repository.list_by_caso(caso_id)
+
+    async def obtener_por_id(self, seguimiento_id: int) -> dict | None:
+        return await self.repository.get_by_id(seguimiento_id)
