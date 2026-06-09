@@ -486,7 +486,7 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
                     </div>
                 </div>
 
-                <div className="overflow-x-auto">
+                <div className="hidden md:block overflow-x-auto">
                     <table className="w-full text-left text-[13px] border-collapse">
                         <thead>
                             <tr className="border-b border-border bg-surface-muted text-fg-muted text-[11px] font-semibold uppercase tracking-wider">
@@ -551,6 +551,57 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
                             </tr>
                         </tbody>
                     </table>
+                </div>
+
+                {/* Vista Móvil */}
+                <div className="md:hidden border border-border rounded-xl p-4 space-y-3 bg-surface">
+                    <div className="flex justify-between items-start">
+                        <span className="font-bold text-primary text-sm">{informe.codigoInforme || 'Borrador'}</span>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${informe.estado === 'FINALIZADO' ? 'bg-success-soft text-success' : 'bg-amber-100 text-amber-700'}`}>
+                            {informe.estado || 'BORRADOR'}
+                        </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                            <span className="text-fg-muted block text-[10px] uppercase font-bold">Fecha de Egreso</span>
+                            <span className="text-fg-2 font-medium">{informe.fechaEgreso ? informe.fechaEgreso.split('T')[0] : 'No registrada'}</span>
+                        </div>
+                        <div>
+                            <span className="text-fg-muted block text-[10px] uppercase font-bold">Motivo</span>
+                            <span className="text-fg-2 font-medium">{informe.motivoEgreso || 'No registrado'}</span>
+                        </div>
+                    </div>
+                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/50">
+                        {informe.estado === 'BORRADOR' ? (
+                            <button
+                                onClick={() => { setShowForm(true); setIsViewing(false); setCurrentStep(1); }}
+                                className="flex-1 inline-flex items-center justify-center gap-1 bg-amber-500 text-white py-1.5 rounded-lg text-xs font-bold"
+                            >
+                                <Edit size={14} /> Editar Borrador
+                            </button>
+                        ) : (
+                            <>
+                                <button
+                                    onClick={() => { setShowForm(true); setIsViewing(true); setCurrentStep(1); }}
+                                    className="flex-1 inline-flex items-center justify-center gap-1 bg-primary-soft text-primary py-1.5 rounded-lg text-xs font-bold"
+                                >
+                                    <Eye size={14} /> Ver
+                                </button>
+                                <button
+                                    onClick={handlePreviewPDF}
+                                    className="flex-1 inline-flex items-center justify-center gap-1 bg-info-soft text-info py-1.5 rounded-lg text-xs font-bold"
+                                >
+                                    <FileText size={14} /> Vista PDF
+                                </button>
+                                <button
+                                    onClick={handleDownloadPDF}
+                                    className="flex-1 inline-flex items-center justify-center gap-1 bg-success text-white py-1.5 rounded-lg text-xs font-bold"
+                                >
+                                    <Download size={14} /> PDF
+                                </button>
+                            </>
+                        )}
+                    </div>
                 </div>
 
                 <PdfViewerModal
@@ -633,7 +684,7 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
                         <h3 className="font-semibold text-[13px] text-fg">Datos Generales del NNA</h3>
                     </div>
                     <div className="p-5 space-y-4">
-                        <div className="grid grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <div>
                                 <label className={LBL}>Apellidos y Nombres</label>
                                 <input className={INP_DISABLED} value={`${nna.apellidoPaterno} ${nna.apellidoMaterno || ''} ${nna.nombres}`} disabled />
@@ -648,7 +699,7 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <div>
                                 <label className={LBL}>Sexo</label>
                                 <div className="flex gap-4 mt-1">
@@ -670,7 +721,7 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
 
                         <div className="pt-3 border-t border-border">
                             <label className={LBL + ' mb-2'}>Perfil del Usuario/a</label>
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 {[
                                     { key: 'trabajoInfantil', label: 'Trabajo Infantil' },
                                     { key: 'mendicidad', label: 'Mendicidad' },
@@ -682,7 +733,7 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4 pt-3 border-t border-border">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-border">
                             <div>
                                 <label className={LBL}>Fecha Ingreso al Servicio</label>
                                 <input type="date" className={INP_DISABLED} value={ficha.fechaIngreso?.split('T')[0] || ''} disabled />
@@ -714,7 +765,7 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
                                 <div className="ml-6 mt-3 space-y-3">
                                     <div>
                                         <label className={LBL + ' mb-2'}>Derechos Restituidos</label>
-                                        <div className="grid grid-cols-2 gap-2">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                             {['derechosIdentidad','derechosSalud','derechosEducacion','derechosRecreacion'].map((k, i) => (
                                                 <CheckCard key={k} label={['Identidad','Salud','Educación','Recreación'][i]} checked={ficha[k]} onChange={v => upBool(k, v)} disabled={isViewing} />
                                             ))}
@@ -736,82 +787,53 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
                             )}
                         </div>
 
-                        {/* Derivación */}
-                        <div className={`rounded-[8px] border transition-all ${ficha.derivacionServicios ? 'bg-primary-soft/30 border-primary/20 p-4' : 'border-border p-3'}`}>
-                            <CheckCard label="Derivación a Servicios Complementarios" checked={ficha.derivacionServicios} onChange={v => upBool('derivacionServicios', v)} disabled={isViewing} />
-                            {ficha.derivacionServicios && (
+                        {/* Intervención Integral */}
+                        <div className={`rounded-[8px] border transition-all ${ficha.modalidadRetiro === 'RET_INTEGRAL' ? 'bg-success-soft/30 border-success/20 p-4' : 'border-border p-3'}`}>
+                            <label className="flex items-center gap-2.5 cursor-pointer text-[13px] text-fg-2 font-medium">
+                                <input type="radio" name="modalidadRetiro" checked={ficha.modalidadRetiro === 'RET_INTEGRAL'} onChange={() => !isViewing && setFicha(p => ({ ...p, modalidadRetiro: 'RET_INTEGRAL' }))} disabled={isViewing} />
+                                Retiro por Intervención Integral
+                            </label>
+                            {ficha.modalidadRetiro === 'RET_INTEGRAL' && (
                                 <div className="ml-6 mt-3 space-y-3">
+                                    <CheckCard label="Medida de Protección de Acogimiento Familiar" checked={ficha.interesSuperiorTrata} onChange={v => upBool('interesSuperiorTrata', v)} disabled={isViewing} />
+                                    <CheckCard label="Medida de Protección de Acogimiento Residencial" checked={ficha.interesSuperiorDelincuencia} onChange={v => upBool('interesSuperiorDelincuencia', v)} disabled={isViewing} />
+                                    <input className={getInputClass(isViewing)} placeholder="Otros motivos de interés superior…" value={ficha.interesSuperiorOtro} onChange={upF('interesSuperiorOtro')} disabled={isViewing} />
                                     <div>
-                                        <label className={LBL}>Institución Derivada</label>
-                                        <input className={getInputClass(isViewing)} value={ficha.institucionDerivada} onChange={upF('institucionDerivada')} placeholder="Nombre de la institución…" disabled={isViewing} />
-                                    </div>
-                                    <div>
-                                        <label className={LBL}>Observaciones / Evidencia</label>
-                                        <textarea className={getTextareaClass(isViewing)} rows={2} value={ficha.observacionesDerivacion} onChange={upF('observacionesDerivacion')} disabled={isViewing} />
+                                        <label className={LBL}>Acciones Realizadas</label>
+                                        <textarea className={getTextareaClass(isViewing)} rows={2} value={ficha.retiInterSuperiorAcciones} onChange={upF('retiInterSuperiorAcciones')} disabled={isViewing} />
                                     </div>
                                 </div>
                             )}
                         </div>
 
-                        {/* Modalidad de Retiro */}
-                        <div className="pt-3 border-t border-border">
-                            <label className={LBL + ' mb-2'}>Modalidad de Retiro</label>
-                            <div className="space-y-2">
-                                {/* Interés Superior */}
-                                <div className={`rounded-[8px] border transition-all ${ficha.modalidadRetiro === 'INTERES_SUPERIOR' ? 'bg-warning-soft border-warning/20 p-4' : 'border-border p-3'}`}>
-                                    <label className="flex items-center gap-2 cursor-pointer text-[13px] font-medium text-fg">
-                                        <input type="radio" name="modalidadRetiro" checked={ficha.modalidadRetiro === 'INTERES_SUPERIOR'} onChange={() => !isViewing && setFicha((p: FichaFormato13) => ({ ...p, modalidadRetiro: 'INTERES_SUPERIOR' }))} disabled={isViewing} />
-                                        Interés Superior del NNA
-                                    </label>
-                                    {ficha.modalidadRetiro === 'INTERES_SUPERIOR' && (
-                                        <div className="ml-6 mt-3 space-y-2">
-                                            <div className="flex gap-3 flex-wrap">
-                                                <CheckCard label="Trata" checked={ficha.interesSuperiorTrata} onChange={v => upBool('interesSuperiorTrata', v)} disabled={isViewing} />
-                                                <CheckCard label="Infractor" checked={ficha.interesSuperiorDelincuencia} onChange={v => upBool('interesSuperiorDelincuencia', v)} disabled={isViewing} />
-                                            </div>
-                                            <input className={getInputClass(isViewing)} placeholder="Otros…" value={ficha.interesSuperiorOtro} onChange={upF('interesSuperiorOtro')} disabled={isViewing} />
-                                            <div>
-                                                <label className={LBL}>Acciones Realizadas</label>
-                                                <textarea className={getTextareaClass(isViewing)} rows={3} value={ficha.retiInterSuperiorAcciones} onChange={upF('retiInterSuperiorAcciones')} placeholder="Adjuntar evidencia…" disabled={isViewing} />
-                                            </div>
+                        {/* Retiro Desestimado */}
+                        <div className={`rounded-[8px] border transition-all ${ficha.modalidadRetiro === 'RET_DESESTIMADO' ? 'bg-amber-50/50 border-amber-200 p-4' : 'border-border p-3'}`}>
+                            <label className="flex items-center gap-2.5 cursor-pointer text-[13px] text-fg-2 font-medium">
+                                <input type="radio" name="modalidadRetiro" checked={ficha.modalidadRetiro === 'RET_DESESTIMADO'} onChange={() => !isViewing && setFicha(p => ({ ...p, modalidadRetiro: 'RET_DESESTIMADO' }))} disabled={isViewing} />
+                                Retiro Desestimado (Pérdida de Contacto / Rechazo / UPE)
+                            </label>
+                            {ficha.modalidadRetiro === 'RET_DESESTIMADO' && (
+                                <div className="ml-6 mt-3 space-y-3">
+                                    <CheckCard label="No Ubicado (Pérdida de Contacto)" checked={ficha.noUbicado} onChange={v => upBool('noUbicado', v)} disabled={isViewing} />
+                                    {ficha.noUbicado && (
+                                        <div>
+                                            <label className={LBL}>Acciones de Búsqueda y Coordinación</label>
+                                            <textarea className={getTextareaClass(isViewing)} rows={2} value={ficha.accionesBusqueda} onChange={upF('accionesBusqueda')} disabled={isViewing} />
                                         </div>
                                     )}
-                                </div>
-
-                                {/* No Ubicado */}
-                                <div className={`rounded-[8px] border transition-all ${ficha.modalidadRetiro === 'NO_UBICADO' ? 'bg-danger-soft border-danger/20 p-4' : 'border-border p-3'}`}>
-                                    <label className="flex items-center gap-2 cursor-pointer text-[13px] font-medium text-fg">
-                                        <input type="radio" name="modalidadRetiro" checked={ficha.modalidadRetiro === 'NO_UBICADO'} onChange={() => !isViewing && setFicha((p: FichaFormato13) => ({ ...p, modalidadRetiro: 'NO_UBICADO', noUbicado: true }))} disabled={isViewing} />
-                                        No Ubicado (3 meses o más)
-                                    </label>
-                                    {ficha.modalidadRetiro === 'NO_UBICADO' && (
-                                        <div className="ml-6 mt-3">
-                                            <label className={LBL}>Acciones para Ubicarlo</label>
-                                            <textarea className={getTextareaClass(isViewing)} rows={3} value={ficha.accionesBusqueda} onChange={upF('accionesBusqueda')} placeholder="Adjuntar evidencia en cuaderno de campo…" disabled={isViewing} />
+                                    <CheckCard label="No Desea Participar" checked={ficha.noDeseaParticipar} onChange={v => upBool('noDeseaParticipar', v)} disabled={isViewing} />
+                                    {ficha.noDeseaParticipar && (
+                                        <div>
+                                            <label className={LBL}>Motivo Manifestado / Dificultades</label>
+                                            <textarea className={getTextareaClass(isViewing)} rows={2} value={ficha.motivoNoDesea} onChange={upF('motivoNoDesea')} disabled={isViewing} />
                                         </div>
                                     )}
+                                    <CheckCard label="No Resuelve UPE" checked={ficha.noResuelveUPE} onChange={v => upBool('noResuelveUPE', v)} disabled={isViewing} />
                                 </div>
-
-                                {/* No Desea Participar */}
-                                <div className={`rounded-[8px] border transition-all ${ficha.modalidadRetiro === 'NO_DESEA' ? 'bg-warning-soft border-warning/20 p-4' : 'border-border p-3'}`}>
-                                    <label className="flex items-center gap-2 cursor-pointer text-[13px] font-medium text-fg">
-                                        <input type="radio" name="modalidadRetiro" checked={ficha.modalidadRetiro === 'NO_DESEA'} onChange={() => !isViewing && setFicha((p: FichaFormato13) => ({ ...p, modalidadRetiro: 'NO_DESEA', noDeseaParticipar: true }))} disabled={isViewing} />
-                                        No Desea Participar
-                                    </label>
-                                    {ficha.modalidadRetiro === 'NO_DESEA' && (
-                                        <div className="ml-6 mt-3">
-                                            <label className={LBL}>Motivo y Acciones para Motivarlo</label>
-                                            <textarea className={getTextareaClass(isViewing)} rows={4} value={ficha.motivoNoDesea} onChange={upF('motivoNoDesea')} disabled={isViewing} />
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* No Resuelve UPE */}
-                                <CheckCard label="No Resuelve UPE" checked={ficha.noResuelveUPE} onChange={v => upBool('noResuelveUPE', v)} disabled={isViewing} />
-                            </div>
+                            )}
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4 pt-3 border-t border-border">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-border">
                             <div>
                                 <label className={LBL}>Cuenta con Resolución UPE</label>
                                 <select className={getSelectClass(isViewing)} value={ficha.cuentaResolucionUPE} onChange={upF('cuentaResolucionUPE')} disabled={isViewing}>
@@ -838,7 +860,7 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
                             <h3 className="font-semibold text-[13px] text-fg">Defensa Pública y Fase del Servicio</h3>
                         </div>
                         <div className="p-5 space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
                                     <label className={LBL}>Recibe Servicio de Defensa Pública</label>
                                     <select className={getSelectClass(isViewing)} value={ficha.recibeDefensaPublica} onChange={upF('recibeDefensaPublica')} disabled={isViewing}>
@@ -912,7 +934,7 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
                             ].map(({ prefix, label, colorCls, titleCls }) => (
                                 <div key={prefix} className={`p-4 rounded-[8px] border ${colorCls}`}>
                                     <h4 className={`font-bold text-[13px] uppercase mb-3 ${titleCls}`}>{label}</h4>
-                                    <div className="grid grid-cols-3 gap-3">
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                         {['ApellidoPaterno','ApellidoMaterno','Nombres'].map(f => (
                                             <div key={f}>
                                                 <label className={LBL}>{f.replace(/([A-Z])/g, ' $1').trim()}</label>
@@ -920,7 +942,7 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
                                             </div>
                                         ))}
                                     </div>
-                                    <div className="grid grid-cols-2 gap-3 mt-3">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
                                         <div>
                                             <label className={LBL}>DNI</label>
                                             <input className={getInputClass(isViewing)} maxLength={8} value={ficha[`${prefix}DNI`] || ''} onChange={upF(`${prefix}DNI`)} disabled={isViewing} />

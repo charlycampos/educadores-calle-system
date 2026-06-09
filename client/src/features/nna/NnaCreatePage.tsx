@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useForm, useFieldArray, useWatch, FormProvider } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useNnaStore } from '../../store/nna.store';
-import { MapPin, Users, Briefcase, School, HeartPulse, Home, Plus, Trash2, AlertCircle, Zap, Calendar, X, Edit2, Search, AlertTriangle, CheckCircle, XCircle, Info } from 'lucide-react';
+import { MapPin, Users, Briefcase, School, HeartPulse, Home, Plus, Trash2, AlertCircle, Zap, Calendar, X, Edit2, Search, AlertTriangle, CheckCircle, XCircle, Info, Menu } from 'lucide-react';
 import { clsx } from 'clsx';
 import { InputField, SelectField, SectionHeader, FooterButtons } from '../../components/ui/FormFields';
 import { UbigeoFields } from '../../components/forms/UbigeoFields';
@@ -566,6 +566,7 @@ export const NnaCreatePage = () => {
     const [submitting, setSubmitting] = useState(false);
     const [isEditMode, setIsEditMode] = useState(false);
     const [activeSection, setActiveSection] = useState('paso1_generales');
+    const [mobileNavOpen, setMobileNavOpen] = useState(false);
     const [showTimeActivityModal, setShowTimeActivityModal] = useState(false);
     const [editingActivityIndex, setEditingActivityIndex] = useState<number | null>(null);
     const [showDuplicateDrawer, setShowDuplicateDrawer] = useState(false);
@@ -1742,9 +1743,61 @@ export const NnaCreatePage = () => {
     };
 
     return (
-        <div className="flex h-[calc(100vh-7rem)] lg:h-[calc(100vh-3.5rem)] gap-0 bg-slate-50 overflow-hidden">
-            {/* SIDEBAR */}
-            <aside className="w-52 flex-shrink-0 bg-white border-r border-gray-200 flex flex-col overflow-hidden">
+        <div className="flex flex-col md:flex-row h-[calc(100vh-7rem)] lg:h-[calc(100vh-3.5rem)] gap-0 bg-slate-50 overflow-hidden">
+
+            {/* MOBILE NAV — visible solo en móvil */}
+            {(() => {
+                const mIdx = sections.findIndex(s => s.id === activeSection);
+                return (
+                    <div className="md:hidden flex-shrink-0 bg-white border-b border-gray-200 z-20">
+                        <div className="px-4 py-3 bg-blue-600 flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                                <p className="text-white font-bold text-sm leading-tight">Ficha F03</p>
+                                <p className="text-blue-200 text-[11px] truncate">
+                                    {mIdx + 1}/{sections.length} · {sections[mIdx].label.replace(/^[IVX]+\.\s/, '')}
+                                </p>
+                            </div>
+                            <button type="button" onClick={() => setMobileNavOpen(v => !v)}
+                                className="flex-shrink-0 text-white p-1 rounded hover:bg-blue-700 transition-colors">
+                                {mobileNavOpen ? <X size={20} /> : <Menu size={20} />}
+                            </button>
+                        </div>
+                        <div className="px-4 py-1.5 bg-white">
+                            <div className="w-full bg-gray-200 rounded-full h-1">
+                                <div className="bg-blue-600 h-1 rounded-full transition-all duration-300"
+                                    style={{ width: `${((mIdx + 1) / sections.length) * 100}%` }} />
+                            </div>
+                        </div>
+                        {mobileNavOpen && (
+                            <nav className="px-3 pb-3 pt-2 space-y-1 border-t border-gray-100 bg-white">
+                                {sections.map((section, idx) => {
+                                    const isAct = activeSection === section.id;
+                                    const isPast = mIdx > idx;
+                                    const Icon = section.icon;
+                                    return (
+                                        <button key={section.id} type="button"
+                                            onClick={() => { setActiveSection(section.id); setMobileNavOpen(false); }}
+                                            className={clsx("w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-left",
+                                                isAct ? "bg-blue-600 text-white shadow-sm" : "text-gray-500 hover:bg-blue-50 hover:text-blue-700")}>
+                                            <div className={clsx("w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0",
+                                                isAct ? "bg-white/20 text-white" : isPast ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-400")}>
+                                                {idx + 1}
+                                            </div>
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                <Icon size={14} className="flex-shrink-0" />
+                                                <span className="text-xs font-semibold truncate">{section.label.replace(/^[IVX]+\.\s/, '')}</span>
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </nav>
+                        )}
+                    </div>
+                );
+            })()}
+
+            {/* SIDEBAR — visible solo en md+ */}
+            <aside className="hidden md:flex md:w-52 flex-shrink-0 bg-white border-r border-gray-200 flex-col overflow-hidden">
                 <div className="px-4 py-4 border-b border-gray-100 bg-blue-600">
                     <p className="text-white font-bold text-sm leading-tight">Ficha de Inscripción</p>
                     <p className="text-blue-200 text-[11px] mt-0.5">Formato F03 · Registro Oficial</p>
@@ -1836,10 +1889,10 @@ export const NnaCreatePage = () => {
             </aside>
 
             {/* MAIN CONTENT */}
-            <main className="flex-1 bg-white flex flex-col overflow-hidden relative">
+            <main className="flex-1 bg-white flex flex-col overflow-hidden relative min-w-0">
                 <FormProvider {...methods}>
                     <form onSubmit={handleSubmit((d) => onSubmit(d, false))} className="flex-1 flex flex-col min-h-0">
-                    <div className="flex-1 overflow-y-auto p-8">
+                    <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
                         {storeError && (
                             <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
                                 {storeError}
@@ -1880,14 +1933,21 @@ export const NnaCreatePage = () => {
                         )}
                     </div>
 
-                    <FooterButtons 
-                        onBack={handlePrev} 
-                        onNext={handleNext} 
-                        onSave={() => handleSubmit((d) => onSubmit(d, false))()} 
-                        onSaveDraft={handleSaveDraft}
-                        loading={submitting} 
-                        submitLabel="Finalizar"
-                    />
+                    {(() => {
+                        const idx = sections.findIndex(s => s.id === activeSection);
+                        const isFirst = idx === 0;
+                        const isLast  = idx === sections.length - 1;
+                        return (
+                            <FooterButtons
+                                onBack={!isFirst ? handlePrev : undefined}
+                                onNext={!isLast ? handleNext : undefined}
+                                onSave={isLast ? () => handleSubmit((d) => onSubmit(d, false))() : undefined}
+                                onSaveDraft={handleSaveDraft}
+                                loading={submitting}
+                                submitLabel="Finalizar"
+                            />
+                        );
+                    })()}
                 </form>
             </FormProvider>
             </main>

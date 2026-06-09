@@ -422,11 +422,10 @@ export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any })
                         </div>
 
                         <div className="overflow-y-auto p-5 space-y-5 flex-1">
-
                             {/* Datos de la Visita */}
                             <div>
                                 <SectionTitle>Datos de la Visita</SectionTitle>
-                                <div className="grid grid-cols-2 gap-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     <FormField label="Zona de Intervención">
                                         <input className={inputCls} value={currentFicha.zona} onChange={up('zona')} placeholder="Ej: Centro de Lima" />
                                     </FormField>
@@ -456,7 +455,7 @@ export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any })
                                     </FormField>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-3 mt-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
                                     <FormField label="Dirección">
                                         <input className={inputCls} value={currentFicha.direccion} onChange={up('direccion')} placeholder="Dirección del lugar visitado" />
                                     </FormField>
@@ -469,7 +468,7 @@ export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any })
                             {/* Persona Entrevistada */}
                             <div>
                                 <SectionTitle>Persona Entrevistada</SectionTitle>
-                                <div className="grid grid-cols-3 gap-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                     <FormField label="Nombre Completo">
                                         <input className={inputCls} value={currentFicha.entrevistado} onChange={up('entrevistado')} placeholder="Nombre del entrevistado" />
                                     </FormField>
@@ -504,9 +503,9 @@ export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any })
                             {/* Cierre y Evaluación */}
                             <div>
                                 <SectionTitle>Cierre y Evaluación</SectionTitle>
-                                <div className="grid grid-cols-2 gap-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     <FormField label="Evaluación de la Visita">
-                                        <div className="grid grid-cols-2 gap-2 mt-1">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1">
                                             {EVALUACION_OPTIONS.map(opt => (
                                                 <label
                                                     key={opt.value}

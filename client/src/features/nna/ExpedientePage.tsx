@@ -329,56 +329,63 @@ export const ExpedientePage = () => {
                         </div>
                     </div>
 
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                         <div>
-                            <h1 className="text-2xl font-bold text-fg uppercase tracking-tight">
+                            <h1 className="text-xl md:text-2xl font-bold text-fg uppercase tracking-tight">
                                 {mainNna.nombres} {mainNna.apellidoPaterno} {mainNna.apellidoMaterno}
                             </h1>
-                            <div className="flex items-center gap-4 mt-2 text-[13px] text-fg-muted font-medium">
+                            <div className="flex flex-wrap items-center gap-2 md:gap-4 mt-2 text-[12px] md:text-[13px] text-fg-muted font-medium">
                                 <span className="flex items-center gap-1.5"><FolderOpen size={14} /> Expediente Digital</span>
-                                <span className="w-1 h-1 bg-border rounded-full"></span>
+                                <span className="w-1 h-1 bg-border rounded-full hidden sm:inline"></span>
                                 <span>{formatTipoDoc(mainNna.tipoDoc)}: {mainNna.numeroDoc || 'S/D'}</span>
-                                <span className="w-1 h-1 bg-border rounded-full"></span>
+                                <span className="w-1 h-1 bg-border rounded-full hidden sm:inline"></span>
                                 <span>{mainNna.fechaNacimiento ? new Date().getFullYear() - new Date(mainNna.fechaNacimiento).getFullYear() : '-'} años</span>
                             </div>
                         </div>
 
-                        {/* Progress Tracker Visual */}
+                        {/* Progress Tracker Visual - Hidden on small screens, replaced by badge */}
                         <div className="flex items-center">
-                            {phases.map((phase, index) => {
-                                const isLast = index === phases.length - 1;
-                                const isActive = phase.status === 'current';
-                                const isCompleted = phase.status === 'completed';
+                            <div className="lg:hidden bg-primary-soft text-primary px-3 py-1.5 rounded-lg border border-primary/20 text-xs font-bold flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+                                Fase 2: Desarrollo e Intervención
+                            </div>
+                            
+                            <div className="hidden lg:flex items-center">
+                                {phases.map((phase, index) => {
+                                    const isLast = index === phases.length - 1;
+                                    const isActive = phase.status === 'current';
+                                    const isCompleted = phase.status === 'completed';
 
-                                return (
-                                    <div key={phase.id} className="flex items-center">
-                                        <div
-                                            title={phase.name}
-                                            className={`
-                                            flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-1.5 rounded-full border text-[11px] font-bold transition-all relative z-10
-                                            ${isCompleted ? 'bg-success-soft border-success/30 text-success' :
-                                                    isActive ? 'bg-primary border-primary text-primary-fg shadow-sm' :
-                                                        'bg-surface border-border text-fg-muted'}
-                                        `}>
-                                            <div className={`flex items-center justify-center w-5 h-5 rounded-full text-[10px] ${isActive ? 'bg-primary-fg text-primary' : isCompleted ? 'bg-success/20 text-success' : 'bg-surface-muted text-fg-muted'}`}>
-                                                {isCompleted ? <CheckCircle2 size={12} /> : phase.id}
+                                    return (
+                                        <div key={phase.id} className="flex items-center">
+                                            <div
+                                                title={phase.name}
+                                                className={`
+                                                flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-1.5 rounded-full border text-[11px] font-bold transition-all relative z-10
+                                                ${isCompleted ? 'bg-success-soft border-success/30 text-success' :
+                                                        isActive ? 'bg-primary border-primary text-primary-fg shadow-sm' :
+                                                            'bg-surface border-border text-fg-muted'}
+                                            `}>
+                                                <div className={`flex items-center justify-center w-5 h-5 rounded-full text-[10px] ${isActive ? 'bg-primary-fg text-primary' : isCompleted ? 'bg-success/20 text-success' : 'bg-surface-muted text-fg-muted'}`}>
+                                                    {isCompleted ? <CheckCircle2 size={12} /> : phase.id}
+                                                </div>
+                                                <span className="hidden xl:inline tracking-tight">{phase.name.replace(/Fase \d+: /, '')}</span>
+                                                <span className="hidden sm:inline xl:hidden">Fase {phase.id}</span>
                                             </div>
-                                            <span className="hidden xl:inline tracking-tight">{phase.name.replace(/Fase \d+: /, '')}</span>
-                                            <span className="hidden sm:inline xl:hidden">Fase {phase.id}</span>
-                                        </div>
 
-                                        {!isLast && (
-                                            <div className={`w-4 sm:w-8 md:w-12 h-px transition-colors ${isCompleted ? 'bg-success/40' : 'bg-border'}`} />
-                                        )}
-                                    </div>
-                                );
-                            })}
+                                            {!isLast && (
+                                                <div className={`w-4 sm:w-8 md:w-12 h-px transition-colors ${isCompleted ? 'bg-success/40' : 'bg-border'}`} />
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         </div>
                     </div>
                     {!mainNna.codigoFicha03 && (
-                        <div className="mt-4 p-3 bg-amber-50/80 border border-amber-200 rounded-xl flex items-center justify-between gap-4">
-                            <div className="flex items-center gap-2.5">
-                                <AlertCircle className="text-amber-600 shrink-0" size={18} />
+                        <div className="mt-4 p-3 bg-amber-50/80 border border-amber-200 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                            <div className="flex items-start gap-2.5">
+                                <AlertCircle className="text-amber-600 shrink-0 mt-0.5" size={18} />
                                 <div>
                                     <p className="text-xs font-bold text-amber-900">Ficha F03 en Borrador (Ficha Incompleta)</p>
                                     <p className="text-[11px] text-amber-700 font-medium">Aún faltan completar datos obligatorios para registrar y finalizar oficialmente esta ficha.</p>
@@ -386,7 +393,7 @@ export const ExpedientePage = () => {
                             </div>
                             <Link
                                 to={`/nna/editar/${mainNna.id}`}
-                                className="px-3.5 py-1.5 bg-amber-600 text-white hover:bg-amber-700 text-xs font-bold rounded-lg transition-colors shadow-sm flex items-center gap-1.5 shrink-0"
+                                className="w-full sm:w-auto text-center justify-center px-3.5 py-1.5 bg-amber-600 text-white hover:bg-amber-700 text-xs font-bold rounded-lg transition-colors shadow-sm flex items-center gap-1.5 shrink-0"
                             >
                                 <FilePlus size={13} />
                                 Completar Ficha F03
@@ -396,9 +403,61 @@ export const ExpedientePage = () => {
                 </div>
             </div>
 
-            <div className="w-full px-6 flex flex-col md:flex-row gap-6 items-start">
-                {/* Sidebar Menu - Ancho Fijo optimizado */}
-                <div className="w-full md:w-64 flex-shrink-0 space-y-4 sticky top-6">
+            {/* Mobile Tab Selector (Scrollable Horizontal on mobile) */}
+            <div className="md:hidden px-4 overflow-x-auto whitespace-nowrap py-1 bg-surface border-b border-border flex gap-2 scrollbar-none">
+                <button
+                    onClick={() => setActiveTab('dashboard')}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-colors ${activeTab === 'dashboard' ? 'bg-primary text-white border-primary' : 'bg-surface text-fg-muted border-border'}`}
+                >
+                    Resumen
+                </button>
+                <button
+                    onClick={() => setActiveTab('social')}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-colors ${activeTab === 'social' ? 'bg-primary-soft text-primary border-primary/20' : 'bg-surface text-fg-muted border-border'}`}
+                >
+                    Diagnóstico (F4)
+                </button>
+                <button
+                    onClick={() => setActiveTab('logros')}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-colors ${activeTab === 'logros' ? 'bg-primary-soft text-primary border-primary/20' : 'bg-surface text-fg-muted border-border'}`}
+                >
+                    Logros (F5)
+                </button>
+                <button
+                    onClick={() => setActiveTab('informe')}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-colors ${activeTab === 'informe' ? 'bg-primary-soft text-primary border-primary/20' : 'bg-surface text-fg-muted border-border'}`}
+                >
+                    Informe Fase 1
+                </button>
+                <button
+                    onClick={() => setActiveTab('pti')}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-colors ${activeTab === 'pti' ? 'bg-info-soft text-info border-info/20' : 'bg-surface text-fg-muted border-border'}`}
+                >
+                    Plan PTI
+                </button>
+                <button
+                    onClick={() => setActiveTab('talleres')}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-colors ${activeTab === 'talleres' ? 'bg-info-soft text-info border-info/20' : 'bg-surface text-fg-muted border-border'}`}
+                >
+                    Talleres (F7/8)
+                </button>
+                <button
+                    onClick={() => setActiveTab('seguimiento_familiar')}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-colors ${activeTab === 'seguimiento_familiar' ? 'bg-success-soft text-success border-success/20' : 'bg-surface text-fg-muted border-border'}`}
+                >
+                    Familiar (F12)
+                </button>
+                <button
+                    onClick={() => setActiveTab('egreso')}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-colors ${activeTab === 'egreso' ? 'bg-success-soft text-success border-success/20' : 'bg-surface text-fg-muted border-border'}`}
+                >
+                    Egreso (F13)
+                </button>
+            </div>
+
+            <div className="w-full px-4 md:px-6 flex flex-col md:flex-row gap-6 items-start">
+                {/* Sidebar Menu - Ancho Fijo optimizado (Hidden on mobile) */}
+                <div className="hidden md:block w-full md:w-64 flex-shrink-0 space-y-4 sticky top-6">
 
                     {/* VISTA GENERAL */}
                     <div className="space-y-1">

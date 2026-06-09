@@ -425,15 +425,15 @@ export const PlanIntervencion = ({ nna, onClose }: PIIProps) => {
 
     // ── Vista Lista ──────────────────────────────────────────────────────────
     if (viewMode === 'list') return (
-        <div className="bg-bg min-h-screen p-8">
-            <div className="flex items-center justify-between mb-6">
+        <div className="bg-bg min-h-screen p-3 sm:p-6 md:p-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                 <div>
-                    <h1 className="text-[17px] font-bold text-fg">Planes de Intervención Individual</h1>
+                    <h1 className="text-base sm:text-[17px] font-bold text-fg">Planes de Intervención Individual</h1>
                     <p className="text-[12px] text-fg-muted mt-0.5">{nna?.nombres} {nna?.apellidoPaterno} {nna?.apellidoMaterno || ''}</p>
                 </div>
                 {onClose && (
                     <button onClick={onClose}
-                        className="flex items-center gap-1.5 bg-surface border border-border text-fg-secondary px-4 py-2 rounded-lg text-[13px] font-medium hover:bg-surface-muted transition-colors">
+                        className="flex items-center justify-center gap-1.5 bg-surface border border-border text-fg-secondary px-4 py-2 rounded-lg text-[13px] font-medium hover:bg-surface-muted transition-colors w-full sm:w-auto">
                         <ArrowLeft size={14} /> Volver
                     </button>
                 )}
@@ -451,7 +451,7 @@ export const PlanIntervencion = ({ nna, onClose }: PIIProps) => {
                     <button onClick={fetchPlans} className="text-[12px] bg-danger text-white px-4 py-2 rounded-lg font-bold">Reintentar</button>
                 </div>
             ) : plans.length === 0 ? (
-                <div className="bg-surface border border-border rounded-xl p-12 text-center max-w-xl mx-auto shadow-[var(--shadow-1)]">
+                <div className="bg-surface border border-border rounded-xl p-6 sm:p-12 text-center max-w-xl mx-auto shadow-[var(--shadow-1)]">
                     <div className="w-14 h-14 bg-primary-soft rounded-full flex items-center justify-center mx-auto mb-4">
                         <ClipboardCheck className="text-primary" size={28} />
                     </div>
@@ -466,14 +466,16 @@ export const PlanIntervencion = ({ nna, onClose }: PIIProps) => {
                 </div>
             ) : (
                 <div className="bg-surface border border-border rounded-xl shadow-[var(--shadow-1)] overflow-hidden max-w-5xl mx-auto">
-                    <div className="flex justify-between items-center px-6 py-4 border-b border-border">
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center px-4 sm:px-6 py-4 border-b border-border gap-3">
                         <h3 className="font-bold text-fg text-[13px]">Planes Registrados</h3>
                         <button onClick={() => goToBoard(null, 'create')}
-                            className="flex items-center gap-1.5 bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg text-[12px] font-bold active:scale-95 transition-all">
+                            className="flex items-center justify-center gap-1.5 bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg text-[12px] font-bold active:scale-95 transition-all w-full sm:w-auto">
                             <Plus size={13} /> Nuevo Plan
                         </button>
                     </div>
-                    <div className="overflow-x-auto">
+
+                    {/* Tabla (Escritorio) */}
+                    <div className="hidden md:block overflow-x-auto">
                         <table className="w-full text-left border-collapse">
                             <thead>
                                 <tr className="border-b border-border text-[10px] font-extrabold text-fg-muted uppercase tracking-wider">
@@ -539,6 +541,68 @@ export const PlanIntervencion = ({ nna, onClose }: PIIProps) => {
                             </tbody>
                         </table>
                     </div>
+
+                    {/* Tarjetas (Móvil) */}
+                    <div className="md:hidden divide-y divide-border">
+                        {plans.map(plan => {
+                            const vig = getVigencia(plan.fechaInicio || plan.createdAt);
+                            const total = plan.acciones?.length ?? 0;
+                            const done = plan.acciones?.filter(a => (a.estado as any) === 'CUMPLIDO' || (a.estado as any) === 'COMPLETADO').length ?? 0;
+                            const pct = total ? Math.round(done / total * 100) : 0;
+                            const sem = getSemaforo(pct);
+                            return (
+                                <div key={plan.id} className="p-4 space-y-3">
+                                    <div className="flex justify-between items-start">
+                                        <span className="font-bold text-primary text-sm">
+                                            {plan.codigoPti || `PII-${new Date(plan.fechaInicio || plan.createdAt).getFullYear()}-${String(plan.id).padStart(4, '0')}`}
+                                        </span>
+                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${plan.estado === 'ACTIVO' ? 'bg-success-soft text-success' : 'bg-surface-muted text-fg-muted'}`}>
+                                            {plan.estado}
+                                        </span>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2 text-xs">
+                                        <div>
+                                            <span className="text-fg-muted block text-[10px] uppercase font-bold">Fecha Inicio</span>
+                                            <div className="flex items-center gap-1 mt-0.5 font-medium text-fg-secondary">
+                                                <Calendar size={12} />
+                                                {plan.fechaInicio ? new Date(plan.fechaInicio).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <span className="text-fg-muted block text-[10px] uppercase font-bold">Vigencia</span>
+                                            <div className="mt-0.5">
+                                                {vig ? (
+                                                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${vig.vencido ? 'bg-danger-soft text-danger' : vig.urgente ? 'bg-warning-soft text-warning' : 'bg-success-soft text-success'}`}>
+                                                        {vig.vencido ? `Vencido ${Math.abs(vig.dias)}d` : `${vig.dias}d restantes`}
+                                                    </span>
+                                                ) : '—'}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <span className="text-fg-muted block text-[10px] uppercase font-bold">Avance</span>
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex-1 bg-border rounded-full h-1.5">
+                                                <div className={`h-1.5 rounded-full ${sem.bar}`} style={{ width: `${pct}%` }} />
+                                            </div>
+                                            <span className={`text-[10px] font-bold ${sem.text}`}>{pct}%</span>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/50">
+                                        <button onClick={() => goToBoard(plan, 'detail')}
+                                            className="flex-1 inline-flex items-center justify-center gap-1.5 bg-primary-soft border border-primary/20 text-primary hover:bg-primary hover:text-white hover:border-primary px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95">
+                                            <Eye size={13} /> Abrir PII
+                                        </button>
+                                        <button onClick={() => { loadPlanIntoState(plan); setTimeout(() => window.print(), 150); }}
+                                            title="Imprimir plan"
+                                            className="flex items-center justify-center w-8 h-8 rounded-lg border border-border bg-surface text-fg-muted hover:text-fg hover:border-border-strong hover:bg-surface-muted transition-all">
+                                            <Printer size={13} />
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
             )}
         </div>
@@ -568,7 +632,7 @@ export const PlanIntervencion = ({ nna, onClose }: PIIProps) => {
         <div className="bg-bg min-h-screen flex flex-col">
 
             {/* ── Header ── */}
-            <div className="bg-surface border-b border-border px-6 py-3.5 flex items-center justify-between gap-4 flex-wrap print:hidden">
+            <div className="bg-surface border-b border-border px-4 sm:px-6 py-3.5 flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden">
                 <div className="flex items-center gap-3">
                     <button onClick={() => setViewMode('list')}
                         className="flex items-center gap-1.5 text-fg-muted hover:text-fg text-[13px] font-medium px-3 py-2 rounded-lg hover:bg-surface-muted border border-transparent hover:border-border transition-all">
@@ -583,61 +647,60 @@ export const PlanIntervencion = ({ nna, onClose }: PIIProps) => {
                         </p>
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap justify-end">
                     <button onClick={handleDownloadPDF} disabled={isGeneratingPDF}
-                        className="flex items-center gap-1.5 bg-surface border border-border text-fg-secondary px-3 py-2 rounded-lg text-[12px] font-semibold hover:bg-surface-muted transition-all disabled:opacity-50">
+                        className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 bg-surface border border-border text-fg-secondary px-3 py-2 rounded-lg text-[12px] font-semibold hover:bg-surface-muted transition-all disabled:opacity-50">
                         {isGeneratingPDF ? <Loader2 size={13} className="animate-spin" /> : <FileDown size={13} />} F9: Acta
                     </button>
                     <button onClick={() => window.print()}
-                        className="flex items-center gap-1.5 bg-surface border border-border text-fg-secondary px-3 py-2 rounded-lg text-[12px] font-semibold hover:bg-surface-muted transition-all">
+                        className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 bg-surface border border-border text-fg-secondary px-3 py-2 rounded-lg text-[12px] font-semibold hover:bg-surface-muted transition-all">
                         <Printer size={13} /> Imprimir
                     </button>
                     <button onClick={() => setShowInforme(true)}
-                        className="flex items-center gap-1.5 bg-warning-soft border border-warning/30 text-warning px-3 py-2 rounded-lg text-[12px] font-semibold hover:opacity-80 transition-all">
+                        className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 bg-warning-soft border border-warning/30 text-warning px-3 py-2 rounded-lg text-[12px] font-semibold hover:opacity-80 transition-all">
                         <AlertTriangle size={13} /> Inf. Ampliación
                     </button>
                 </div>
             </div>
 
             {/* ── Contenido del tablero ── */}
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="flex-1 overflow-y-auto p-3 sm:p-6">
                 <div className="max-w-[980px] mx-auto space-y-4">
 
                     {/* Resumen con anillo */}
-                    <div className="flex items-center gap-6 bg-surface border border-border rounded-xl shadow-[var(--shadow-1)] flex-wrap"
-                        style={{ padding: '18px 22px' }}>
+                    <div className="flex flex-col sm:flex-row items-center gap-6 bg-surface border border-border rounded-xl shadow-[var(--shadow-1)] p-4 sm:p-[18px_22px] text-center sm:text-left">
                         <PtiRing pct={pctGlobal} />
-                        <div className="flex gap-6 flex-wrap flex-1">
+                        <div className="grid grid-cols-3 sm:flex sm:flex-wrap gap-4 sm:gap-6 flex-1 w-full justify-items-center sm:justify-start">
                             <div className="flex flex-col gap-0.5">
-                                <span className="text-[24px] font-bold leading-none text-fg">{objetivos.length}</span>
-                                <span className="text-[11px] text-fg-muted uppercase tracking-widest font-semibold">Objetivos</span>
+                                <span className="text-[20px] sm:text-[24px] font-bold leading-none text-fg">{objetivos.length}</span>
+                                <span className="text-[10px] sm:text-[11px] text-fg-muted uppercase tracking-widest font-semibold">Objetivos</span>
                             </div>
                             <div className="flex flex-col gap-0.5">
-                                <span className="text-[24px] font-bold leading-none text-fg">{totalActs}</span>
-                                <span className="text-[11px] text-fg-muted uppercase tracking-widest font-semibold">Actividades</span>
+                                <span className="text-[20px] sm:text-[24px] font-bold leading-none text-fg">{totalActs}</span>
+                                <span className="text-[10px] sm:text-[11px] text-fg-muted uppercase tracking-widest font-semibold">Actividades</span>
                             </div>
                             <div className="flex flex-col gap-0.5">
-                                <span className="text-[24px] font-bold leading-none text-success">{logActs}</span>
-                                <span className="text-[11px] text-fg-muted uppercase tracking-widest font-semibold flex items-center gap-1">
+                                <span className="text-[20px] sm:text-[24px] font-bold leading-none text-success">{logActs}</span>
+                                <span className="text-[10px] sm:text-[11px] text-fg-muted uppercase tracking-widest font-semibold flex items-center gap-1">
                                     <span className="w-2 h-2 rounded-full bg-success inline-block" /> Logradas
                                 </span>
                             </div>
                             <div className="flex flex-col gap-0.5">
-                                <span className="text-[24px] font-bold leading-none text-warning">{procActs}</span>
-                                <span className="text-[11px] text-fg-muted uppercase tracking-widest font-semibold flex items-center gap-1">
-                                    <span className="w-2 h-2 rounded-full bg-warning inline-block" /> En proceso
+                                <span className="text-[20px] sm:text-[24px] font-bold leading-none text-warning">{procActs}</span>
+                                <span className="text-[10px] sm:text-[11px] text-fg-muted uppercase tracking-widest font-semibold flex items-center gap-1">
+                                    <span className="w-2 h-2 rounded-full bg-warning inline-block" /> Proceso
                                 </span>
                             </div>
                             {vencActs > 0 && (
                                 <div className="flex flex-col gap-0.5">
-                                    <span className="text-[24px] font-bold leading-none text-danger">{vencActs}</span>
-                                    <span className="text-[11px] text-fg-muted uppercase tracking-widest font-semibold flex items-center gap-1">
+                                    <span className="text-[20px] sm:text-[24px] font-bold leading-none text-danger">{vencActs}</span>
+                                    <span className="text-[10px] sm:text-[11px] text-fg-muted uppercase tracking-widest font-semibold flex items-center gap-1">
                                         <span className="w-2 h-2 rounded-full bg-danger inline-block" /> Vencidas
                                     </span>
                                 </div>
                             )}
                         </div>
-                        <div className="text-right">
+                        <div className="text-center sm:text-right w-full sm:w-auto pt-3 sm:pt-0 border-t sm:border-t-0 border-border">
                             <span className="inline-flex px-2 py-1 rounded-full bg-info-soft text-info text-[10px] font-bold uppercase mb-1">
                                 Fase 2 · Activo
                             </span>
@@ -689,7 +752,7 @@ export const PlanIntervencion = ({ nna, onClose }: PIIProps) => {
                     </div>
 
                     {/* Tablero de tarjetas */}
-                    <div className="grid gap-3.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' }}>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                         {objetivos.map((obj, idx) => {
                             const s = objStats(obj);
                             if (!objPass(s, ptiFilter)) return null;
@@ -748,9 +811,7 @@ export const PlanIntervencion = ({ nna, onClose }: PIIProps) => {
                                                 ? `Próximo: ${fmtDate(s.next.toISOString().split('T')[0])}`
                                                 : s.pct === 100 ? 'Objetivo cumplido' : 'Sin plazos definidos'}
                                         </span>
-                                        <span className="text-[11px] text-primary font-semibold flex items-center gap-0.5">
-                                            Abrir <ChevronRight size={12} />
-                                        </span>
+                                        <ChevronRight size={14} className="text-fg-muted" />
                                     </div>
                                 </div>
                             );
@@ -779,15 +840,15 @@ export const PlanIntervencion = ({ nna, onClose }: PIIProps) => {
             </div>
 
             {/* ── Footer ── */}
-            <div className="bg-surface border-t border-border px-6 py-3.5 flex items-center justify-between print:hidden">
+            <div className="bg-surface border-t border-border px-4 sm:px-6 py-3.5 flex items-center justify-between print:hidden">
                 <div />
-                <div className="flex gap-2">
+                <div className="flex gap-2 w-full sm:w-auto">
                     <button onClick={() => setMptiOpen(true)}
-                        className="flex items-center gap-1.5 bg-surface border border-border text-fg px-4 py-2 rounded-lg text-[13px] font-semibold hover:bg-surface-muted transition-all">
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-surface border border-border text-fg px-4 py-2 rounded-lg text-[13px] font-semibold hover:bg-surface-muted transition-all">
                         <Plus size={13} /> Nuevo Objetivo
                     </button>
                     <button onClick={handleSave} disabled={isSaving}
-                        className="flex items-center gap-1.5 bg-primary hover:bg-primary-hover text-white px-5 py-2 rounded-lg text-[13px] font-bold shadow-sm active:scale-95 transition-all disabled:opacity-50">
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-primary hover:bg-primary-hover text-white px-5 py-2 rounded-lg text-[13px] font-bold shadow-sm active:scale-95 transition-all disabled:opacity-50">
                         {isSaving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} Guardar Plan
                     </button>
                 </div>
@@ -795,14 +856,14 @@ export const PlanIntervencion = ({ nna, onClose }: PIIProps) => {
 
             {/* ── Modal: Detalle de objetivo ── */}
             {mobjObj && mobjIdx !== null && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-3 sm:p-4"
                     onClick={() => setMobjIdx(null)}>
-                    <div className="bg-surface rounded-xl w-full shadow-[var(--shadow-3)] flex flex-col overflow-hidden"
-                        style={{ maxWidth: 660, maxHeight: '90vh' }}
+                    <div className="bg-surface rounded-xl w-full max-w-lg sm:max-w-xl md:max-w-2xl shadow-[var(--shadow-3)] flex flex-col overflow-hidden mx-auto"
+                        style={{ maxHeight: '90vh' }}
                         onClick={e => e.stopPropagation()}>
 
                         {/* Modal header */}
-                        <div className="flex items-center justify-between border-b border-border px-[18px] py-3.5">
+                        <div className="flex items-center justify-between border-b border-border px-4 py-3.5">
                             <div>
                                 <h3 className="text-[14px] font-semibold text-fg">Detalle del Objetivo</h3>
                                 <p className="text-[11px] text-fg-muted mt-0.5">Edita y registra el avance de cada actividad</p>
@@ -813,11 +874,11 @@ export const PlanIntervencion = ({ nna, onClose }: PIIProps) => {
                         </div>
 
                         {/* Modal body */}
-                        <div className="overflow-y-auto flex-1 px-[18px] py-4 space-y-3">
+                        <div className="overflow-y-auto flex-1 px-4 py-4 space-y-3">
                             {/* Área + descripción */}
-                            <div className="flex gap-2">
+                            <div className="flex flex-col sm:flex-row gap-2">
                                 <select value={mobjObj.area} onChange={e => updateObjetivoField(mobjIdx, 'area', e.target.value)}
-                                    className="border border-border rounded-lg px-3 py-2 text-[12px] font-bold text-fg-secondary bg-surface-muted outline-none focus:border-primary">
+                                    className="w-full sm:w-auto border border-border rounded-lg px-3 py-2 text-[12px] font-bold text-fg-secondary bg-surface-muted outline-none focus:border-primary">
                                     {Object.keys(AREA_CFG).map(a => <option key={a} value={a}>{a}</option>)}
                                 </select>
                                 <input type="text" value={mobjObj.descripcion}
@@ -827,42 +888,43 @@ export const PlanIntervencion = ({ nna, onClose }: PIIProps) => {
                             </div>
 
                             {/* Lista de actividades */}
-                            <div className="space-y-2">
+                            <div className="space-y-3">
                                 {mobjObj.actividades.map(act => {
                                     const ov = isOverdue(act);
                                     return (
                                         <div key={act.id}
-                                            className={`flex flex-col gap-2 border rounded-lg bg-surface transition-colors ${ov ? 'border-danger/40 bg-danger-soft' : 'border-border'}`}
-                                            style={{ padding: '12px 14px' }}>
-                                            <div className="flex items-center gap-2">
+                                            className={`flex flex-col gap-3 border rounded-lg bg-surface transition-colors ${ov ? 'border-danger/40 bg-danger-soft' : 'border-border'} p-3 sm:p-4`}>
+                                            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                                                 {/* Chip de estado (clic para ciclar) */}
                                                 <button onClick={() => cycleEstado(mobjIdx, act.id)}
                                                     title="Clic para cambiar estado"
-                                                    className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg text-[12px] font-bold border transition-all hover:brightness-95 active:scale-[0.97] ${
+                                                    className={`w-full sm:w-auto shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg text-[12px] font-bold border transition-all hover:brightness-95 active:scale-[0.97] ${
                                                         act.estado === 'COMPLETADO' ? 'bg-success-soft text-success border-success/30' :
                                                         act.estado === 'EN_PROCESO' ? 'bg-warning-soft text-warning border-warning/30' :
                                                         'bg-surface-muted text-fg-muted border-border-strong'
-                                                    }`} style={{ minWidth: 130, justifyContent: 'center' }}>
-                                                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${act.estado === 'COMPLETADO' ? 'bg-success' : act.estado === 'EN_PROCESO' ? 'bg-warning' : 'bg-fg-muted'}`} />
+                                                    }`} style={{ justifyContent: 'center' }}>
+                                                    <span className={`w-2 h-2 rounded-full shrink-0 ${act.estado === 'COMPLETADO' ? 'bg-success' : act.estado === 'EN_PROCESO' ? 'bg-warning' : 'bg-fg-muted'}`} />
                                                     {act.estado === 'COMPLETADO' ? 'Logrado' : act.estado === 'EN_PROCESO' ? 'En proceso' : 'Pendiente'}
                                                 </button>
                                                 {/* Descripción */}
-                                                <input type="text" value={act.descripcion}
-                                                    onChange={e => updateActividadField(mobjIdx, act.id, 'descripcion', e.target.value)}
-                                                    placeholder="Descripción de la actividad..."
-                                                    className="flex-1 border-b border-transparent outline-none bg-transparent text-[13px] font-medium text-fg focus:border-primary transition-colors py-1 min-w-0" />
-                                                <button onClick={() => removeActividad(mobjIdx, act.id)}
-                                                    className="text-fg-muted hover:text-danger transition-colors flex-shrink-0 p-1">
-                                                    <Trash2 size={14} />
-                                                </button>
+                                                <div className="flex items-center gap-2 flex-1 w-full">
+                                                    <input type="text" value={act.descripcion}
+                                                        onChange={e => updateActividadField(mobjIdx, act.id, 'descripcion', e.target.value)}
+                                                        placeholder="Descripción de la actividad..."
+                                                        className="flex-1 border-b border-transparent outline-none bg-transparent text-[13px] font-medium text-fg focus:border-primary transition-colors py-1 min-w-0" />
+                                                    <button onClick={() => removeActividad(mobjIdx, act.id)}
+                                                        className="text-fg-muted hover:text-danger transition-colors shrink-0 p-1">
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </div>
                                             </div>
                                             {/* Metadatos */}
-                                            <div className="flex gap-3 flex-wrap pl-1">
+                                            <div className="flex gap-3 flex-wrap pl-1 justify-between sm:justify-start">
                                                 <label className="flex items-center gap-1.5 text-[11px] text-fg-muted">
                                                     Responsable:
                                                     <input type="text" value={act.responsable}
                                                         onChange={e => updateActividadField(mobjIdx, act.id, 'responsable', e.target.value)}
-                                                        className="border border-border rounded-md px-2 py-1 text-[12px] bg-surface-muted outline-none focus:border-primary text-fg-secondary w-28" />
+                                                        className="border border-border rounded-md px-2 py-1 text-[12px] bg-surface-muted outline-none focus:border-primary text-fg-secondary w-24 sm:w-28" />
                                                 </label>
                                                 <label className="flex items-center gap-1.5 text-[11px] text-fg-muted">
                                                     Inicio:
@@ -900,7 +962,7 @@ export const PlanIntervencion = ({ nna, onClose }: PIIProps) => {
                         </div>
 
                         {/* Modal footer */}
-                        <div className="flex items-center justify-between border-t border-border px-[18px] py-3">
+                        <div className="flex items-center justify-between border-t border-border px-4 py-3">
                             <button onClick={() => { if (confirm('¿Eliminar este objetivo del plan?')) removeObjetivo(mobjIdx); }}
                                 className="flex items-center gap-1.5 text-[12px] font-semibold text-danger hover:bg-danger-soft px-3 py-2 rounded-lg transition-colors">
                                 <Trash2 size={13} /> Eliminar Objetivo
@@ -916,13 +978,13 @@ export const PlanIntervencion = ({ nna, onClose }: PIIProps) => {
 
             {/* ── Modal: Plantillas ── */}
             {mptiOpen && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-3 sm:p-4"
                     onClick={() => setMptiOpen(false)}>
-                    <div className="bg-surface rounded-xl w-full shadow-[var(--shadow-3)] flex flex-col overflow-hidden"
-                        style={{ maxWidth: 580, maxHeight: '90vh' }}
+                    <div className="bg-surface rounded-xl w-full max-w-lg shadow-[var(--shadow-3)] flex flex-col overflow-hidden mx-auto"
+                        style={{ maxHeight: '90vh' }}
                         onClick={e => e.stopPropagation()}>
 
-                        <div className="flex items-center justify-between border-b border-border px-[18px] py-3.5">
+                        <div className="flex items-center justify-between border-b border-border px-4 py-3.5">
                             <div>
                                 <h3 className="text-[14px] font-semibold text-fg">Agregar Objetivo al Plan</h3>
                                 <p className="text-[11px] text-fg-muted mt-0.5">Elige una plantilla por área o crea uno en blanco</p>
@@ -932,10 +994,10 @@ export const PlanIntervencion = ({ nna, onClose }: PIIProps) => {
                             </button>
                         </div>
 
-                        <div className="overflow-y-auto flex-1 px-[18px] py-4 space-y-4">
+                        <div className="overflow-y-auto flex-1 px-4 py-4 space-y-4">
                             {/* En blanco */}
                             <div onClick={() => addObjetivo()}
-                                className="flex items-center gap-3 border border-border rounded-lg cursor-pointer hover:border-primary hover:bg-primary-soft/20 transition-all"
+                                className="flex items-center gap-3 border border-border rounded-lg cursor-pointer hover:border-primary hover:bg-primary-soft/20 transition-all p-3"
                                 style={{ padding: '12px 14px' }}>
                                 <div className="w-[30px] h-[30px] rounded-lg bg-primary-soft text-primary flex items-center justify-center flex-shrink-0">
                                     <Plus size={16} />
@@ -957,7 +1019,7 @@ export const PlanIntervencion = ({ nna, onClose }: PIIProps) => {
                                         <div className="space-y-1.5">
                                             {acts.map(act => (
                                                 <div key={act} onClick={() => addObjetivoDesdeTemplate(area, act)}
-                                                    className="flex items-center gap-3 border border-border rounded-lg cursor-pointer hover:border-primary hover:bg-primary-soft/20 transition-all"
+                                                    className="flex items-center gap-3 border border-border rounded-lg cursor-pointer hover:border-primary hover:bg-primary-soft/20 transition-all p-3"
                                                     style={{ padding: '10px 14px' }}>
                                                     <div className={`w-[28px] h-[28px] rounded-lg flex items-center justify-center flex-shrink-0 ${cfg.bgSoft} ${cfg.iconColor}`}>
                                                         {cfg.icon}

@@ -1,97 +1,78 @@
 import { useEffect } from 'react';
 import type { UseFormRegister, UseFormSetValue, UseFormWatch } from 'react-hook-form';
 import { SelectField } from '../../../components/ui/FormFields';
-import { DEPARTAMENTOS, PROVINCIAS, DISTRITOS } from '../../../data/ubigeo';
+import { departamentos, provincias, distritos } from '../../../data/ubigeo-data';
+import { normalizeUbigeo } from '../../../utils/normalizeUbigeo';
 
 interface UbigeoSelectorProps {
-    prefix: string; // "Nac", "Dom", etc.
+    prefix: string;
     register: UseFormRegister<any>;
     watch: UseFormWatch<any>;
     setValue: UseFormSetValue<any>;
-    index?: number; // Optional index for array fields
+    index?: number;
 }
 
 export const UbigeoSelector = ({ prefix, register, watch, setValue, index }: UbigeoSelectorProps) => {
-    // Construct field names based on prefix and optional index
-    // If index is defined, it means we are in 'nnas[index].prefix...'
-    // If index is undefined, we are in 'prefix...' (root level)
-
-    // Example: prefix="departamentoNac" -> base="departamentoNac"
-    // Wait, the hook names in NnaCreatePage are "departamentoNac", "provinciaNac", "distritoNac".
-    // So prefix passed is just "Nac".
-    // Field names: departamento${prefix}, provincia${prefix}, distrito${prefix}
-
-    // BUT if index is present: nnas.${index}.departamento${prefix}
-
     const getFieldName = (field: 'departamento' | 'provincia' | 'distrito') => {
-        const baseName = `${field}${prefix}`; // e.g., departamentoNac
+        const baseName = `${field}${prefix}`;
         return typeof index === 'number' ? `nnas.${index}.${baseName}` : baseName;
     };
 
-    const depName = getFieldName('departamento');
+    const depName  = getFieldName('departamento');
     const provName = getFieldName('provincia');
     const distName = getFieldName('distrito');
 
-    const selectedDep = watch(depName);
+    const selectedDep  = watch(depName);
     const selectedProv = watch(provName);
 
-    // Reset logic
     useEffect(() => {
-        if (!selectedDep) {
-            setValue(provName, '');
-            setValue(distName, '');
-        }
+        if (!selectedDep) { setValue(provName, ''); setValue(distName, ''); }
     }, [selectedDep, setValue, provName, distName]);
 
     useEffect(() => {
-        if (!selectedProv) {
-            setValue(distName, '');
-        }
+        if (!selectedProv) { setValue(distName, ''); }
     }, [selectedProv, setValue, distName]);
 
-    // Logic to find IDs based on selected Names
-    const selectedDepObj = DEPARTAMENTOS.find(d => d.name === selectedDep);
-    const depId = selectedDepObj?.id;
+    const selectedDepObj = departamentos.find(d => normalizeUbigeo(d.name) === normalizeUbigeo(selectedDep));
+    const provincesList  = selectedDepObj ? provincias.filter(p => p.dep === selectedDepObj.id) : [];
 
-    const provinces = depId ? PROVINCIAS[depId] : [];
+    const selectedProvObj = provincesList.find(p => normalizeUbigeo(p.name) === normalizeUbigeo(selectedProv));
+    const districtsList   = selectedProvObj ? distritos.filter(d => d.prov === selectedProvObj.id) : [];
 
-    // For provinces, we need to find the ID to get districts
-    const selectedProvObj = provinces?.find(p => p.name === selectedProv);
-    const provId = selectedProvObj?.id;
-
-    const districts = provId ? DISTRITOS[provId] : [];
+    // Al seleccionar, guardar siempre normalizado (sin tildes)
+    const wrapRegister = (fieldName: string, options?: object) => {
+        const reg = register(fieldName, options);
+        return {
+            ...reg,
+            onChange: (e: React.ChangeEvent<HTMLSelectElement>) => {
+                setValue(fieldName, normalizeUbigeo(e.target.value));
+            },
+        };
+    };
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <SelectField
                 label={`Departamento ${prefix === 'Dom' ? 'Domicilio' : 'Nacimiento'}`}
-                register={register(depName)}
+                register={wrapRegister(depName)}
             >
                 <option value="">Seleccionar...</option>
-                {DEPARTAMENTOS.map((dep) => (
-                    <option key={dep.id} value={dep.name}>{dep.name}</option>
+                {departamentos.map(dep => (
+                    <option key={dep.id} value={normalizeUbigeo(dep.name)}>{normalizeUbigeo(dep.name)}</option>
                 ))}
             </SelectField>
 
-            <SelectField
-                label="Provincia"
-                register={register(provName)}
-                disabled={!selectedDep}
-            >
+            <SelectField label="Provincia" register={wrapRegister(provName)} disabled={!selectedDep}>
                 <option value="">Seleccionar...</option>
-                {provinces?.map((prov) => (
-                    <option key={prov.id} value={prov.name}>{prov.name}</option>
+                {provincesList.map(prov => (
+                    <option key={prov.id} value={normalizeUbigeo(prov.name)}>{normalizeUbigeo(prov.name)}</option>
                 ))}
             </SelectField>
 
-            <SelectField
-                label="Distrito"
-                register={register(distName)}
-                disabled={!selectedProv}
-            >
+            <SelectField label="Distrito" register={wrapRegister(distName)} disabled={!selectedProv}>
                 <option value="">Seleccionar...</option>
-                {districts?.map((dist) => (
-                    <option key={dist.id} value={dist.name}>{dist.name}</option>
+                {districtsList.map(dist => (
+                    <option key={dist.id} value={normalizeUbigeo(dist.name)}>{normalizeUbigeo(dist.name)}</option>
                 ))}
             </SelectField>
         </div>

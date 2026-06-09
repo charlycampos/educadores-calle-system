@@ -114,19 +114,15 @@ export const DatosPersonalesSection: React.FC<DatosPersonalesSectionProps> = ({
                             ]} />
                         </div>
 
-                        <div className="md:col-span-2 grid grid-cols-3 gap-2">
-                            <div className="col-span-1">
+                        <div className="md:col-span-2 grid grid-cols-2 gap-2">
+                            <InputField type="number" label="Edad" register={register(`nnas.${index}.edad` as const)} placeholder="Edad" />
+                            <SelectField label="Unidad" register={register(`nnas.${index}.unidadEdad` as const)} options={[
+                                { value: 'ANIOS', label: 'Años' },
+                                { value: 'MESES', label: 'Meses' },
+                                { value: 'DIAS', label: 'Días' }
+                            ]} />
+                            <div className="col-span-2">
                                 <InputField type="date" label="Fecha Nacimiento" register={register(`nnas.${index}.fechaNacimiento` as const)} />
-                            </div>
-                            <div className="col-span-1">
-                                <InputField type="number" label="Edad" register={register(`nnas.${index}.edad` as const)} placeholder="Edad" />
-                            </div>
-                            <div className="col-span-1">
-                                <SelectField label="Unidad" register={register(`nnas.${index}.unidadEdad` as const)} options={[
-                                    { value: 'ANIOS', label: 'Años' },
-                                    { value: 'MESES', label: 'Meses' },
-                                    { value: 'DIAS', label: 'Días' }
-                                ]} />
                             </div>
                         </div>
 
@@ -147,10 +143,9 @@ export const DatosPersonalesSection: React.FC<DatosPersonalesSectionProps> = ({
                         </div>
 
                         {/* Identidad Cultural (SEC 2026) */}
-                        <div className="md:col-span-3 bg-white p-3 rounded border border-gray-200 grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <label className="col-span-3 text-[10px] font-bold text-gray-500 uppercase">Nacionalidad e Identidad Cultural (SEC 2026)</label>
+                        <div className="md:col-span-3 bg-white p-3 rounded border border-gray-200 space-y-3">
+                            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Nacionalidad e Identidad Cultural (SEC 2026)</p>
                             <InputField label="Nacionalidad" register={register(`nnas.${index}.nacionalidad` as const)} placeholder="Ej. PERUANA" />
-                            
                             <div>
                                 <SelectField label="Lengua Materna" register={register(`nnas.${index}.lenMatNna` as const)} options={parametros?.OPCIONES_LENGUA_APO_2026 || [
                                     { value: '10', label: 'Castellano' },
@@ -165,7 +160,6 @@ export const DatosPersonalesSection: React.FC<DatosPersonalesSectionProps> = ({
                                     </div>
                                 )}
                             </div>
-
                             <div>
                                 <SelectField label="Autoidentificación Étnica" register={register(`nnas.${index}.autIdeEtNna` as const)} options={parametros?.OPCIONES_ETNIA_APO_2026 || [
                                     { value: '7', label: 'Mestizo' },

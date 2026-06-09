@@ -755,10 +755,10 @@ export const ResumenCaso = ({ nna, caso, familia }: ResumenCasoProps) => {
 
                     <div className="flex-1 flex flex-col justify-center">
                         <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4 mb-2">
-                            <h1 className="text-2xl md:text-3xl font-black text-fg tracking-tight uppercase">
+                            <h1 className="text-xl md:text-3xl font-black text-fg tracking-tight uppercase text-center md:text-left">
                                 {nna.nombres} {nna.apellidoPaterno} {nna.apellidoMaterno || ''}
                             </h1>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center justify-center md:justify-start gap-2">
                                 {estadoBadge(caso?.estado)}
                                 {caso?.nivelRiesgo && (
                                     <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-tighter border ${
@@ -772,24 +772,24 @@ export const ResumenCaso = ({ nna, caso, familia }: ResumenCasoProps) => {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-y-2 gap-x-6">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-y-3 gap-x-4 md:gap-x-6 text-center md:text-left bg-surface-muted/20 md:bg-transparent p-4 md:p-0 rounded-xl border border-border/40 md:border-transparent">
                             <div className="flex flex-col">
-                                <span className="text-[10px] font-black text-fg-muted uppercase tracking-widest">Expediente</span>
-                                <span className="text-[14px] font-mono font-bold text-fg">{nna.carpeta?.codigo || '—'}</span>
+                                <span className="text-[9px] md:text-[10px] font-black text-fg-muted uppercase tracking-widest">Expediente</span>
+                                <span className="text-[12px] md:text-[14px] font-mono font-bold text-fg">{nna.carpeta?.codigo || '—'}</span>
                             </div>
                             <div className="flex flex-col">
-                                <span className="text-[10px] font-black text-fg-muted uppercase tracking-widest">Documento</span>
-                                <span className="text-[14px] font-bold text-fg">
+                                <span className="text-[9px] md:text-[10px] font-black text-fg-muted uppercase tracking-widest">Documento</span>
+                                <span className="text-[12px] md:text-[14px] font-bold text-fg truncate">
                                     {nna.numeroDoc ? `${TIPO_DOC_MAP[nna.tipoDoc] || nna.tipoDoc || 'DNI'}: ${nna.numeroDoc}` : 'S/D'}
                                 </span>
                             </div>
                             <div className="flex flex-col">
-                                <span className="text-[10px] font-black text-fg-muted uppercase tracking-widest">Edad</span>
-                                <span className="text-[14px] font-bold text-fg">{calcEdad(nna.fechaNacimiento, nna)}</span>
+                                <span className="text-[9px] md:text-[10px] font-black text-fg-muted uppercase tracking-widest">Edad</span>
+                                <span className="text-[12px] md:text-[14px] font-bold text-fg">{calcEdad(nna.fechaNacimiento, nna)}</span>
                             </div>
                             <div className="flex flex-col">
-                                <span className="text-[10px] font-black text-fg-muted uppercase tracking-widest">Fase Actual</span>
-                                <span className="text-[14px] font-black text-primary uppercase">Fase {caso?.fase || 'I'}</span>
+                                <span className="text-[9px] md:text-[10px] font-black text-fg-muted uppercase tracking-widest">Fase Actual</span>
+                                <span className="text-[12px] md:text-[14px] font-black text-primary uppercase">Fase {caso?.fase || 'I'}</span>
                             </div>
                         </div>
                     </div>
@@ -797,7 +797,7 @@ export const ResumenCaso = ({ nna, caso, familia }: ResumenCasoProps) => {
             </div>
 
             {/* Tabs de Navegación */}
-            <div className="flex gap-1 bg-surface-muted p-1 rounded-2xl border border-border sticky top-4 z-20 shadow-sm">
+            <div className="flex overflow-x-auto whitespace-nowrap gap-1 bg-surface-muted p-1 rounded-2xl border border-border sticky top-4 z-20 shadow-sm scrollbar-none">
                 {TABS.map(tab => {
                     const Icon = tab.icon;
                     const isActive = activeTab === tab.id;
@@ -805,13 +805,13 @@ export const ResumenCaso = ({ nna, caso, familia }: ResumenCasoProps) => {
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
-                            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-[12px] font-bold transition-all ${isActive
+                            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-[12px] font-bold transition-all ${isActive
                                 ? 'bg-surface text-primary shadow-md border border-primary/10'
                                 : 'text-fg-muted hover:text-fg hover:bg-surface/50'
                                 }`}
                         >
-                            <Icon size={16} />
-                            <span className="hidden md:inline">{tab.label}</span>
+                            <Icon size={16} className="shrink-0" />
+                            <span>{tab.label}</span>
                         </button>
                     );
                 })}

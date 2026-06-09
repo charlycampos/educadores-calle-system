@@ -202,14 +202,14 @@ export const Formato5Logros = ({ nna, caso, initialData, onClose, onSuccess }: F
     ];
 
     return (
-        <div className="bg-bg min-h-screen p-6">
+        <div className="bg-bg min-h-screen p-3 sm:p-6">
             <div className="max-w-5xl mx-auto bg-surface rounded-[8px] shadow-lg overflow-hidden border border-border">
 
                 {/* Header */}
-                <div className="bg-primary px-6 py-5 text-primary-fg">
-                    <div className="flex justify-between items-start">
+                <div className="bg-primary px-4 sm:px-6 py-4 sm:py-5 text-primary-fg">
+                    <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
                         <div>
-                            <h1 className="text-xl font-bold uppercase tracking-wide">Ficha de Proceso de Logros</h1>
+                            <h1 className="text-lg sm:text-xl font-bold uppercase tracking-wide">Ficha de Proceso de Logros</h1>
                             <p className="text-primary-fg/60 text-xs mt-1 font-medium">
                                 Servicio de Educadores de Calle — INABIF (Formato 5)
                                 {initialData?.codigo_f05 && (
@@ -217,7 +217,7 @@ export const Formato5Logros = ({ nna, caso, initialData, onClose, onSuccess }: F
                                 )}
                             </p>
                         </div>
-                        <div className="text-right">
+                        <div className="text-left sm:text-right">
                             <p className="text-sm font-bold">{nna?.nombres} {nna?.apellidoPaterno}</p>
                             <p className="text-xs text-primary-fg/50">DNI: {nna?.numeroDoc || '---'}</p>
                             {caso?.perfil && <p className="text-xs text-primary-fg/50 mt-0.5">Perfil: {caso.perfil}</p>}
@@ -226,7 +226,7 @@ export const Formato5Logros = ({ nna, caso, initialData, onClose, onSuccess }: F
                 </div>
 
                 {/* Tabs */}
-                <div className="flex border-b border-border bg-surface-muted">
+                <div className="flex overflow-x-auto sm:overflow-x-visible whitespace-nowrap border-b border-border bg-surface-muted scrollbar-thin">
                     {faseConfig.map(fc => {
                         const { done, total } = countLogros(fc.id);
                         const isActive = activeFase === fc.id;
@@ -238,7 +238,7 @@ export const Formato5Logros = ({ nna, caso, initialData, onClose, onSuccess }: F
                                 onClick={() => !bloqueada && setActiveFase(fc.id)}
                                 disabled={bloqueada}
                                 title={bloqueada ? `Completa la Fase ${fc.id === 2 ? 'I' : 'II'} primero` : isCerrada ? 'Fase cerrada oficialmente — solo lectura' : undefined}
-                                className={`flex-1 py-3 text-sm font-bold uppercase tracking-wider transition-colors relative
+                                className={`flex-1 min-w-[120px] sm:min-w-0 py-3 text-xs sm:text-sm font-bold uppercase tracking-wider transition-colors relative
                                     ${bloqueada
                                         ? 'text-fg-muted opacity-40 cursor-not-allowed'
                                         : isCerrada && !isActive
@@ -248,20 +248,20 @@ export const Formato5Logros = ({ nna, caso, initialData, onClose, onSuccess }: F
                                                 : 'text-fg-muted hover:text-fg-2 hover:bg-border/30'
                                     }`}
                             >
-                                <div className="flex flex-col items-center gap-0.5">
+                                <div className="flex flex-col items-center gap-0.5 px-2">
                                     <div className="flex items-center gap-1.5">
                                         {bloqueada
-                                            ? <Lock size={13} />
+                                            ? <Lock size={12} />
                                             : isCerrada
-                                                ? <CheckCircle2 size={13} className="text-success" />
-                                                : <Target size={15} />}
+                                                ? <CheckCircle2 size={12} className="text-success" />
+                                                : <Target size={14} />}
                                         <span>{fc.label}</span>
                                     </div>
-                                    <span className="text-[10px] font-normal normal-case opacity-70">
-                                        {bloqueada ? 'Bloqueada' : isCerrada ? 'Archivada en Expediente' : fc.sub}
+                                    <span className="text-[9px] sm:text-[10px] font-normal normal-case opacity-70 block truncate max-w-full">
+                                        {bloqueada ? 'Bloqueada' : isCerrada ? 'Archivada' : fc.sub}
                                     </span>
                                     {!bloqueada && (
-                                        <span className={`text-[10px] font-bold mt-0.5 ${isCerrada ? 'text-success' : done === total ? 'text-success' : 'text-fg-muted'}`}>
+                                        <span className={`text-[9px] sm:text-[10px] font-bold mt-0.5 ${isCerrada ? 'text-success' : done === total ? 'text-success' : 'text-fg-muted'}`}>
                                             {isCerrada ? `${total}/${total} — Cerrada` : `${done}/${total} logros`}
                                         </span>
                                     )}
@@ -273,10 +273,10 @@ export const Formato5Logros = ({ nna, caso, initialData, onClose, onSuccess }: F
                     })}
                 </div>
 
-                <div className="p-8">
+                <div className="p-4 sm:p-8">
                     {/* Fecha */}
-                    <div className="flex items-center gap-4 mb-6 bg-primary-soft/10 p-4 rounded-[6px] border border-primary/20">
-                        <Calendar className="text-primary" size={20} />
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6 bg-primary-soft/10 p-4 rounded-[6px] border border-primary/20">
+                        <Calendar className="text-primary shrink-0" size={20} />
                         <div>
                             <label className="block text-xs font-bold text-primary uppercase mb-1">
                                 Fecha de Evaluación — Fase {activeFase === 1 ? 'I' : activeFase === 2 ? 'II' : 'III'}
@@ -291,8 +291,8 @@ export const Formato5Logros = ({ nna, caso, initialData, onClose, onSuccess }: F
                         </div>
                     </div>
 
-                    {/* Tabla */}
-                    <div className="overflow-hidden rounded-[8px] border border-border shadow-sm">
+                    {/* Tabla (Escritorio) */}
+                    <div className="hidden md:block overflow-hidden rounded-[8px] border border-border shadow-sm">
                         <table className="w-full">
                             <thead className="bg-surface-muted text-xs text-fg-muted uppercase font-bold border-b border-border">
                                 <tr>
@@ -324,6 +324,26 @@ export const Formato5Logros = ({ nna, caso, initialData, onClose, onSuccess }: F
                         </table>
                     </div>
 
+                    {/* Lista de Tarjetas (Móvil) */}
+                    <div className="md:hidden space-y-4">
+                        {getItems(activeFase).map(item => (
+                            <div key={item.id} className="bg-surface rounded-xl border border-border p-4 shadow-sm space-y-3">
+                                <div className="flex items-start gap-2.5">
+                                    <span className="font-bold text-primary text-xs bg-primary-soft/30 px-2 py-0.5 rounded shrink-0">N° {item.id}</span>
+                                    <p className="text-xs sm:text-sm text-fg-2 font-medium leading-relaxed">{item.texto}</p>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border/50 justify-start">
+                                    <StatusButton fase={activeFase} itemId={item.id} value="SI"
+                                        label="SÍ"         colorClass="bg-success-soft text-success border-success/30 ring-success/40" />
+                                    <StatusButton fase={activeFase} itemId={item.id} value="NO"
+                                        label="NO"         colorClass="bg-danger-soft text-danger border-danger/30 ring-danger/40" />
+                                    <StatusButton fase={activeFase} itemId={item.id} value="PROCESO"
+                                        label="EN PROCESO" colorClass="bg-warning-soft text-warning border-warning/30 ring-warning/40" />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
                     {/* Observaciones */}
                     <div className="mt-6">
                         <label className="block text-sm font-bold text-fg-2 mb-2 uppercase flex items-center gap-2">
@@ -341,7 +361,7 @@ export const Formato5Logros = ({ nna, caso, initialData, onClose, onSuccess }: F
                     </div>
 
                     {/* Firmas */}
-                    <div className="mt-8 pt-6 border-t border-border grid grid-cols-2 gap-8">
+                    <div className="mt-8 pt-6 border-t border-border grid grid-cols-1 sm:grid-cols-2 gap-8">
                         <div className="text-center">
                             <p className="text-xs font-bold text-fg-muted uppercase mb-6">Educador/a Responsable</p>
                             <div className="h-px bg-border mx-4" />
@@ -356,20 +376,20 @@ export const Formato5Logros = ({ nna, caso, initialData, onClose, onSuccess }: F
                 </div>
 
                 {/* Footer */}
-                <div className="bg-surface-muted px-8 py-4 border-t border-border flex items-center justify-between">
-                    <div className="text-sm">
+                <div className="bg-surface-muted px-4 sm:px-8 py-4 border-t border-border flex flex-col sm:flex-row items-center gap-4 sm:justify-between">
+                    <div className="text-sm text-center sm:text-left">
                         {saveError && (
-                            <span className="text-danger font-medium flex items-center gap-1.5">
+                            <span className="text-danger font-medium flex items-center gap-1.5 justify-center sm:justify-start">
                                 <AlertCircle size={15} /> {saveError}
                             </span>
                         )}
                         {savedOk && !saveError && (
-                            <span className="text-success font-medium flex items-center gap-1.5">
+                            <span className="text-success font-medium flex items-center gap-1.5 justify-center sm:justify-start">
                                 <CheckCircle size={15} /> Guardado correctamente
                             </span>
                         )}
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
                         <button
                             onClick={() => window.print()}
                             className="flex items-center gap-2 text-fg-2 font-bold hover:text-fg px-4 py-2 hover:bg-border/30 rounded-[6px] transition-colors text-sm"

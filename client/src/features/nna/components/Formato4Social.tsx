@@ -919,30 +919,30 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
             <div className="max-w-7xl mx-auto print:hidden">
 
                 {/* Header con acciones */}
-                <div className="bg-surface border-b border-border px-6 py-4 rounded-t-[8px] shadow-1">
-                    <div className="flex items-center justify-between">
+                <div className="bg-surface border-b border-border px-4 md:px-6 py-4 rounded-t-[8px] shadow-1">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                         <div>
-                            <h1 className="text-[16px] font-bold text-fg uppercase">FICHA DE DIAGNÓSTICO SOCIAL</h1>
-                            <p className="text-[12px] text-fg-muted mt-0.5">Completa la evaluación social del NNA</p>
+                            <h1 className="text-[15px] md:text-[16px] font-bold text-fg uppercase">FICHA DE DIAGNÓSTICO SOCIAL</h1>
+                            <p className="text-[12px] text-fg-muted mt-0.5 font-medium">Completa la evaluación social del NNA</p>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                             <button
                                 onClick={() => setShowDraftConfirm(true)}
                                 disabled={loading}
-                                className="flex items-center gap-1.5 bg-warning-soft text-warning border border-warning/30 px-4 py-2 rounded-[6px] text-[13px] font-medium hover:bg-warning/10 transition-colors disabled:opacity-60"
+                                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-warning-soft text-warning border border-warning/30 px-3.5 py-2 rounded-[6px] text-[13px] font-bold hover:bg-warning/10 transition-colors disabled:opacity-60"
                             >
                                 <Clock size={16} /> Borrador
                             </button>
                             <button
                                 onClick={() => setShowSaveConfirm(true)}
                                 disabled={loading}
-                                className="flex items-center gap-1.5 bg-primary text-primary-fg px-4 py-2 rounded-[6px] text-[13px] font-medium hover:bg-primary/90 transition-colors disabled:opacity-60"
+                                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-primary text-primary-fg px-3.5 py-2 rounded-[6px] text-[13px] font-bold hover:bg-primary/90 transition-colors disabled:opacity-60"
                             >
                                 <Save size={16} /> Guardar
                             </button>
                             <button
                                 onClick={() => window.print()}
-                                className="flex items-center gap-1.5 bg-surface border border-border-strong text-fg px-4 py-2 rounded-[6px] text-[13px] font-medium hover:bg-surface-muted transition-colors"
+                                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-surface border border-border-strong text-fg px-3.5 py-2 rounded-[6px] text-[13px] font-bold hover:bg-surface-muted transition-colors"
                             >
                                 <Printer size={16} /> Imprimir
                             </button>
@@ -951,8 +951,8 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                 </div>
 
                 {/* TABS DE NAVEGACIÓN */}
-                <div className="bg-surface px-4 pt-0 border-x border-border">
-                    <div className="flex overflow-x-auto no-scrollbar">
+                <div className="bg-surface px-4 pt-0 border-x border-border overflow-hidden">
+                    <div className="flex overflow-x-auto whitespace-nowrap gap-1 py-1 scrollbar-none">
                         {[
                             { id: 'GENERAL',    label: 'I-III. General / Calle',       icon: User },
                             { id: 'FAMILIA',    label: 'IV-V. Familia / Vivienda',     icon: Users },
@@ -964,9 +964,9 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id as any)}
                                 className={`
-                                    flex items-center gap-1.5 px-4 py-3.5 border-b-2 text-[12px] font-semibold uppercase tracking-wide transition-all whitespace-nowrap
+                                    flex items-center gap-1.5 px-4 py-3 border-b-2 text-[12px] font-bold uppercase tracking-wide transition-all
                                     ${activeTab === tab.id
-                                        ? 'border-primary text-primary bg-primary-soft/20'
+                                        ? 'border-primary text-primary bg-primary-soft/20 rounded-t-lg'
                                         : 'border-transparent text-fg-muted hover:text-fg hover:bg-surface-muted'}
                                 `}
                             >

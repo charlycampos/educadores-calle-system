@@ -13,6 +13,28 @@ const SEGUROS_PREDEFINIDOS = [
     "Seguro Universitario"
 ];
 
+/* Fila de pregunta + opciones tipo radio responsiva:
+   - Móvil: pregunta arriba, opciones en fila abajo
+   - sm+:   grilla tabla tipo table row                        */
+const RadioRow = ({
+    question,
+    options,
+    bgClass = 'bg-gray-50',
+    borderBottom = true,
+    cols = 3,
+}: {
+    question: React.ReactNode;
+    options: React.ReactNode;
+    bgClass?: string;
+    borderBottom?: boolean;
+    cols?: 2 | 3;
+}) => (
+    <div className={`flex flex-col ${cols === 3 ? 'sm:grid sm:grid-cols-[2fr_1fr_1fr_1fr]' : 'sm:grid sm:grid-cols-[2fr_1fr_1fr]'} ${borderBottom ? 'border-b' : ''} sm:divide-x items-stretch ${bgClass}`}>
+        <div className="p-3 text-sm font-bold text-gray-700 border-b sm:border-b-0">{question}</div>
+        <div className="flex divide-x sm:contents">{options}</div>
+    </div>
+);
+
 export const SaludSection: React.FC = () => {
     const { register, watch, setValue, control } = useFormContext<NnaFormData>();
     const { fields } = useFieldArray({ control, name: "nnas" });
@@ -23,17 +45,22 @@ export const SaludSection: React.FC = () => {
             <SectionHeader title="V. Salud" subtitle="Aseguramiento y condición de salud." />
 
             {fields.map((field, index) => (
-                <div key={field.id} className="border border-gray-200 rounded-xl p-5 bg-white shadow-sm">
+                <div key={field.id} className="border border-gray-200 rounded-xl p-4 sm:p-5 bg-white shadow-sm">
                     <h3 className="font-bold text-gray-800 text-sm mb-4 bg-gray-100 px-3 py-1 rounded inline-block">
                         {index + 1}. {watch(`nnas.${index}.nombres`) || 'NNA Sin Nombre'} {watch(`nnas.${index}.apellidoPaterno`)}
                     </h3>
 
                     <div className="space-y-6">
+
+                        {/* Seguros */}
                         <div className="border rounded-lg overflow-hidden">
-                            <div className="grid grid-cols-[2fr_1fr_1fr_1fr] border-b divide-x items-center bg-gray-50">
-                                <div className="p-3 text-sm font-bold text-gray-700">¿Estás afiliado al Seguro Universal de Salud (SIS)?</div>
-                                {['SI', 'NO', 'NO_SABE'].map((opt) => (
-                                    <label key={opt} className={`p-3 flex items-center justify-center cursor-pointer hover:bg-blue-50 transition-colors h-full ${watch(`nnas.${index}.afiliadoSIS` as const) === opt ? 'bg-blue-100 text-blue-900 font-bold' : ''}`}>
+                            <RadioRow
+                                cols={3}
+                                bgClass="bg-gray-50"
+                                borderBottom
+                                question="¿Estás afiliado al Seguro Universal de Salud (SIS)?"
+                                options={['SI', 'NO', 'NO_SABE'].map((opt) => (
+                                    <label key={opt} className={`flex-1 p-3 flex items-center justify-center cursor-pointer hover:bg-blue-50 transition-colors ${watch(`nnas.${index}.afiliadoSIS` as const) === opt ? 'bg-blue-100 text-blue-900 font-bold' : ''}`}>
                                         <input
                                             type="radio"
                                             value={opt}
@@ -51,11 +78,14 @@ export const SaludSection: React.FC = () => {
                                         <span className="text-xs font-bold">{opt.replace('_', ' ')}</span>
                                     </label>
                                 ))}
-                            </div>
-                            <div className="grid grid-cols-[2fr_1fr_1fr_1fr] divide-x items-center bg-white">
-                                <div className="p-3 text-sm font-bold text-gray-700">¿Estás afiliado a algún otro tipo de seguro de salud?</div>
-                                {['SI', 'NO', 'NO_SABE'].map((opt) => (
-                                    <label key={opt} className={`p-3 flex items-center justify-center cursor-pointer hover:bg-blue-50 transition-colors h-full ${watch(`nnas.${index}.afiliadoOtroSeguro` as const) === opt ? 'bg-blue-100 text-blue-900 font-bold' : ''}`}>
+                            />
+                            <RadioRow
+                                cols={3}
+                                bgClass="bg-white"
+                                borderBottom={false}
+                                question="¿Estás afiliado a algún otro tipo de seguro de salud?"
+                                options={['SI', 'NO', 'NO_SABE'].map((opt) => (
+                                    <label key={opt} className={`flex-1 p-3 flex items-center justify-center cursor-pointer hover:bg-blue-50 transition-colors ${watch(`nnas.${index}.afiliadoOtroSeguro` as const) === opt ? 'bg-blue-100 text-blue-900 font-bold' : ''}`}>
                                         <input
                                             type="radio"
                                             value={opt}
@@ -74,7 +104,7 @@ export const SaludSection: React.FC = () => {
                                         <span className="text-xs font-bold">{opt.replace('_', ' ')}</span>
                                     </label>
                                 ))}
-                            </div>
+                            />
                             {watch(`nnas.${index}.afiliadoOtroSeguro` as const) === 'SI' && (
                                 <div className="p-4 bg-blue-50 animate-slideDown border-t space-y-4">
                                     <SelectField
@@ -98,32 +128,35 @@ export const SaludSection: React.FC = () => {
                                             { value: 'OTRO', label: 'Otro (Especificar)' }
                                         ]}
                                     />
-
-                                    {(!SEGUROS_PREDEFINIDOS.includes(watch(`nnas.${index}.detalleOtroSeguro` as const) || '') || 
-                                     watch(`nnas.${index}.detalleOtroSeguro` as const) === '') && 
-                                     (watch(`nnas.${index}.detalleOtroSeguro` as const) !== undefined) && (
-                                        <div className="animate-slideDown">
-                                            <InputField
-                                                label="Especifique el seguro de salud alternativo"
-                                                register={register(`nnas.${index}.detalleOtroSeguro` as const)}
-                                                placeholder="Ej: Mapfre, Seguro universitario particular..."
-                                            />
-                                        </div>
-                                    )}
+                                    {(!SEGUROS_PREDEFINIDOS.includes(watch(`nnas.${index}.detalleOtroSeguro` as const) || '') ||
+                                        watch(`nnas.${index}.detalleOtroSeguro` as const) === '') &&
+                                        (watch(`nnas.${index}.detalleOtroSeguro` as const) !== undefined) && (
+                                            <div className="animate-slideDown">
+                                                <InputField
+                                                    label="Especifique el seguro de salud alternativo"
+                                                    register={register(`nnas.${index}.detalleOtroSeguro` as const)}
+                                                    placeholder="Ej: Mapfre, Seguro universitario particular..."
+                                                />
+                                            </div>
+                                        )}
                                 </div>
                             )}
                         </div>
 
+                        {/* Enfermedad */}
                         <div className="border rounded-lg overflow-hidden">
-                            <div className="grid grid-cols-[2fr_1fr_1fr] border-b divide-x items-center bg-gray-50">
-                                <div className="p-3 text-sm font-bold text-gray-700">¿Sufres alguna enfermedad actualmente?</div>
-                                {['SI', 'NO'].map((opt) => (
-                                    <label key={opt} className={`p-3 flex items-center justify-center cursor-pointer hover:bg-blue-50 transition-colors h-full ${watch(`nnas.${index}.sufreEnfermedad` as const) === opt ? 'bg-blue-100 text-blue-900 font-bold' : ''}`}>
+                            <RadioRow
+                                cols={2}
+                                bgClass="bg-gray-50"
+                                borderBottom
+                                question="¿Sufres alguna enfermedad actualmente?"
+                                options={['SI', 'NO'].map((opt) => (
+                                    <label key={opt} className={`flex-1 p-3 flex items-center justify-center cursor-pointer hover:bg-blue-50 transition-colors ${watch(`nnas.${index}.sufreEnfermedad` as const) === opt ? 'bg-blue-100 text-blue-900 font-bold' : ''}`}>
                                         <input type="radio" value={opt} {...register(`nnas.${index}.sufreEnfermedad` as const)} className="mr-2" />
                                         <span className="text-xs font-bold">{opt}</span>
                                     </label>
                                 ))}
-                            </div>
+                            />
                             {watch(`nnas.${index}.sufreEnfermedad` as const) === 'SI' && (
                                 <div className="p-3 bg-red-50 animate-slideDown">
                                     <InputField label="De ser afirmativo especificar: ¿Cuál?" register={register(`nnas.${index}.detalleEnfermedad` as const)} placeholder="Especifique la enfermedad..." />
@@ -131,33 +164,40 @@ export const SaludSection: React.FC = () => {
                             )}
                         </div>
 
+                        {/* Discapacidad */}
                         <div className="border rounded-lg overflow-hidden">
-                            <div className="grid grid-cols-[2fr_1fr_1fr] border-b divide-x items-center bg-gray-50">
-                                <div className="p-3 text-sm font-bold text-gray-700">¿Presenta algún tipo de discapacidad?</div>
-                                <label className={`p-3 flex items-center justify-center cursor-pointer hover:bg-blue-50 transition-colors h-full ${watch(`nnas.${index}.tieneDiscapacidad` as const) === true ? 'bg-blue-100 text-blue-900 font-bold' : ''}`}>
-                                    <input
-                                        type="radio"
-                                        value="true"
-                                        {...register(`nnas.${index}.tieneDiscapacidad` as const)}
-                                        className="mr-2"
-                                        checked={String(watch(`nnas.${index}.tieneDiscapacidad`)) === 'true'}
-                                        onChange={() => setValue(`nnas.${index}.tieneDiscapacidad`, true)}
-                                    />
-                                    <span className="text-xs font-bold">Sí</span>
-                                </label>
-                                <label className={`p-3 flex items-center justify-center cursor-pointer hover:bg-blue-50 transition-colors h-full ${watch(`nnas.${index}.tieneDiscapacidad` as const) === false ? 'bg-blue-100 text-blue-900 font-bold' : ''}`}>
-                                    <input
-                                        type="radio"
-                                        value="false"
-                                        {...register(`nnas.${index}.tieneDiscapacidad` as const)}
-                                        className="mr-2"
-                                        checked={String(watch(`nnas.${index}.tieneDiscapacidad`)) === 'false'}
-                                        onChange={() => setValue(`nnas.${index}.tieneDiscapacidad`, false)}
-                                    />
-                                    <span className="text-xs font-bold">NO</span>
-                                </label>
-                            </div>
-
+                            <RadioRow
+                                cols={2}
+                                bgClass="bg-gray-50"
+                                borderBottom
+                                question="¿Presenta algún tipo de discapacidad?"
+                                options={
+                                    <>
+                                        <label className={`flex-1 p-3 flex items-center justify-center cursor-pointer hover:bg-blue-50 transition-colors ${watch(`nnas.${index}.tieneDiscapacidad` as const) === true ? 'bg-blue-100 text-blue-900 font-bold' : ''}`}>
+                                            <input
+                                                type="radio"
+                                                value="true"
+                                                {...register(`nnas.${index}.tieneDiscapacidad` as const)}
+                                                className="mr-2"
+                                                checked={String(watch(`nnas.${index}.tieneDiscapacidad`)) === 'true'}
+                                                onChange={() => setValue(`nnas.${index}.tieneDiscapacidad`, true)}
+                                            />
+                                            <span className="text-xs font-bold">Sí</span>
+                                        </label>
+                                        <label className={`flex-1 p-3 flex items-center justify-center cursor-pointer hover:bg-blue-50 transition-colors ${watch(`nnas.${index}.tieneDiscapacidad` as const) === false ? 'bg-blue-100 text-blue-900 font-bold' : ''}`}>
+                                            <input
+                                                type="radio"
+                                                value="false"
+                                                {...register(`nnas.${index}.tieneDiscapacidad` as const)}
+                                                className="mr-2"
+                                                checked={String(watch(`nnas.${index}.tieneDiscapacidad`)) === 'false'}
+                                                onChange={() => setValue(`nnas.${index}.tieneDiscapacidad`, false)}
+                                            />
+                                            <span className="text-xs font-bold">NO</span>
+                                        </label>
+                                    </>
+                                }
+                            />
                             {(String(watch(`nnas.${index}.tieneDiscapacidad`)) === 'true') && (
                                 <div className="p-4 bg-gray-50 animate-slideDown">
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

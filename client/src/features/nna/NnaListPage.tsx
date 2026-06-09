@@ -174,9 +174,10 @@ export const NnaListPage = () => {
                 </Button>
             </div>
 
-            {/* Table */}
+            {/* Table / Cards View */}
             <div className="bg-surface rounded-lg border border-border overflow-hidden">
-                <div className="overflow-x-auto">
+                {/* Desktop view (Hidden on mobile) */}
+                <div className="hidden md:block overflow-x-auto">
                     <table className="w-full text-left text-[13px]">
                         <thead className="bg-surface-muted border-b border-border">
                             <tr>
@@ -276,20 +277,20 @@ export const NnaListPage = () => {
                                                     <td className="px-4 py-3 align-top border-r border-border bg-surface-muted/30" rowSpan={group.length}>
                                                         <div className="flex flex-col gap-2.5 sticky top-4">
                                                             <div className="flex items-center gap-2">
-                                                                <div className="bg-warning-soft text-warning p-1.5 rounded-md">
-                                                                    <Briefcase size={16} />
-                                                                </div>
-                                                                <div>
-                                                                    <span className="font-mono text-[13px] font-semibold text-fg block whitespace-nowrap">
-                                                                        {nna.carpeta?.codigo || '---'}
-                                                                    </span>
-                                                                </div>
+                                                                  <div className="bg-warning-soft text-warning p-1.5 rounded-md">
+                                                                      <Briefcase size={16} />
+                                                                  </div>
+                                                                  <div>
+                                                                      <span className="font-mono text-[13px] font-semibold text-fg block whitespace-nowrap">
+                                                                          {nna.carpeta?.codigo || '---'}
+                                                                      </span>
+                                                                  </div>
                                                             </div>
                                                             {group.length > 1 && (
-                                                                <div className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-info-soft text-info rounded-md text-[11px] font-semibold w-fit ml-0.5">
-                                                                    <User size={12} />
-                                                                    {group.length} Beneficiarios
-                                                                </div>
+                                                                  <div className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-info-soft text-info rounded-md text-[11px] font-semibold w-fit ml-0.5">
+                                                                      <User size={12} />
+                                                                      {group.length} Beneficiarios
+                                                                  </div>
                                                             )}
                                                         </div>
                                                     </td>
@@ -364,6 +365,146 @@ export const NnaListPage = () => {
                             )}
                         </tbody>
                     </table>
+                </div>
+
+                {/* Mobile view (Hidden on desktop/tablet) */}
+                <div className="md:hidden p-4 space-y-4 bg-bg">
+                    {isLoading ? (
+                        <div className="py-8 text-center text-fg-muted text-sm font-medium">Cargando datos...</div>
+                    ) : filteredNnas.length === 0 ? (
+                        <div className="py-8 text-center text-fg-muted text-sm font-medium">
+                            {searchTerm ? 'No se encontraron resultados.' : 'No hay beneficiarios registrados.'}
+                        </div>
+                    ) : (
+                        Object.values(filteredNnas.reduce((acc: any, nna) => {
+                            const key = nna.carpeta?.id != null ? `carpeta-${nna.carpeta?.id}` : `nna-${nna.id}`;
+                            if (!acc[key]) acc[key] = [];
+                            acc[key].push(nna);
+                            return acc;
+                        }, {})).map((group: any, groupIndex) => {
+                            const representativeNna = group[0];
+                            const folderCode = representativeNna.carpeta?.codigo || 'Sin Expediente';
+                            
+                            return (
+                                <div key={groupIndex} className="bg-surface rounded-xl border border-border shadow-sm overflow-hidden divide-y divide-border/60">
+                                    {/* Folder Header */}
+                                    <div className="bg-surface-muted/30 px-4 py-2.5 flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <Briefcase size={14} className="text-warning" />
+                                            <span className="font-mono text-xs font-bold text-fg-secondary">
+                                                Exp: {folderCode}
+                                            </span>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <Link
+                                                to={`/nna/expediente/${representativeNna.carpeta?.id ?? representativeNna.id}?nnaId=${representativeNna.id}`}
+                                                className="px-2 py-1 bg-primary text-white text-[11px] font-bold rounded flex items-center gap-1 shadow-sm"
+                                            >
+                                                <FolderOpen size={12} /> Carpeta
+                                            </Link>
+                                        </div>
+                                    </div>
+
+                                    {/* Beneficiaries inside this folder */}
+                                    <div className="divide-y divide-border/40">
+                                        {group.map((nna: any) => {
+                                            const age = nna.fechaNacimiento
+                                                ? `${calculateAge(nna.fechaNacimiento)} años`
+                                                : nna.edad != null
+                                                    ? `${nna.edad} ${nna.unidadEdad === 'MESES' ? 'meses' : nna.unidadEdad === 'DIAS' ? 'días' : 'años'}`
+                                                    : '-';
+                                            const gender = ['1', 'M'].includes(String(nna.sexo).trim().toUpperCase()) ? 'Hombre' : ['2', 'F'].includes(String(nna.sexo).trim().toUpperCase()) ? 'Mujer' : '-';
+                                            
+                                            return (
+                                                <div key={nna.id} className="p-4 space-y-3.5 bg-surface">
+                                                    {/* Row 1: Header */}
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div className="flex items-center gap-2.5">
+                                                            <div className="w-8 h-8 rounded-full bg-primary-soft flex items-center justify-center text-primary font-bold text-xs shrink-0">
+                                                                {(nna?.nombres || '').charAt(0)}{(nna?.apellidoPaterno || '').charAt(0)}
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <h4 className="text-sm font-bold text-fg leading-tight">
+                                                                    {nna.nombres} {nna.apellidoPaterno} {nna.apellidoMaterno}
+                                                                </h4>
+                                                                <span className="text-[11px] font-mono font-medium text-fg-muted">
+                                                                    Ficha: {nna.codigoFicha03 || '---'}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+
+                                                        {nna.codigoFicha03 ? (
+                                                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200/50 uppercase tracking-wider shrink-0">
+                                                                Registrado
+                                                            </span>
+                                                        ) : (
+                                                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-extrabold bg-amber-100 text-amber-800 border border-amber-200/50 uppercase tracking-wider shrink-0">
+                                                                Borrador
+                                                            </span>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Row 2: Details Grid */}
+                                                    <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-xs bg-surface-muted/20 p-2.5 rounded-lg border border-border/40">
+                                                        <div>
+                                                            <span className="text-fg-secondary font-medium block text-[10px] uppercase tracking-wider">Edad / Sexo</span>
+                                                            <span className="text-fg font-semibold">{age} • {gender}</span>
+                                                        </div>
+                                                        <div>
+                                                            <span className="text-fg-secondary font-medium block text-[10px] uppercase tracking-wider">Fecha Reg.</span>
+                                                            <span className="text-fg font-semibold font-mono">
+                                                                {nna.createdAt ? new Date(nna.createdAt).toLocaleDateString() : '-'}
+                                                            </span>
+                                                        </div>
+                                                        {isNacional && nna.casos?.[0]?.sede_id && (
+                                                            <div className="col-span-2 border-t border-border/30 pt-1.5 mt-0.5">
+                                                                <span className="text-fg-secondary font-medium block text-[10px] uppercase tracking-wider">Sede de atención</span>
+                                                                <span className="text-fg font-semibold text-[11px]">Sede {nna.casos[0].sede_id}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Row 3: Action Buttons */}
+                                                    <div className="flex items-center gap-2 pt-1 border-t border-border/30">
+                                                        <button
+                                                            onClick={() => {
+                                                                setSelectedPdfNna({
+                                                                    id: nna.id,
+                                                                    name: `${nna.nombres} ${nna.apellidoPaterno} ${nna.apellidoMaterno}`,
+                                                                    codigoFicha03: nna.codigoFicha03
+                                                                });
+                                                                setIsPdfOpen(true);
+                                                            }}
+                                                            className="flex-1 py-2 bg-surface text-fg-muted border border-border rounded-lg text-xs font-bold hover:text-primary hover:bg-primary-soft transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+                                                        >
+                                                            <FileText size={14} /> PDF
+                                                        </button>
+                                                        {canEdit && (
+                                                            <Link
+                                                                to={`/nna/editar/${nna.id}`}
+                                                                className="flex-1 py-2 bg-surface text-fg-muted border border-border rounded-lg text-xs font-bold hover:text-primary hover:bg-primary-soft transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+                                                            >
+                                                                <Pencil size={14} /> Editar
+                                                            </Link>
+                                                        )}
+                                                        {canEdit && (
+                                                            <button
+                                                                onClick={() => handleDerivar(nna)}
+                                                                className="p-2 bg-surface text-fg-muted border border-border rounded-lg hover:text-warning hover:bg-warning-soft transition-colors flex items-center justify-center shadow-sm"
+                                                                title="Derivar"
+                                                            >
+                                                                <ArrowRightCircle size={15} />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            );
+                        })
+                    )}
                 </div>
             </div>
 

@@ -109,7 +109,7 @@ export const ActividadesCalleSection: React.FC<ActividadesCalleSectionProps> = (
                         </span>
                     </div>
 
-                    <div className="p-6 flex-1 space-y-6">
+                    <div className="p-4 md:p-6 flex-1 space-y-6">
                         {fields.length === 0 ? (
                             <div className="text-center py-10 bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl">
                                 <Briefcase className="w-10 h-10 text-slate-300 mx-auto mb-3" />
@@ -168,14 +168,24 @@ export const ActividadesCalleSection: React.FC<ActividadesCalleSectionProps> = (
                                                  })}
                                              </div>
                                              
-                                             <div className="grid grid-cols-2 gap-1.5 w-full max-w-[280px]">
+                                             <div className="grid grid-cols-2 gap-2 w-full">
                                                  {DIAS_KEYS.filter(k => act.agenda?.[k]?.activo).map(k => {
                                                      const d = act.agenda[k];
-                                                     const text = d.turno2Inicio ? `${d.turno1Inicio}-${d.turno1Fin} / ${d.turno2Inicio}-${d.turno2Fin}` : `${d.turno1Inicio}-${d.turno1Fin}`;
+                                                     const turno1 = `${d.turno1Inicio}–${d.turno1Fin}`;
+                                                     const turno2 = d.turno2Inicio ? `${d.turno2Inicio}–${d.turno2Fin}` : null;
                                                      return (
-                                                         <div key={k} className="bg-blue-50/70 border border-blue-100/50 rounded-lg px-2 py-1 text-blue-700 font-bold text-[9px] flex items-center justify-between gap-1 uppercase shadow-sm">
-                                                             <span className="text-blue-800 font-extrabold">{k.substring(0,2)}:</span>
-                                                             <span className="font-mono tracking-tighter text-[8.5px]">{text}</span>
+                                                         <div key={k} className="bg-blue-50 border border-blue-100 rounded-lg px-2.5 py-2 flex flex-col gap-0.5 shadow-sm">
+                                                             <span className="text-[10px] font-black text-blue-900 uppercase tracking-wide">
+                                                                 {k.substring(0, 2).toUpperCase()}
+                                                             </span>
+                                                             <span className="font-mono text-[11px] font-semibold text-blue-700 leading-tight">
+                                                                 {turno1}
+                                                             </span>
+                                                             {turno2 && (
+                                                                 <span className="font-mono text-[11px] font-semibold text-blue-500 leading-tight">
+                                                                     {turno2}
+                                                                 </span>
+                                                             )}
                                                          </div>
                                                      );
                                                  })}

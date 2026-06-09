@@ -135,27 +135,29 @@ export const FooterButtons = ({
     submitLabel = 'Guardar',
     draftLabel = 'Guardar Borrador',
 }: FooterButtonsProps) => (
-    <div className="flex items-center justify-between pt-4 border-t border-border mt-4 bg-surface sticky bottom-0 z-10 px-6 py-4">
+    <div className="flex items-center justify-between border-t border-border bg-surface sticky bottom-0 z-10 px-3 py-3 sm:px-6 sm:py-4 gap-2">
         {onBack ? (
             <button
                 type="button"
                 onClick={onBack}
                 disabled={loading}
-                className="flex items-center gap-2 px-4 py-2 text-fg-secondary hover:bg-surface-muted hover:text-fg rounded-md text-[13px] font-medium transition-colors disabled:opacity-50"
+                className="flex items-center gap-1.5 px-3 py-2 sm:px-4 text-fg-secondary hover:bg-surface-muted hover:text-fg rounded-md text-xs sm:text-[13px] font-medium transition-colors disabled:opacity-50 flex-shrink-0"
             >
-                <ArrowLeft size={15} /> Atrás
+                <ArrowLeft size={14} /> Atrás
             </button>
         ) : <div />}
 
-        <div className="flex gap-3">
+        <div className="flex gap-2 sm:gap-3 flex-wrap justify-end">
             {onSaveDraft && (
                 <button
                     type="button"
                     onClick={onSaveDraft}
                     disabled={loading}
-                    className="flex items-center gap-2 px-5 py-2 bg-amber-600 text-white hover:bg-amber-700 rounded-md text-[13px] font-medium transition-colors disabled:opacity-50 shadow-sm"
+                    className="flex items-center gap-1.5 px-3 py-2 sm:px-5 bg-amber-600 text-white hover:bg-amber-700 rounded-md text-xs sm:text-[13px] font-medium transition-colors disabled:opacity-50 shadow-sm"
                 >
-                    <Save size={14} /> {draftLabel}
+                    <Save size={13} />
+                    <span className="hidden sm:inline">{draftLabel}</span>
+                    <span className="sm:hidden">Borrador</span>
                 </button>
             )}
             {onNext && (
@@ -163,9 +165,11 @@ export const FooterButtons = ({
                     type="button"
                     onClick={onNext}
                     disabled={loading}
-                    className="flex items-center gap-2 px-5 py-2 bg-fg text-surface rounded-md text-[13px] font-medium hover:bg-fg/90 transition-colors disabled:opacity-50"
+                    className="flex items-center gap-1.5 px-3 py-2 sm:px-5 bg-fg text-surface rounded-md text-xs sm:text-[13px] font-medium hover:bg-fg/90 transition-colors disabled:opacity-50"
                 >
-                    {nextLabel} <ArrowRight size={15} />
+                    <span className="hidden sm:inline">{nextLabel}</span>
+                    <span className="sm:hidden">Sig.</span>
+                    <ArrowRight size={14} />
                 </button>
             )}
             {onSave && (
@@ -173,9 +177,9 @@ export const FooterButtons = ({
                     type="submit"
                     onClick={onSave}
                     disabled={loading}
-                    className="flex items-center gap-2 px-5 py-2 bg-primary hover:bg-primary-hover text-primary-fg rounded-md text-[13px] font-medium transition-colors disabled:opacity-50"
+                    className="flex items-center gap-1.5 px-3 py-2 sm:px-5 bg-primary hover:bg-primary-hover text-primary-fg rounded-md text-xs sm:text-[13px] font-medium transition-colors disabled:opacity-50"
                 >
-                    {loading ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                    {loading ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
                     {submitLabel}
                 </button>
             )}

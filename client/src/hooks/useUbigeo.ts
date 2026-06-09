@@ -1,52 +1,48 @@
 import { useState, useMemo, useEffect } from 'react';
 import { departamentos, provincias, distritos } from '../data/ubigeo-data';
+import { normalizeUbigeo } from '../utils/normalizeUbigeo';
 
 export const useUbigeo = (initialNames?: { dep?: string, prov?: string, dist?: string }) => {
-    // 1. Estados de IDs seleccionados
     const [selectedDepId, setSelectedDepId] = useState<string>(() => {
         if (!initialNames?.dep) return '';
-        return departamentos.find(d => d.name === initialNames.dep)?.id || '';
+        return departamentos.find(d => normalizeUbigeo(d.name) === normalizeUbigeo(initialNames.dep!))?.id || '';
     });
 
     const [selectedProvId, setSelectedProvId] = useState<string>(() => {
         if (!initialNames?.prov) return '';
-        // Intentar buscar provincia asumiendo que pertenece al departamento inicial (si existe)
-        // O buscar globalmente por nombre (riesgoso si hay duplicados, pero aceptable para init)
-        const depId = departamentos.find(d => d.name === initialNames?.dep)?.id;
+        const depId = departamentos.find(d => normalizeUbigeo(d.name) === normalizeUbigeo(initialNames?.dep || ''))?.id;
         if (depId) {
-            return provincias.find(p => p.name === initialNames.prov && p.dep === depId)?.id || '';
+            return provincias.find(p => normalizeUbigeo(p.name) === normalizeUbigeo(initialNames.prov!) && p.dep === depId)?.id || '';
         }
-        return provincias.find(p => p.name === initialNames.prov)?.id || '';
+        return provincias.find(p => normalizeUbigeo(p.name) === normalizeUbigeo(initialNames.prov!))?.id || '';
     });
 
     const [selectedDistId, setSelectedDistId] = useState<string>(() => {
         if (!initialNames?.dist) return '';
-        return distritos.find(d => d.name === initialNames.dist)?.id || '';
+        return distritos.find(d => normalizeUbigeo(d.name) === normalizeUbigeo(initialNames.dist!))?.id || '';
     });
 
-    // Sincronización con props externos (para Edición Async)
     useEffect(() => {
         if (initialNames?.dep) {
-            const d = departamentos.find(x => x.name === initialNames.dep);
+            const d = departamentos.find(x => normalizeUbigeo(x.name) === normalizeUbigeo(initialNames.dep!));
             if (d && d.id !== selectedDepId) setSelectedDepId(d.id);
         }
     }, [initialNames?.dep]);
 
     useEffect(() => {
         if (initialNames?.prov) {
-            const p = provincias.find(x => x.name === initialNames.prov);
+            const p = provincias.find(x => normalizeUbigeo(x.name) === normalizeUbigeo(initialNames.prov!));
             if (p && p.id !== selectedProvId) setSelectedProvId(p.id);
         }
     }, [initialNames?.prov]);
 
     useEffect(() => {
         if (initialNames?.dist) {
-            const d = distritos.find(x => x.name === initialNames.dist);
+            const d = distritos.find(x => normalizeUbigeo(x.name) === normalizeUbigeo(initialNames.dist!));
             if (d && d.id !== selectedDistId) setSelectedDistId(d.id);
         }
     }, [initialNames?.dist]);
 
-    // 2. Opciones Filtradas
     const depOptions = useMemo(() => departamentos, []);
 
     const provOptions = useMemo(() => {
@@ -59,7 +55,6 @@ export const useUbigeo = (initialNames?: { dep?: string, prov?: string, dist?: s
         return distritos.filter(d => d.prov === selectedProvId);
     }, [selectedProvId]);
 
-    // 3. Manejadores de Cambio (Actualizan IDs y limpian hijos)
     const handleDepChange = (depId: string) => {
         setSelectedDepId(depId);
         setSelectedProvId('');
@@ -75,30 +70,15 @@ export const useUbigeo = (initialNames?: { dep?: string, prov?: string, dist?: s
         setSelectedDistId(distId);
     };
 
-    // 4. Obtener Nombres actuales (para devolver al form)
-    const currentDepName = useMemo(() => departamentos.find(d => d.id === selectedDepId)?.name || '', [selectedDepId]);
-    const currentProvName = useMemo(() => provincias.find(p => p.id === selectedProvId)?.name || '', [selectedProvId]);
-    const currentDistName = useMemo(() => distritos.find(d => d.id === selectedDistId)?.name || '', [selectedDistId]);
+    // Nombres normalizados: siempre sin tildes para consistencia en BD
+    const currentDepName  = useMemo(() => normalizeUbigeo(departamentos.find(d => d.id === selectedDepId)?.name || ''), [selectedDepId]);
+    const currentProvName = useMemo(() => normalizeUbigeo(provincias.find(p => p.id === selectedProvId)?.name || ''), [selectedProvId]);
+    const currentDistName = useMemo(() => normalizeUbigeo(distritos.find(d => d.id === selectedDistId)?.name || ''), [selectedDistId]);
 
     return {
-        // IDs para controlar los selects
-        selectedDepId,
-        selectedProvId,
-        selectedDistId,
-
-        // Opciones para renderizar
-        depOptions,
-        provOptions,
-        distOptions,
-
-        // Handlers
-        handleDepChange,
-        handleProvChange,
-        handleDistChange,
-
-        // Nombres finales
-        currentDepName,
-        currentProvName,
-        currentDistName
+        selectedDepId, selectedProvId, selectedDistId,
+        depOptions, provOptions, distOptions,
+        handleDepChange, handleProvChange, handleDistChange,
+        currentDepName, currentProvName, currentDistName,
     };
 };

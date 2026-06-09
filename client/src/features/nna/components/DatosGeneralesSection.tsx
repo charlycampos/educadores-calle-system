@@ -41,24 +41,10 @@ export const DatosGeneralesSection: React.FC = () => {
                 </div>
             </div>
 
-            <div className="border-t border-gray-100 pt-6 mt-2">
-                <label className="block text-sm font-bold text-gray-700 mb-3">¿Víctima de Explotación Sexual?</label>
-                <div className="flex gap-6">
-                    <label className="flex items-center gap-2 cursor-pointer bg-white px-4 py-2 rounded-lg border border-gray-200 shadow-sm transition-all hover:bg-gray-50">
-                        <input type="radio" value="SI" {...register('victimaExplotacion')} className="text-blue-600 focus:ring-blue-500" />
-                        <span className="font-bold text-sm text-gray-800">SÍ</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer bg-white px-4 py-2 rounded-lg border border-gray-200 shadow-sm transition-all hover:bg-gray-50">
-                        <input type="radio" value="NO" {...register('victimaExplotacion')} className="text-blue-600 focus:ring-blue-500" />
-                        <span className="font-bold text-sm text-gray-800">NO</span>
-                    </label>
-                </div>
-            </div>
-
             {perfilValue === 'VIDA_EN_CALLE' && (
                 <div className="border-t border-gray-100 pt-6 mt-2 animate-fadeIn">
                     <label className="block text-sm font-bold text-gray-700 mb-2">Modalidad de Permanencia (Situación)</label>
-                    <div className="flex gap-6">
+                    <div className="flex flex-wrap gap-3">
                         <label className="flex items-center gap-2 cursor-pointer bg-white px-4 py-2 rounded-lg border border-yellow-200 shadow-sm transition-all hover:bg-yellow-50">
                             <input type="radio" value="TRANSITO_EN_CALLE" {...register('situacionCalle', { required: perfilValue === 'VIDA_EN_CALLE' ? 'Debe marcar la situación' : false })} className="text-yellow-600 focus:ring-yellow-500" />
                             <span className="font-bold text-sm text-gray-800">Tránsito en Calle</span>
@@ -72,7 +58,21 @@ export const DatosGeneralesSection: React.FC = () => {
                 </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 border-t border-gray-100 pt-6">
+            <div className="border-t border-gray-100 pt-6 mt-2">
+                <label className="block text-sm font-bold text-gray-700 mb-3">¿Víctima de Explotación Sexual?</label>
+                <div className="flex flex-wrap gap-3">
+                    <label className="flex items-center gap-2 cursor-pointer bg-white px-4 py-2 rounded-lg border border-gray-200 shadow-sm transition-all hover:bg-gray-50">
+                        <input type="radio" value="SI" {...register('victimaExplotacion')} className="text-blue-600 focus:ring-blue-500" />
+                        <span className="font-bold text-sm text-gray-800">SÍ</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer bg-white px-4 py-2 rounded-lg border border-gray-200 shadow-sm transition-all hover:bg-gray-50">
+                        <input type="radio" value="NO" {...register('victimaExplotacion')} className="text-blue-600 focus:ring-blue-500" />
+                        <span className="font-bold text-sm text-gray-800">NO</span>
+                    </label>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 border-t border-gray-100 pt-6">
                 <InputField type="date" label="Fecha de Abordaje" register={register('fechaAbordaje')} />
                 <InputField type="date" label="Fecha de Ingreso" register={register('fechaIngreso')} />
                 <InputField type="date" label="Fecha Reingreso" register={register('fechaReingreso')} />
