@@ -46,6 +46,7 @@ import { InformeEgresoList } from './components/InformeEgresoList';
 // Formato 12: Seguimiento Familiar (Fase 3)
 import { SeguimientoFamiliarList } from './components/SeguimientoFamiliarList';
 import { ResumenCaso } from './components/ResumenCaso';
+import { DiarioCampoSection } from './components/DiarioCampoSection';
 import { PdfViewerModal } from './components/PdfViewerModal';
 import { formatTipoDoc } from '../../data/ubigeo';
 import { getLogrosById } from '../../api/logros.api';
@@ -304,7 +305,7 @@ export const ExpedientePage = () => {
                     </div>
                 );
             case 'seguimiento':
-                return <PlaceholderModule title="Diario de Campo y Seguimiento" description="Registro de visitas, abordajes en calle y evoluciones." />;
+                return <DiarioCampoSection casoId={activeCase.id} />;
             default:
                 return <ResumenCaso nna={mainNna} caso={activeCase} familia={selectedExpediente || [mainNna]} />;
         }

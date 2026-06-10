@@ -4,6 +4,7 @@ import { useAuthStore } from '../../store/auth.store';
 import { Users, Target, CheckCircle2, AlertTriangle, TrendingUp, PlusCircle, ClipboardList } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { PendientesTicker } from '../../components/dashboard/PendientesTicker';
+import { DiarioCampoModal } from './DiarioCampoModal';
 import clsx from 'clsx';
 
 const API_URL = AUTH_API_URL;
@@ -28,6 +29,7 @@ export const EducadorDashboard = () => {
     const { user } = useAuthStore();
     const [stats, setStats] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [diarioOpen, setDiarioOpen] = useState(false);
 
     useEffect(() => {
         const fetchStats = async () => {
@@ -63,6 +65,7 @@ export const EducadorDashboard = () => {
     }
 
     return (
+        <>
         <div className="max-w-6xl w-full mx-auto">
             <div className="mb-6">
                 <h1 className="text-[22px] font-semibold tracking-tight text-fg">Mi Tablero</h1>
@@ -87,13 +90,17 @@ export const EducadorDashboard = () => {
                     <Users size={22} className="text-fg-muted" />
                 </Link>
 
-                <div className="bg-surface-muted border border-border px-4 py-3.5 rounded-lg opacity-50 flex items-center justify-between cursor-default">
+                <button
+                    type="button"
+                    onClick={() => setDiarioOpen(true)}
+                    className="bg-surface border border-border px-4 py-3.5 rounded-lg flex items-center justify-between cursor-pointer hover:bg-surface-muted transition-colors w-full text-left"
+                >
                     <div>
                         <p className="font-semibold text-[14px] text-fg leading-tight">Diario de Campo</p>
-                        <p className="text-[11px] text-fg-muted mt-0.5">Próximamente</p>
+                        <p className="text-[11px] text-fg-muted mt-0.5">Nueva entrada rápida</p>
                     </div>
                     <ClipboardList size={22} className="text-fg-muted" />
-                </div>
+                </button>
             </div>
 
             {/* 2. ALERTAS PERSONALES */}
@@ -174,6 +181,9 @@ export const EducadorDashboard = () => {
                 </div>
             </div>
         </div>
+
+        <DiarioCampoModal open={diarioOpen} onClose={() => setDiarioOpen(false)} />
+        </>
     );
 };
 

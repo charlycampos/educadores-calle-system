@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useNnaStore } from '../../store/nna.store';
 import { getPtiByCaso, createPti, addAccion, updateAccion, deleteAccion, type PlanTrabajo, type AccionPTI } from '../../api/pti.api';
-import { getDiarioByCaso, createEntradaDiario, deleteEntradaDiario, type EntradaDiario } from '../../api/diario.api';
+import { DiarioCampoSection } from './components/DiarioCampoSection';
 import { getDerivacionesByCaso, createDerivacion, type Derivacion } from '../../api/derivacion.api';
 import { ArrowLeft, Plus, Trash2, CheckCircle, Clock, Calendar, ClipboardList, X, Building2, FileText, AlertTriangle, Send } from 'lucide-react';
 import { useForm, useFieldArray, type SubmitHandler } from 'react-hook-form';
@@ -32,10 +32,6 @@ export const NnaCaseManagementPage = () => {
     const [loadingPti, setLoadingPti] = useState(false);
     const [isCreatingPti, setIsCreatingPti] = useState(false);
 
-    // Diario State
-    const [diarioEntries, setDiarioEntries] = useState<EntradaDiario[]>([]);
-    const [isCreatingDiario, setIsCreatingDiario] = useState(false);
-
     // Derivacion State
     const [derivaciones, setDerivaciones] = useState<Derivacion[]>([]);
     const [isCreatingDerivacion, setIsCreatingDerivacion] = useState(false);
@@ -53,11 +49,6 @@ export const NnaCaseManagementPage = () => {
     // New Action Form (for existing PTI)
     const { register: registerNew, handleSubmit: handleNewAction, reset: resetNew } = useForm<AccionForm>();
 
-    // Diario Form
-    const { register: registerDiario, handleSubmit: handleDiarioSubmit, reset: resetDiario } = useForm<EntradaDiario>({
-        defaultValues: { fecha: new Date().toISOString().slice(0, 16) } // Local datetime default
-    });
-
     // Derivacion Form
     const { register: registerDerivacion, handleSubmit: handleDerivacionSubmit, reset: resetDerivacion } = useForm<Derivacion>();
 
@@ -70,7 +61,6 @@ export const NnaCaseManagementPage = () => {
     useEffect(() => {
         if (activeCase?.id) {
             if (activeTab === 'pti') loadPti(activeCase.id);
-            if (activeTab === 'diario') loadDiario(activeCase.id);
             if (activeTab === 'derivacion') loadDerivaciones(activeCase.id);
         }
     }, [activeCase, activeTab]);
@@ -88,15 +78,6 @@ export const NnaCaseManagementPage = () => {
         }
     };
 
-    const loadDiario = async (casoId: number) => {
-        try {
-            const data = await getDiarioByCaso(casoId);
-            setDiarioEntries(data);
-        } catch (error) {
-            console.error(error);
-        }
-    };
-
     const loadDerivaciones = async (casoId: number) => {
         try {
             const data = await getDerivacionesByCaso(casoId);
@@ -105,18 +86,6 @@ export const NnaCaseManagementPage = () => {
     };
 
     // Handlers ===============================================================
-    const onSaveDiario: SubmitHandler<EntradaDiario> = async (data) => {
-        if (!activeCase) return;
-        try {
-            await createEntradaDiario(activeCase.id, data);
-            setIsCreatingDiario(false);
-            resetDiario({ fecha: new Date().toISOString().slice(0, 16) });
-            loadDiario(activeCase.id);
-        } catch (error) {
-            alert('Error al guardar diario');
-        }
-    };
-
     const onSaveDerivacion: SubmitHandler<Derivacion> = async (data) => {
         if (!activeCase) return;
         try {
@@ -125,16 +94,6 @@ export const NnaCaseManagementPage = () => {
             resetDerivacion();
             loadDerivaciones(activeCase.id);
         } catch (error) { alert('Error al guardar derivación'); }
-    };
-
-    const onDeleteDiario = async (id: number) => {
-        if (!confirm('¿Eliminar registro?')) return;
-        try {
-            await deleteEntradaDiario(id);
-            if (activeCase) loadDiario(activeCase.id);
-        } catch (error) {
-            alert('Error al eliminar');
-        }
     };
 
     const onCreatePti: SubmitHandler<PtiFormValues> = async (data) => {
@@ -412,159 +371,8 @@ export const NnaCaseManagementPage = () => {
                     </div>
                 )}
 
-                {activeTab === 'diario' && (
-                    <div className="space-y-6">
-                        <div className="flex justify-between items-center">
-                            <h2 className="text-2xl font-black text-gray-800 tracking-tight">Diario de Campo (Atenciones)</h2>
-                            <button
-                                onClick={() => setIsCreatingDiario(true)}
-                                className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold shadow-lg hover:bg-green-700 transition flex items-center gap-2"
-                            >
-                                <Plus size={18} /> Registrar Atención
-                            </button>
-                        </div>
-
-                        {/* FORMULARIO NUEVA ATENCIÓN */}
-                        {isCreatingDiario && (
-                            <div className="bg-white p-6 rounded-xl shadow-lg border-l-4 border-green-500 animate-fade-in relative">
-                                <button
-                                    onClick={() => setIsCreatingDiario(false)}
-                                    className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
-                                >
-                                    <X size={20} />
-                                </button>
-                                <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                                    <ClipboardList size={20} className="text-green-600" /> Nueva Entrada de Campo
-                                </h3>
-
-                                <form onSubmit={handleDiarioSubmit(onSaveDiario)} className="space-y-4">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Fecha y Hora</label>
-                                            <input
-                                                type="datetime-local"
-                                                {...registerDiario('fecha', { required: true })}
-                                                className="w-full p-2.5 border border-gray-300 rounded-lg text-sm bg-gray-50"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Ubicación del Encuentro</label>
-                                            <input
-                                                placeholder="Ej: Parque central, Mercado..."
-                                                {...registerDiario('ubicacion', { required: true })}
-                                                className="w-full p-2.5 border border-gray-300 rounded-lg text-sm"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Actividad Realizada / Temática</label>
-                                        <textarea
-                                            rows={2}
-                                            placeholder="Descripción breve de la intervención..."
-                                            {...registerDiario('actividad', { required: true })}
-                                            className="w-full p-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500"
-                                        />
-                                    </div>
-
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
-                                        <div>
-                                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Estado Físico (Observación)</label>
-                                            <select {...registerDiario('estadoFisico')} className="w-full p-2 border border-gray-300 rounded text-sm bg-white">
-                                                <option value="BUENO">Bueno (Sin lesiones visibles)</option>
-                                                <option value="REGULAR">Regular (Descuido higiene/ropa)</option>
-                                                <option value="MALO">Malo (Lesiones, Enfermo)</option>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Estado de Ánimo</label>
-                                            <select {...registerDiario('estadoAnimo')} className="w-full p-2 border border-gray-300 rounded text-sm bg-white">
-                                                <option value="TRANQUILO">Tranquilo / Estable</option>
-                                                <option value="ALEGRE">Alegre / Participativo</option>
-                                                <option value="TRISTE">Triste / Aislado</option>
-                                                <option value="AGRESIVO">Agresivo / Irritable</option>
-                                                <option value="ANSIOSO">Ansioso / Temeroso</option>
-                                            </select>
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Observaciones Confidenciales</label>
-                                        <textarea
-                                            rows={2}
-                                            placeholder="Detalles relevantes para el expediente..."
-                                            {...registerDiario('observaciones')}
-                                            className="w-full p-2.5 border border-gray-300 rounded-lg text-sm"
-                                        />
-                                    </div>
-
-                                    <div className="flex justify-end pt-2">
-                                        <button type="submit" className="bg-green-600 text-white px-6 py-2.5 rounded-lg font-bold shadow hover:bg-green-700 transition">
-                                            Guardar Registro
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
-                        )}
-
-                        {/* TIMELINE LIST */}
-                        <div className="relative border-l-2 border-gray-200 ml-3 space-y-8 pb-8">
-                            {diarioEntries.map((entry) => (
-                                <div key={entry.id} className="relative pl-8">
-                                    {/* Dot */}
-                                    <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-green-500 border-2 border-white shadow-sm box-content"></div>
-
-                                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition group">
-                                        <div className="flex justify-between items-start mb-2">
-                                            <div>
-                                                <p className="text-xs font-bold text-gray-400 uppercase flex items-center gap-1">
-                                                    <Calendar size={12} /> {new Date(entry.fecha).toLocaleDateString()}
-                                                    <span className="text-gray-300">|</span>
-                                                    <Clock size={12} /> {new Date(entry.fecha).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                </p>
-                                                <h4 className="font-bold text-gray-900 mt-1">{entry.actividad}</h4>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-[10px] font-bold bg-gray-100 text-gray-600 px-2 py-1 rounded-full uppercase">
-                                                    {entry.ubicacion}
-                                                </span>
-                                                <button
-                                                    onClick={() => onDeleteDiario(entry.id!)}
-                                                    className="opacity-0 group-hover:opacity-100 transition text-gray-300 hover:text-red-500"
-                                                >
-                                                    <Trash2 size={16} />
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex gap-4 mb-3">
-                                            <div className={clsx("text-xs font-bold px-2 py-1 rounded border",
-                                                entry.estadoFisico === 'MALO' ? "bg-red-50 border-red-200 text-red-700" : "bg-green-50 border-green-200 text-green-700")}>
-                                                Físico: {entry.estadoFisico}
-                                            </div>
-                                            <div className={clsx("text-xs font-bold px-2 py-1 rounded border", "bg-blue-50 border-blue-200 text-blue-700")}>
-                                                Ánimo: {entry.estadoAnimo}
-                                            </div>
-                                        </div>
-
-                                        {entry.observaciones && (
-                                            <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg border border-gray-100 italic">
-                                                "{entry.observaciones}"
-                                            </p>
-                                        )}
-
-                                        <p className="text-[10px] text-gray-400 mt-3 text-right">
-                                            Registrado por: {entry.creadoPor?.nombreCompleto || 'Desconocido'}
-                                        </p>
-                                    </div>
-                                </div>
-                            ))}
-
-                            {diarioEntries.length === 0 && !isCreatingDiario && (
-                                <div className="pl-8 text-gray-500 italic">No hay registros en el diario de campo.</div>
-                            )}
-                        </div>
-                    </div>
+                {activeTab === 'diario' && activeCase && (
+                    <DiarioCampoSection casoId={activeCase.id} />
                 )}
 
                 {activeTab === 'derivacion' && (
