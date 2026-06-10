@@ -111,7 +111,7 @@ export const DiarioCampoModal: React.FC<Props> = ({ open, onClose }) => {
             const casoActivo = nna.casos?.find((c: any) => c.estado !== 'CERRADO');
             if (!casoActivo) return false;
             const nombreCompleto = `${nna.nombres} ${nna.apellidoPaterno} ${nna.apellidoMaterno}`.toLowerCase();
-            const dni = (nna.nnas?.[0]?.numeroDoc || '').toLowerCase();
+            const dni = (nna.numeroDoc || '').toLowerCase();
             const term = search.toLowerCase();
             return !term || nombreCompleto.includes(term) || dni.includes(term);
         })

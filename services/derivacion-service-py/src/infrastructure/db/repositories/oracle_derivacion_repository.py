@@ -88,7 +88,9 @@ class OracleDerivacionRepository:
         pool = get_pool()
         async with pool.acquire() as conn:
             async with conn.cursor() as cur:
-                await cur.execute("SELECT * FROM DERIVACION WHERE SEDE_ID = :1 AND ESTADO = 'PENDIENTE'", [sede_id])
+                await cur.execute(
+                    "SELECT * FROM DERIVACION WHERE SEDE_ID = :1 AND ESTADO = 'PENDIENTE'"
+                    " ORDER BY FECHA_DERIVACION DESC FETCH FIRST 500 ROWS ONLY", [sede_id])
                 columns = [col[0].lower() for col in cur.description]
                 return [self._row_to_dict(row, columns) for row in await cur.fetchall()]
 
@@ -96,7 +98,9 @@ class OracleDerivacionRepository:
         pool = get_pool()
         async with pool.acquire() as conn:
             async with conn.cursor() as cur:
-                await cur.execute("SELECT * FROM DERIVACION WHERE DESTINATARIO_ID = :1 AND ESTADO = 'PENDIENTE'", [usuario_id])
+                await cur.execute(
+                    "SELECT * FROM DERIVACION WHERE DESTINATARIO_ID = :1 AND ESTADO = 'PENDIENTE'"
+                    " ORDER BY FECHA_DERIVACION DESC FETCH FIRST 500 ROWS ONLY", [usuario_id])
                 columns = [col[0].lower() for col in cur.description]
                 return [self._row_to_dict(row, columns) for row in await cur.fetchall()]
 

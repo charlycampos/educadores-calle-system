@@ -1,3 +1,4 @@
+import { getToken } from '../../../utils/auth';
 import { NNA_API_URL, DERIVACION_API_URL, INTERVENCION_API_URL, AUTH_API_URL, EXPEDIENTE_API_URL } from '../../../config/api';
 import { useState, useEffect, useMemo } from 'react';
 import { Printer, Save, Plus, Edit2, Trash2, X, ArrowLeft, User, Users, GraduationCap, HeartPulse, Target, Clock, Timer, Briefcase, AlertCircle, School, CheckCircle2, XCircle } from 'lucide-react';
@@ -716,7 +717,7 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
     const handleSaveDraft = async () => {
         setLoading(true);
         try {
-            const token = localStorage.getItem('token');
+            const token = getToken();
             const isEdit = !!(initialData && initialData.id);
             const method = isEdit ? 'PUT' : 'POST';
             const url = isEdit
@@ -757,7 +758,7 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
     const handleSave = async () => {
         setLoading(true);
         try {
-            const token = localStorage.getItem('token');
+            const token = getToken();
             const isEdit = !!(initialData && initialData.id);
             const method = isEdit ? 'PUT' : 'POST';
             const url = isEdit

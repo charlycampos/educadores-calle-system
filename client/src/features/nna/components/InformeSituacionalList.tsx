@@ -1,3 +1,4 @@
+import { getToken } from '../../../utils/auth';
 import { EXPEDIENTE_API_URL } from '../../../config/api';
 import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, FileText, AlertCircle, RefreshCw, Eye } from 'lucide-react';
@@ -24,7 +25,7 @@ export const InformeSituacionalList = ({
         setLoading(true);
         setError(null);
         try {
-            const token = localStorage.getItem('token');
+            const token = getToken();
             const response = await fetch(`${EXPEDIENTE_API_URL}/informe-situacional/caso/${casoId}`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
@@ -52,7 +53,7 @@ export const InformeSituacionalList = ({
     const handleEliminar = async () => {
         if (!window.confirm('¿Estás seguro de eliminar este informe situacional?')) return;
         try {
-            const token = localStorage.getItem('token');
+            const token = getToken();
             const res = await fetch(`${EXPEDIENTE_API_URL}/informe-situacional/caso/${casoId}`, {
                 method: 'DELETE',
                 headers: { Authorization: `Bearer ${token}` },
@@ -139,7 +140,7 @@ export const InformeSituacionalList = ({
                                                 {informe.estado === 'FINALIZADO' ? (
                                                     <button
                                                         onClick={() => {
-                                                            const token = localStorage.getItem('token');
+                                                            const token = getToken();
                                                             window.open(`${EXPEDIENTE_API_URL}/informe-situacional/caso/${casoId}/vista?token=${token}`, '_blank');
                                                         }}
                                                         className="p-1.5 text-fg-muted hover:text-primary hover:bg-primary-soft rounded-[4px] transition-colors"
@@ -194,7 +195,7 @@ export const InformeSituacionalList = ({
                                 {informe.estado === 'FINALIZADO' ? (
                                     <button
                                         onClick={() => {
-                                            const token = localStorage.getItem('token');
+                                            const token = getToken();
                                             window.open(`${EXPEDIENTE_API_URL}/informe-situacional/caso/${casoId}/vista?token=${token}`, '_blank');
                                         }}
                                         className="flex-1 inline-flex items-center justify-center gap-1.5 bg-primary-soft text-primary py-1.5 rounded-lg text-xs font-bold"

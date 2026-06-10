@@ -539,17 +539,6 @@ async def buscar_duplicados(
     return {"status": "unique", "message": "NNA Único: No se encontraron coincidencias.", "matches": []}
 
 
-@router.get("/debug-loaded/show")
-async def debug_loaded():
-    import sys
-    import inspect
-    return {
-        "sys_path": sys.path,
-        "nna_router_file": __file__,
-        "_nna_to_dict_source": inspect.getsource(_nna_to_dict)
-    }
-
-
 @router.put("/{carpeta_id}")
 async def actualizar_expediente(carpeta_id: int, body: dict, background_tasks: BackgroundTasks, user: dict = Depends(get_current_user)):
     """Actualiza todos los NNA y familiares de una carpeta."""

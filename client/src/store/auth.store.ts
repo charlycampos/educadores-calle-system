@@ -1,3 +1,4 @@
+import { getToken, setToken, clearToken } from '../utils/auth';
 import { create } from 'zustand';
 import { AUTH_API_URL } from '../config/api';
 
@@ -27,8 +28,8 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>((set) => ({
     user: null,
-    token: localStorage.getItem('token'),
-    isAuthenticated: !!localStorage.getItem('token'),
+    token: getToken(),
+    isAuthenticated: !!getToken(),
     isLoading: false,
     error: null,
 
@@ -47,7 +48,7 @@ export const useAuthStore = create<AuthState>((set) => ({
                 throw new Error(data.message || 'Error al iniciar sesión');
             }
 
-            localStorage.setItem('token', data.token);
+            setToken(data.token);
             localStorage.setItem('user', JSON.stringify(data.user));
 
             set({
@@ -66,13 +67,13 @@ export const useAuthStore = create<AuthState>((set) => ({
     },
 
     logout: () => {
-        localStorage.removeItem('token');
+        clearToken();
         localStorage.removeItem('user');
         set({ user: null, token: null, isAuthenticated: false });
     },
 
     checkAuth: () => {
-        const token = localStorage.getItem('token');
+        const token = getToken();
         const userStr = localStorage.getItem('user');
         if (token && userStr) {
             set({ token, user: JSON.parse(userStr), isAuthenticated: true });

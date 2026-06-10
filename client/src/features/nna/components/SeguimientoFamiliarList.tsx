@@ -1,3 +1,4 @@
+import { getToken } from '../../../utils/auth';
 import React, { useState, useEffect } from 'react';
 import { Plus, Calendar, Users, MapPin, X, Home, ClipboardCheck, Pencil, FolderInput, CheckCheck } from 'lucide-react';
 import { useNnaStore } from '../../../store/nna.store';
@@ -68,7 +69,7 @@ export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any })
 
     useEffect(() => {
         if (!caso?.id) return;
-        const token = localStorage.getItem('token');
+        const token = getToken();
         setIsLoading(true);
         fetch(`${INTERVENCION_API_URL}/seguimiento/caso/${caso.id}`, {
             headers: { Authorization: `Bearer ${token}` },
@@ -127,7 +128,7 @@ export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any })
         setCurrentFicha((prev: any) => ({ ...prev, [key]: e.target.value }));
 
     const handleSave = async () => {
-        const token = localStorage.getItem('token');
+        const token = getToken();
         if (!token) return;
 
         const payload = {
@@ -181,7 +182,7 @@ export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any })
 
     const handleRegistrarExpediente = async (ficha: any) => {
         if (registeredIds.has(ficha.id) || !caso?.id) return;
-        const token = localStorage.getItem('token');
+        const token = getToken();
         if (!token) return;
 
         setIsRegistering(true);

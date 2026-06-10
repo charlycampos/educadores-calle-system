@@ -44,7 +44,8 @@ export const UbigeoSelector = ({ prefix, register, watch, setValue, index }: Ubi
         const reg = register(fieldName, options);
         return {
             ...reg,
-            onChange: (e: React.ChangeEvent<HTMLSelectElement>) => {
+            // Firma compatible con el ChangeHandler (async) de react-hook-form
+            onChange: async (e: { target: any; type?: any }) => {
                 setValue(fieldName, normalizeUbigeo(e.target.value));
             },
         };

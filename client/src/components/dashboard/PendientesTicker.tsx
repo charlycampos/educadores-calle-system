@@ -1,3 +1,4 @@
+import { getToken } from '../../utils/auth';
 import { NNA_API_URL, DERIVACION_API_URL, INTERVENCION_API_URL, AUTH_API_URL, EXPEDIENTE_API_URL } from '../../config/api';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -17,7 +18,7 @@ interface Pendiente {
 }
 
 const getHeaders = () => {
-    const token = localStorage.getItem('token');
+    const token = getToken();
     return {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`

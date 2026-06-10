@@ -11,7 +11,7 @@ async def init_pool() -> None:
         password=settings.oracle_password,
         dsn=f"{settings.oracle_host}:{settings.oracle_port}/{settings.oracle_service}",
         min=1,
-        max=5,
+        max=4,
         increment=1,
     )
     async with pool.acquire() as conn:

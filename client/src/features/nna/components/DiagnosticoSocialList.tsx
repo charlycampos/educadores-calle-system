@@ -1,3 +1,4 @@
+import { getToken } from '../../../utils/auth';
 import { INTERVENCION_API_URL } from '../../../config/api';
 import { useState, useEffect } from 'react';
 import { Plus, Eye, Edit, Trash2, FileText, AlertCircle, RefreshCw } from 'lucide-react';
@@ -30,7 +31,7 @@ export const DiagnosticoSocialList = ({
         setLoading(true);
         setError(null);
         try {
-            const token = localStorage.getItem('token');
+            const token = getToken();
             if (!nnaId) throw new Error('ID de NNA no válido');
 
             const response = await fetch(`${INTERVENCION_API_URL}/diagnostico/nna/${nnaId}`, {
@@ -70,7 +71,7 @@ export const DiagnosticoSocialList = ({
     const handleEliminar = async (id: number) => {
         if (!window.confirm('¿Estás seguro de eliminar este diagnóstico social?')) return;
         try {
-            const token = localStorage.getItem('token');
+            const token = getToken();
             const res = await fetch(`${INTERVENCION_API_URL}/diagnostico/${id}`, {
                 method: 'DELETE',
                 headers: { Authorization: `Bearer ${token}` },

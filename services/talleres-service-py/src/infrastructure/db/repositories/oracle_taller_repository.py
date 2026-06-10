@@ -239,24 +239,13 @@ class OracleTallerRepository:
             logros = eval_str
         return logros, limitaciones, sugerencias
 
-    async def list_all(self) -> list:
-        pool = get_pool()
-        async with pool.acquire() as conn:
-            async with conn.cursor() as cur:
-                await cur.execute(_TALLER_SELECT + "ORDER BY t.FECHA_PROGRAMADA DESC")
-                columns = [col[0].lower() for col in cur.description]
-                talleres = [self._row_to_dict(row, columns) for row in await cur.fetchall()]
-        for t in talleres:
-            t["participantes"] = await self._get_participantes_for_taller(t["id"])
-        return talleres
-
-    async def list_by_sede(self, sede_id: int) -> list:
+    async def list_all(self, limit: int = 500, offset: int = 0) -> list:
         pool = get_pool()
         async with pool.acquire() as conn:
             async with conn.cursor() as cur:
                 await cur.execute(
-                    _TALLER_SELECT + "WHERE t.SEDE_ID = :1 ORDER BY t.FECHA_PROGRAMADA DESC",
-                    [sede_id]
+                    _TALLER_SELECT + "ORDER BY t.FECHA_PROGRAMADA DESC OFFSET :1 ROWS FETCH NEXT :2 ROWS ONLY",
+                    [offset, limit]
                 )
                 columns = [col[0].lower() for col in cur.description]
                 talleres = [self._row_to_dict(row, columns) for row in await cur.fetchall()]
@@ -264,13 +253,27 @@ class OracleTallerRepository:
             t["participantes"] = await self._get_participantes_for_taller(t["id"])
         return talleres
 
-    async def list_by_educador(self, educador_id: int) -> list:
+    async def list_by_sede(self, sede_id: int, limit: int = 500, offset: int = 0) -> list:
         pool = get_pool()
         async with pool.acquire() as conn:
             async with conn.cursor() as cur:
                 await cur.execute(
-                    _TALLER_SELECT + "WHERE t.EDUCADOR_ID = :1 ORDER BY t.FECHA_PROGRAMADA DESC",
-                    [educador_id]
+                    _TALLER_SELECT + "WHERE t.SEDE_ID = :1 ORDER BY t.FECHA_PROGRAMADA DESC OFFSET :2 ROWS FETCH NEXT :3 ROWS ONLY",
+                    [sede_id, offset, limit]
+                )
+                columns = [col[0].lower() for col in cur.description]
+                talleres = [self._row_to_dict(row, columns) for row in await cur.fetchall()]
+        for t in talleres:
+            t["participantes"] = await self._get_participantes_for_taller(t["id"])
+        return talleres
+
+    async def list_by_educador(self, educador_id: int, limit: int = 500, offset: int = 0) -> list:
+        pool = get_pool()
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    _TALLER_SELECT + "WHERE t.EDUCADOR_ID = :1 ORDER BY t.FECHA_PROGRAMADA DESC OFFSET :2 ROWS FETCH NEXT :3 ROWS ONLY",
+                    [educador_id, offset, limit]
                 )
                 columns = [col[0].lower() for col in cur.description]
                 talleres = [self._row_to_dict(row, columns) for row in await cur.fetchall()]

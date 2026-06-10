@@ -139,7 +139,7 @@ app = FastAPI(title="SEC - NNA Service (PRODUCCIÓN)", lifespan=lifespan)
 app.add_middleware(AuditMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:5173", "http://localhost:4173"],  # Agregar dominio de producción aquí
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

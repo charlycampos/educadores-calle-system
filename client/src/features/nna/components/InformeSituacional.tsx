@@ -1,3 +1,4 @@
+import { getToken } from '../../../utils/auth';
 import { useState, useEffect } from 'react';
 import { Printer, Save, CheckCircle2 as CheckIcon, ClipboardList, MapPin, Users, CheckCircle2, FileSignature, PenLine } from 'lucide-react';
 import { EXPEDIENTE_API_URL } from '../../../config/api';
@@ -39,7 +40,7 @@ export const InformeSituacional = ({ nna, caso, onClose }: InformeSituacionalPro
  
     useEffect(() => {
         if (!caso?.id) return;
-        const token = localStorage.getItem('token');
+        const token = getToken();
         fetch(`${EXPEDIENTE_API_URL}/informe-situacional/caso/${caso.id}`, {
             headers: { 'Authorization': `Bearer ${token}` }
         })
@@ -87,7 +88,7 @@ export const InformeSituacional = ({ nna, caso, onClose }: InformeSituacionalPro
     });
  
     const saveToApi = async (estado: string) => {
-        const token = localStorage.getItem('token');
+        const token = getToken();
         const res = await fetch(`${EXPEDIENTE_API_URL}/informe-situacional/caso/${caso.id}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },

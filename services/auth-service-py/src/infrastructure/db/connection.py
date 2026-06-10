@@ -14,8 +14,8 @@ async def init_pool() -> None:
         user=settings.oracle_user,
         password=settings.oracle_password,
         dsn=f"{settings.oracle_host}:{settings.oracle_port}/{settings.oracle_service}",
-        min=2,
-        max=10,
+        min=1,
+        max=4,
         increment=1,
     )
     # Verificar conexión

@@ -107,13 +107,14 @@ class OracleUrgenciaRepository:
                 columns = [col[0].lower() for col in cur.description]
                 return self._row_to_dict(row, columns)
 
-    async def list_by_sede(self, sede_id: int) -> list[dict]:
+    async def list_by_sede(self, sede_id: int, limit: int = 500, offset: int = 0) -> list[dict]:
         pool = get_pool()
         async with pool.acquire() as conn:
             async with conn.cursor() as cur:
                 await cur.execute(
-                    "SELECT * FROM NNA_URGENCIA_F15 WHERE SEDE_ID = :1 ORDER BY CREATED_AT DESC",
-                    [sede_id]
+                    "SELECT * FROM NNA_URGENCIA_F15 WHERE SEDE_ID = :1 ORDER BY CREATED_AT DESC"
+                    " OFFSET :2 ROWS FETCH NEXT :3 ROWS ONLY",
+                    [sede_id, offset, limit]
                 )
                 columns = [col[0].lower() for col in cur.description]
                 rows = await cur.fetchall()

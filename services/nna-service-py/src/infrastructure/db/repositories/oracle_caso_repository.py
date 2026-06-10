@@ -75,7 +75,11 @@ class OracleCasoRepository:
                 row = await cur.fetchone()
                 return _row_to_caso(row) if row else None
 
-    async def list_by_sede(self, sede_id: int, solo_activos: bool = True) -> list[Caso]:
+    # Paginación: límite por defecto para no cargar tablas completas en memoria
+    _PAGINACION = " OFFSET :p_offset ROWS FETCH NEXT :p_limit ROWS ONLY"
+
+    async def list_by_sede(self, sede_id: int, solo_activos: bool = True,
+                           limit: int = 500, offset: int = 0) -> list[Caso]:
         pool = get_pool()
         where = "WHERE c.SEDE_ID = :sede_id"
         if solo_activos:
@@ -83,12 +87,13 @@ class OracleCasoRepository:
         async with pool.acquire() as conn:
             async with conn.cursor() as cur:
                 await cur.execute(
-                    f"{_SELECT_CASO} {where} ORDER BY c.FECHA_APERTURA DESC",
-                    {"sede_id": sede_id},
+                    f"{_SELECT_CASO} {where} ORDER BY c.FECHA_APERTURA DESC{self._PAGINACION}",
+                    {"sede_id": sede_id, "p_offset": offset, "p_limit": limit},
                 )
                 return [_row_to_caso(r) for r in await cur.fetchall()]
 
-    async def list_all(self, solo_activos: bool = True) -> list[Caso]:
+    async def list_all(self, solo_activos: bool = True,
+                       limit: int = 500, offset: int = 0) -> list[Caso]:
         pool = get_pool()
         where = ""
         if solo_activos:
@@ -96,11 +101,13 @@ class OracleCasoRepository:
         async with pool.acquire() as conn:
             async with conn.cursor() as cur:
                 await cur.execute(
-                    f"{_SELECT_CASO} {where} ORDER BY c.FECHA_APERTURA DESC"
+                    f"{_SELECT_CASO} {where} ORDER BY c.FECHA_APERTURA DESC{self._PAGINACION}",
+                    {"p_offset": offset, "p_limit": limit},
                 )
                 return [_row_to_caso(r) for r in await cur.fetchall()]
 
-    async def list_by_responsable(self, responsable_id: int, solo_activos: bool = True) -> list[Caso]:
+    async def list_by_responsable(self, responsable_id: int, solo_activos: bool = True,
+                                  limit: int = 500, offset: int = 0) -> list[Caso]:
         pool = get_pool()
         where = "WHERE c.RESPONSABLE_ID = :resp_id"
         if solo_activos:
@@ -108,8 +115,8 @@ class OracleCasoRepository:
         async with pool.acquire() as conn:
             async with conn.cursor() as cur:
                 await cur.execute(
-                    f"{_SELECT_CASO} {where} ORDER BY c.FECHA_APERTURA DESC",
-                    {"resp_id": responsable_id},
+                    f"{_SELECT_CASO} {where} ORDER BY c.FECHA_APERTURA DESC{self._PAGINACION}",
+                    {"resp_id": responsable_id, "p_offset": offset, "p_limit": limit},
                 )
                 return [_row_to_caso(r) for r in await cur.fetchall()]
 

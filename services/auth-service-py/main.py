@@ -45,9 +45,17 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Rate limiting (slowapi) — responde 429 al exceder el límite
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from src.infrastructure.http.routers.auth_router import limiter
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],          # Ajustar en producción
+    allow_origins=["http://localhost:5173", "http://localhost:4173"],  # Agregar dominio de producción aquí
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

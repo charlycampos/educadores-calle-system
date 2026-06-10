@@ -80,23 +80,50 @@ async def upload_documento(
     import uuid
     import re
 
-    if not file.filename.lower().endswith(".pdf"):
+    MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
+
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Solo se permiten archivos en formato PDF."
+        )
+
+    # Leer por chunks con límite de tamaño (evita cargar archivos gigantes en memoria)
+    chunks = []
+    total = 0
+    while True:
+        chunk = await file.read(1024 * 1024)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > MAX_UPLOAD_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail="El archivo excede el tamaño máximo permitido (10 MB)."
+            )
+        chunks.append(chunk)
+    content = b"".join(chunks)
+
+    # Validar que realmente sea un PDF (magic bytes), no solo la extensión
+    if not content.startswith(b"%PDF-"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El archivo no es un PDF válido."
         )
 
     # Crear subcarpeta del repositorio local si no existe
     repositorio_dir = os.path.abspath("./repositorio_archivos/documentos_subidos")
     os.makedirs(repositorio_dir, exist_ok=True)
 
+    # Sanitizar el nombre original (solo el nombre base, sin rutas ni caracteres peligrosos)
+    safe_name = os.path.basename(file.filename)
+    safe_name = re.sub(r"[^\w\-. ]", "_", safe_name)
+
     # Nombre único para guardarlo
-    unique_filename = f"{uuid.uuid4()}_{file.filename}"
+    unique_filename = f"{uuid.uuid4()}_{safe_name}"
     filepath = os.path.join(repositorio_dir, unique_filename)
 
     try:
-        content = await file.read()
-        
         # Escribir el archivo
         with open(filepath, "wb") as f:
             f.write(content)
@@ -175,4 +202,3 @@ async def get_documento_file(
         filename=download_name,
         headers={"Content-Disposition": f"inline; filename={download_name}"}
     )
-

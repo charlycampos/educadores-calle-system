@@ -1,3 +1,4 @@
+import { getToken } from '../../utils/auth';
 import { NNA_API_URL, DERIVACION_API_URL, INTERVENCION_API_URL, AUTH_API_URL, EXPEDIENTE_API_URL } from '../../config/api';
 import { useState, useEffect } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
@@ -87,7 +88,7 @@ export const ExpedientePage = () => {
 
     useEffect(() => {
         if (currentDiagnosticoId) {
-            const token = localStorage.getItem('token');
+            const token = getToken();
             fetch(`${INTERVENCION_API_URL}/diagnostico/${currentDiagnosticoId}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
@@ -101,7 +102,7 @@ export const ExpedientePage = () => {
 
     useEffect(() => {
         if (currentLogrosId) {
-            const token = localStorage.getItem('token');
+            const token = getToken();
             fetch(`${INTERVENCION_API_URL}/proceso-logros/${currentLogrosId}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
@@ -174,7 +175,7 @@ export const ExpedientePage = () => {
                         nnaFullName={`${mainNna.nombres} ${mainNna.apellidoPaterno} ${mainNna.apellidoMaterno}`}
                         onNuevoDiagnostico={() => {
                             setCurrentDiagnosticoId(null);
-                            const token = localStorage.getItem('token');
+                            const token = getToken();
                             fetch(`${INTERVENCION_API_URL}/diagnostico/prefilled/nna/${mainNna.id}`, {
                                 headers: { 'Authorization': `Bearer ${token}` }
                             })
