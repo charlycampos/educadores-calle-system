@@ -69,7 +69,7 @@ async def stats_diarios_sede(request: Request):
             # Diarios recientes con nombres
             await cur.execute(
                 """SELECT d.ID, d.CASO_ID, d.FECHA, d.UBICACION, d.ACTIVIDAD, d.OBSERVACIONES,
-                          d.ESTADO_FISICO, d.ESTADO_ANIMO,
+                          d.ESTADO_FISICO, d.ESTADO_ANIMO, d.LATITUD, d.LONGITUD,
                           u.NOMBRE_COMPLETO AS EDUCADOR_NOMBRE,
                           TRIM(n.NOMBRES || ' ' || n.APELLIDO_PATERNO || ' ' || NVL(n.APELLIDO_MATERNO, '')) AS NNA_NOMBRE
                      FROM DIARIO_CAMPO d
@@ -84,6 +84,7 @@ async def stats_diarios_sede(request: Request):
             recientes = []
             for r in await cur.fetchall():
                 obs = r[5]
+                lat, lng = r[8], r[9]
                 tipo, foto, firma = "CONSEJERIA", None, None
                 if obs:
                     try:
@@ -99,7 +100,9 @@ async def stats_diarios_sede(request: Request):
                     "fecha": r[2].isoformat() if hasattr(r[2], "isoformat") else str(r[2]),
                     "ubicacion": r[3], "actividad": r[4],
                     "estadoFisico": r[6], "estadoAnimo": r[7],
-                    "educadorNombre": r[8], "nnaNombre": r[9],
+                    "latitud": float(lat) if lat is not None else None,
+                    "longitud": float(lng) if lng is not None else None,
+                    "educadorNombre": r[10], "nnaNombre": r[11],
                     "tipoActividad": tipo, "foto": foto, "firma": firma,
                 })
 

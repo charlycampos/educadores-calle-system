@@ -9,6 +9,8 @@ class DiarioCampoBase(BaseModel):
     estado_fisico: Optional[str] = None
     estado_animo: Optional[str] = None
     observaciones: Optional[str] = None
+    latitud: Optional[float] = None
+    longitud: Optional[float] = None
 
 class DiarioCampoCreate(DiarioCampoBase):
     pass

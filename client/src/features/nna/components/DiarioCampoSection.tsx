@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { GpsCapture } from '../../../components/ui/GpsCapture';
+import { urlMapa, type Coordenadas } from '../../../utils/geo';
 import { toast } from '../../../components/ui/Toast';
 import { useForm } from 'react-hook-form';
 import { Plus, Mic, MicOff, Trash2, Calendar, Clock, MapPin, BookOpen, Camera, FileImage, PenTool } from 'lucide-react';
@@ -40,6 +42,7 @@ export const DiarioCampoSection: React.FC<Props> = ({ casoId }) => {
 
     // Evidencias: Foto y Firma
     const [fotoB64, setFotoB64] = useState<string | null>(null);
+    const [coords, setCoords] = useState<Coordenadas | null>(null);
     const [isDrawing, setIsDrawing] = useState(false);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -170,6 +173,8 @@ export const DiarioCampoSection: React.FC<Props> = ({ casoId }) => {
                 ubicacion:    data.ubicacion,
                 actividad:    data.actividad,
                 observaciones: obsJson, // Guardamos la metadata aquí
+                latitud:      coords?.latitud,
+                longitud:     coords?.longitud,
             });
 
             reset({
@@ -178,6 +183,7 @@ export const DiarioCampoSection: React.FC<Props> = ({ casoId }) => {
                 actividad:    '',
                 tipoActividad: 'CONSEJERIA',
             });
+            setCoords(null);
             setFotoB64(null);
             clearSignature();
             setShowForm(false);
@@ -349,6 +355,7 @@ export const DiarioCampoSection: React.FC<Props> = ({ casoId }) => {
                                     {...register('ubicacion', { required: true })}
                                     className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-green-400 outline-none"
                                 />
+                                <GpsCapture coords={coords} onChange={setCoords} />
                             </div>
                         </div>
 
@@ -536,6 +543,12 @@ export const DiarioCampoSection: React.FC<Props> = ({ casoId }) => {
                                         {entry.ubicacion && (
                                             <p className="text-[11px] text-gray-400 flex items-center gap-1 mt-0.5 truncate">
                                                 <MapPin size={10} /> {entry.ubicacion}
+                                                {entry.latitud != null && entry.longitud != null && (
+                                                    <a href={urlMapa(entry.latitud, entry.longitud)} target="_blank" rel="noreferrer"
+                                                        className="text-blue-500 hover:underline font-bold ml-1 flex-shrink-0">
+                                                        Ver en mapa
+                                                    </a>
+                                                )}
                                             </p>
                                         )}
                                     </div>

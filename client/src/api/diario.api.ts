@@ -18,6 +18,8 @@ export interface EntradaDiario {
     estadoFisico?: string;
     estadoAnimo?: string;
     observaciones?: string;
+    latitud?: number | null;
+    longitud?: number | null;
     creadoPor?: {
         nombreCompleto: string;
     };
@@ -44,6 +46,8 @@ export const createEntradaDiario = async (casoId: number, data: Partial<EntradaD
             estado_fisico: data.estadoFisico,
             estado_animo: data.estadoAnimo,
             observaciones: data.observaciones,
+            latitud: data.latitud ?? null,
+            longitud: data.longitud ?? null,
         })
     });
     if (!response.ok) throw new Error('Error creating entrada');

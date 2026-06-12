@@ -11,9 +11,9 @@ class OracleDiarioRepository:
         async with pool.acquire() as conn:
             async with conn.cursor() as cur:
                 sql = """
-                    INSERT INTO DIARIO_CAMPO (CASO_ID, UBICACION, ACTIVIDAD, ESTADO_FISICO, ESTADO_ANIMO, OBSERVACIONES, CREADO_POR_ID)
-                    VALUES (:1, :2, :3, :4, :5, :6, :7)
-                    RETURNING ID, FECHA, CREATED_AT, UPDATED_AT INTO :8, :9, :10, :11
+                    INSERT INTO DIARIO_CAMPO (CASO_ID, UBICACION, ACTIVIDAD, ESTADO_FISICO, ESTADO_ANIMO, OBSERVACIONES, LATITUD, LONGITUD, CREADO_POR_ID)
+                    VALUES (:1, :2, :3, :4, :5, :6, :7, :8, :9)
+                    RETURNING ID, FECHA, CREATED_AT, UPDATED_AT INTO :10, :11, :12, :13
                 """
                 id_var = cur.var(int)
                 fecha_var = cur.var(oracledb.DB_TYPE_TIMESTAMP)
@@ -21,7 +21,8 @@ class OracleDiarioRepository:
                 updated_var = cur.var(oracledb.DB_TYPE_TIMESTAMP)
 
                 await cur.execute(sql, [
-                    data.caso_id, data.ubicacion, data.actividad, data.estado_fisico, data.estado_animo, data.observaciones, educador_id,
+                    data.caso_id, data.ubicacion, data.actividad, data.estado_fisico, data.estado_animo, data.observaciones,
+                    data.latitud, data.longitud, educador_id,
                     id_var, fecha_var, created_var, updated_var
                 ])
                 await conn.commit()
@@ -32,6 +33,8 @@ class OracleDiarioRepository:
                     "ubicacion": data.ubicacion,
                     "actividad": data.actividad,
                     "estado_fisico": data.estado_fisico,
+                    "latitud": data.latitud,
+                    "longitud": data.longitud,
                     "estado_animo": data.estado_animo,
                     "observaciones": data.observaciones,
                     "creado_por_id": educador_id,

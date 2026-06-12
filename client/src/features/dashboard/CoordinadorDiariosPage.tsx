@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { urlMapa } from '../../utils/geo';
 import { useAuthStore } from '../../store/auth.store';
 import { Link } from 'react-router-dom';
 import { 
@@ -20,6 +21,8 @@ interface DiaryEntryData {
     tipoActividad: string;
     foto?: string;
     firma?: string;
+    latitud?: number | null;
+    longitud?: number | null;
 }
 
 export const CoordinadorDiariosPage = () => {
@@ -53,6 +56,8 @@ export const CoordinadorDiariosPage = () => {
                 educadorNombre: d.educadorNombre || 'Educador',
                 fecha: d.fecha,
                 ubicacion: d.ubicacion || 'No especificada',
+                latitud: d.latitud,
+                longitud: d.longitud,
                 actividad: d.actividad,
                 tipoActividad: d.tipoActividad || 'CONSEJERIA',
                 foto: d.foto,
@@ -324,6 +329,12 @@ export const CoordinadorDiariosPage = () => {
                                         {entry.ubicacion && (
                                             <p className="text-[11px] text-gray-400 flex items-center gap-1">
                                                 <MapPin size={11} /> {entry.ubicacion}
+                                                {entry.latitud != null && entry.longitud != null && (
+                                                    <a href={urlMapa(entry.latitud, entry.longitud)} target="_blank" rel="noreferrer"
+                                                        className="text-blue-500 hover:underline font-bold ml-1">
+                                                        Ver en mapa
+                                                    </a>
+                                                )}
                                             </p>
                                         )}
 

@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { GpsCapture } from '../../components/ui/GpsCapture';
+import type { Coordenadas } from '../../utils/geo';
 import { toast } from '../../components/ui/Toast';
 import { useForm } from 'react-hook-form';
 import { X, Search, ChevronLeft, Mic, MicOff, Calendar, MapPin, BookOpen, User, Camera, FileImage, PenTool } from 'lucide-react';
@@ -51,6 +53,9 @@ export const DiarioCampoModal: React.FC<Props> = ({ open, onClose }) => {
     const [saving, setSaving]           = useState(false);
     const [savedOk, setSavedOk]         = useState(false);
 
+    // Coordenadas GPS (opcionales)
+    const [coords, setCoords] = useState<Coordenadas | null>(null);
+
     // Evidencias: Foto y Firma
     const [fotoB64, setFotoB64] = useState<string | null>(null);
     const [isDrawing, setIsDrawing] = useState(false);
@@ -83,6 +88,7 @@ export const DiarioCampoModal: React.FC<Props> = ({ open, onClose }) => {
             setSelected(null);
             setSavedOk(false);
             setFotoB64(null);
+            setCoords(null);
             reset({
                 fecha: new Date().toISOString().slice(0, 16),
                 ubicacion: '',
@@ -219,6 +225,8 @@ export const DiarioCampoModal: React.FC<Props> = ({ open, onClose }) => {
                 ubicacion:    data.ubicacion,
                 actividad:    data.actividad,
                 observaciones: obsJson,
+                latitud:      coords?.latitud,
+                longitud:     coords?.longitud,
             });
             setSavedOk(true);
             setTimeout(() => onClose(), 1400);
@@ -399,6 +407,7 @@ export const DiarioCampoModal: React.FC<Props> = ({ open, onClose }) => {
                                         {...register('ubicacion', { required: true })}
                                         className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-green-400 outline-none"
                                     />
+                                    <GpsCapture coords={coords} onChange={setCoords} />
                                 </div>
                             </div>
 
