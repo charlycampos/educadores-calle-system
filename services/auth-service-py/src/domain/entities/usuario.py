@@ -15,6 +15,7 @@ class Usuario:
     sede_nombre: Optional[str]
     region_id: int
     zona_asignada: Optional[str]
+    profesion: Optional[str]
     activo: int
 
     def esta_activo(self) -> bool:

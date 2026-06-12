@@ -19,6 +19,7 @@ export interface Usuario {
     sedeId?: number;
     sedeCodigo?: string;
     zonaAsignada?: string;
+    profesion?: string | null;
     activo: boolean;
     password?: string; // Optional for creating/updating
 }

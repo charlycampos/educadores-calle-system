@@ -21,6 +21,7 @@ ORACLE_PASSWORD = os.getenv("ORACLE_PASSWORD", "password")
 ORACLE_DSN = os.getenv("ORACLE_DSN", "localhost:1521/XEPDB1")
 
 SQL_FILES = [
+    "auth-service-py/src/infrastructure/db/migrations/009_profesion_y_supervisor.sql",
     "auth-service/src/infrastructure/db/migrations/001_create_tables.sql",
     "nna-service-py/src/infrastructure/db/migrations/001_create_tables.sql",
     "nna-service-py/src/infrastructure/db/migrations/002_add_edad_nna.sql",

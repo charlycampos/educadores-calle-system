@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { confirmar } from '../../components/ui/ConfirmDialog';
 import { toast } from '../../components/ui/Toast';
 import { useAuthStore } from '../../store/auth.store';
+import { AUTH_API_URL } from '../../config/api';
+import { getToken } from '../../utils/auth';
 import { getUsers, createUser, updateUser, deleteUser, type Usuario } from '../../api/usuario.api';
 import { getSedesAll, type Sede } from '../../api/sedes.api';
 import {
@@ -19,8 +21,12 @@ interface UsuarioForm {
     rolId: number;
     sedeId?: number;
     zonaAsignada?: string;
+    profesion?: string;
     activo?: boolean;
 }
+
+// La especialidad del educador es su profesión (atributo), no un rol del sistema
+const PROFESIONES = ['Educador Social', 'Psicólogo/a', 'Trabajador/a Social', 'Abogado/a', 'Docente', 'Otra'];
 
 const ROL_COLORES: Record<string, string> = {
     ADMIN_NACIONAL:    'bg-primary-soft text-primary',
@@ -91,6 +97,7 @@ export const UserListPage = () => {
                 rolId:          Number(data.rolId),
                 sedeId:         sedeDestino,
                 zonaAsignada:   data.zonaAsignada || undefined,
+                profesion:      data.profesion || undefined,
                 activo:         data.activo,
             };
 
@@ -107,6 +114,14 @@ export const UserListPage = () => {
         }
     };
 
+    const [rolesCatalogo, setRolesCatalogo] = useState<{ id: number; nombre: string }[]>([]);
+    useEffect(() => {
+        fetch(`${AUTH_API_URL}/usuarios/roles/catalogo`, { headers: { Authorization: `Bearer ${getToken()}` } })
+            .then(r => r.ok ? r.json() : [])
+            .then(setRolesCatalogo)
+            .catch(() => setRolesCatalogo([]));
+    }, []);
+
     const openEdit = (user: Usuario) => {
         setEditingUser(user);
         reset({
@@ -116,6 +131,7 @@ export const UserListPage = () => {
             rolId:          user.rolId ?? 3,
             sedeId:         user.sedeId,
             zonaAsignada:   user.zonaAsignada ?? '',
+            profesion:      user.profesion ?? '',
             activo:         user.activo,
         });
         setIsModalOpen(true);
@@ -385,13 +401,25 @@ export const UserListPage = () => {
                                         {...register('rolId', { required: true, valueAsNumber: true })}
                                         className="w-full p-2.5 border border-border rounded-md text-[13px] bg-bg text-fg focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
                                     >
-                                        {isAdminNacional && <option value={1}>ADMIN NACIONAL</option>}
-                                        <option value={2}>ADMIN SEDE</option>
-                                        <option value={3}>COORDINADOR</option>
-                                        <option value={4}>EDUCADOR</option>
-                                        <option value={5}>PSICÓLOGO</option>
-                                        <option value={6}>TRABAJADOR SOCIAL</option>
-                                        <option value={7}>ABOGADO</option>
+                                        {rolesCatalogo
+                                            .filter(r => isAdminNacional || !['ADMIN_NACIONAL', 'MONITOR', 'ESTADISTICO', 'SUPERVISOR_EXPEDIENTES'].includes(r.nombre))
+                                            .map(r => (
+                                                <option key={r.id} value={r.id}>{r.nombre.replace(/_/g, ' ')}</option>
+                                            ))}
+                                    </select>
+                                </div>
+
+                                {/* Profesión del educador (su especialidad no es un rol) */}
+                                <div>
+                                    <label className="block text-[12px] font-semibold text-fg-secondary mb-1.5">
+                                        Profesión
+                                    </label>
+                                    <select
+                                        {...register('profesion')}
+                                        className="w-full p-2.5 border border-border rounded-md text-[13px] bg-bg text-fg focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
+                                    >
+                                        <option value="">— Sin especificar —</option>
+                                        {PROFESIONES.map(p => <option key={p} value={p}>{p}</option>)}
                                     </select>
                                 </div>
 

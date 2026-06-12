@@ -24,6 +24,7 @@ class CrearUsuarioRequest(BaseModel):
     sedeId:  Optional[int] = None
     zona_asignada: Optional[str] = None
     zonaAsignada:  Optional[str] = None
+    profesion: Optional[str] = None
 
     def get_nombre(self) -> str:
         return self.nombre_completo or self.nombreCompleto or ""
@@ -50,6 +51,7 @@ class ActualizarUsuarioRequest(BaseModel):
     sedeId:          Optional[int] = None
     zona_asignada:   Optional[str] = None
     zonaAsignada:    Optional[str] = None
+    profesion:       Optional[str] = None
     activo:          Optional[bool] = None
 
     def get_nombre(self) -> Optional[str]:
@@ -78,6 +80,7 @@ def _formato(u) -> dict:
         "sedeId":          u.sede_id,
         "sedeCodigo":      u.sede_codigo,
         "zonaAsignada":    u.zona_asignada,
+        "profesion":       u.profesion,
         "activo":          bool(u.activo),
     }
 
@@ -136,6 +139,7 @@ async def crear_usuario(
                 rol_id=body.get_rol_id(),
                 sede_id=body.get_sede_id(),
                 zona_asignada=body.get_zona(),
+                profesion=body.profesion,
             )
         )
         return _formato(usuario)
@@ -144,6 +148,23 @@ async def crear_usuario(
 
 
 # ── GET /sede/{sede_id} ───────────────────────────────────────────────────────
+
+@router.get("/roles/catalogo")
+async def listar_roles(current_user: dict = Depends(get_current_user)):
+    """Roles asignables al crear usuarios. Los roles de especialista
+    (PSICOLOGO/TRABAJADOR_SOCIAL/ABOGADO) quedan ocultos: la especialidad
+    del educador es su PROFESION, no un rol."""
+    from src.infrastructure.db.connection import get_pool
+    pool = get_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                """SELECT ID, NOMBRE, DESCRIPCION FROM SEC_ROL
+                    WHERE NOMBRE NOT IN ('PSICOLOGO', 'TRABAJADOR_SOCIAL', 'ABOGADO')
+                    ORDER BY ID"""
+            )
+            return [{"id": r[0], "nombre": r[1], "descripcion": r[2]} for r in await cur.fetchall()]
+
 
 @router.get("/sede/{sede_id}")
 async def list_usuarios_por_sede(
@@ -192,6 +213,7 @@ async def update_usuario(
         rol_id=body.get_rol_id(),
         sede_id=body.get_sede_id(),
         zona_asignada=body.get_zona(),
+        profesion=body.profesion,
         activo=body.activo,
         password_hash=nuevo_hash,
     )

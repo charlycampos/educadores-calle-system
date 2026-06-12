@@ -94,6 +94,9 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
             });
             if (isSedeSupervisor) {
                 items.push({ label: 'Bandeja Derivaciones', icon: Shield, path: '/coordinador/derivaciones' });
+                if (user.rol === ROLES.COORDINADOR) {
+                    items.push({ label: 'Monitoreo de Diarios', icon: Presentation, path: '/coordinador/diarios' });
+                }
             }
             if (user.rol === ROLES.EDUCADOR) {
                 items.push({ label: 'Talleres', icon: Presentation, path: '/talleres' });

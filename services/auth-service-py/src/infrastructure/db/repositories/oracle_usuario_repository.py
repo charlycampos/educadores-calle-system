@@ -24,6 +24,7 @@ _SELECT = """
         s.NOMBRE          AS sede_nombre,
         s.REGION_ID       AS region_id,
         u.ZONA_ASIGNADA   AS zona_asignada,
+        u.PROFESION       AS profesion,
         u.ACTIVO          AS activo
     FROM SEC_USUARIO u
     JOIN      SEC_ROL  r ON r.ID = u.ROL_ID
@@ -44,7 +45,8 @@ def _row_to_usuario(row) -> Usuario:
         sede_nombre=row[8],
         region_id=row[9],
         zona_asignada=row[10],
-        activo=row[11],
+        profesion=row[11],
+        activo=row[12],
     )
 
 
@@ -80,6 +82,7 @@ class OracleUsuarioRepository(IUsuarioRepository):
         rol_id: int,
         sede_id: int,
         zona_asignada: Optional[str] = None,
+        profesion: Optional[str] = None,
     ) -> Usuario:
         pool = get_pool()
         async with pool.acquire() as conn:
@@ -89,9 +92,9 @@ class OracleUsuarioRepository(IUsuarioRepository):
                 await cur.execute(
                     """
                     INSERT INTO SEC_USUARIO
-                        (NOMBRE_COMPLETO, EMAIL, PASSWORD_HASH, ROL_ID, SEDE_ID, ZONA_ASIGNADA)
+                        (NOMBRE_COMPLETO, EMAIL, PASSWORD_HASH, ROL_ID, SEDE_ID, ZONA_ASIGNADA, PROFESION)
                     VALUES
-                        (:nombre, :email, :hash, :rol_id, :sede_id, :zona)
+                        (:nombre, :email, :hash, :rol_id, :sede_id, :zona, :profesion)
                     RETURNING ID INTO :out_id
                     """,
                     {
@@ -101,6 +104,7 @@ class OracleUsuarioRepository(IUsuarioRepository):
                         "rol_id":  rol_id,
                         "sede_id": sede_id,
                         "zona":    zona_asignada,
+                        "profesion": profesion,
                         "out_id":  out_id,
                     },
                 )
@@ -146,6 +150,7 @@ class OracleUsuarioRepository(IUsuarioRepository):
         zona_asignada: Optional[str] = None,
         activo: Optional[bool] = None,
         password_hash: Optional[str] = None,
+        profesion: Optional[str] = None,
     ) -> Optional[Usuario]:
         """Actualiza solo los campos que se pasen (no None)."""
         updates = []
@@ -166,6 +171,9 @@ class OracleUsuarioRepository(IUsuarioRepository):
         if zona_asignada is not None:
             updates.append("ZONA_ASIGNADA = :zona")
             params["zona"] = zona_asignada
+        if profesion is not None:
+            updates.append("PROFESION = :profesion")
+            params["profesion"] = profesion
         if activo is not None:
             updates.append("ACTIVO = :activo")
             params["activo"] = 1 if activo else 0

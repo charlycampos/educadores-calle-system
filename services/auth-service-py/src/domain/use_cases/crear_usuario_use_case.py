@@ -14,6 +14,7 @@ class CrearUsuarioInput:
     rol_id: int
     sede_id: int
     zona_asignada: Optional[str] = None
+    profesion: Optional[str] = None
 
 
 class ConflictError(Exception):
@@ -38,5 +39,6 @@ class CrearUsuarioUseCase:
             rol_id=input.rol_id,
             sede_id=input.sede_id,
             zona_asignada=input.zona_asignada,
+            profesion=input.profesion,
         )
         return usuario

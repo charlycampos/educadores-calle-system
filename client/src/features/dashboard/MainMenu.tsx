@@ -198,7 +198,7 @@ export const MainMenu = () => {
             icono: <FileText className="w-[18px] h-[18px]" />,
             ruta: '/monitor/auditoria',
             disponible: true,
-            roles: [ROLES.ADMIN_NACIONAL, ROLES.MONITOR],
+            roles: [ROLES.ADMIN_NACIONAL, ROLES.MONITOR, ROLES.SUPERVISOR_EXPEDIENTES],
             theme: 'warning',
         },
     ];

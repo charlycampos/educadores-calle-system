@@ -248,7 +248,6 @@ export const CoordinadorDiariosPage = () => {
             {/* MAPA DE ABORDAJES (registros con GPS) */}
             {(() => {
                 const conGps = filteredDiarios.filter(d => d.latitud != null && d.longitud != null);
-                if (!conGps.length) return null;
                 return (
                     <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-3">
                         <div>
@@ -257,15 +256,23 @@ export const CoordinadorDiariosPage = () => {
                                 {conGps.length} de {filteredDiarios.length} registros tienen ubicación GPS capturada en campo.
                             </p>
                         </div>
-                        <MapaDiarios puntos={conGps.map(d => ({
-                            latitud: d.latitud!,
-                            longitud: d.longitud!,
-                            tipoActividad: d.tipoActividad,
-                            nnaNombre: d.nnaNombre,
-                            educadorNombre: d.educadorNombre,
-                            fecha: d.fecha,
-                            ubicacion: d.ubicacion,
-                        }))} />
+                        {conGps.length > 0 ? (
+                            <MapaDiarios puntos={conGps.map(d => ({
+                                latitud: d.latitud!,
+                                longitud: d.longitud!,
+                                tipoActividad: d.tipoActividad,
+                                nnaNombre: d.nnaNombre,
+                                educadorNombre: d.educadorNombre,
+                                fecha: d.fecha,
+                                ubicacion: d.ubicacion,
+                            }))} />
+                        ) : (
+                            <div className="h-[200px] flex flex-col items-center justify-center bg-gray-50 border border-dashed border-gray-200 rounded-xl">
+                                <MapPin size={24} className="text-gray-400 mb-1" />
+                                <span className="text-xs font-bold text-gray-500">Ningún registro filtrado cuenta con coordenadas GPS</span>
+                                <span className="text-[10px] text-gray-400 mt-0.5">Las ubicaciones se capturan automáticamente al registrar una nueva entrada.</span>
+                            </div>
+                        )}
                     </div>
                 );
             })()}

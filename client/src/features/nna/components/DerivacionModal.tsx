@@ -264,9 +264,13 @@ export const DerivacionModal = ({ isOpen, onClose, casoId, nnaName }: Derivacion
                             <label className="der-label">Destinatario (Equipo)</label>
                             <select {...register('destinatarioId', { required: true })} className="der-input">
                                 <option value="">Seleccione un compañero...</option>
-                                {users.map(u => (
-                                    <option key={u.id} value={u.id}>{u.nombreCompleto} — {u.rol?.nombre ?? u.rol}</option>
-                                ))}
+                                {users
+                                    .filter((u: any) => ['EDUCADOR', 'PSICOLOGO', 'TRABAJADOR_SOCIAL', 'ABOGADO'].includes(u.rol?.nombre ?? u.rol))
+                                    .map((u: any) => (
+                                        <option key={u.id} value={u.id}>
+                                            {u.nombreCompleto} — {u.profesion || (u.rol?.nombre ?? u.rol)?.replace(/_/g, ' ')}
+                                        </option>
+                                    ))}
                             </select>
                             {errors.destinatarioId && <span className="der-error">Campo requerido</span>}
                         </div>
