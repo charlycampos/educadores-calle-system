@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { MapaDiarios } from './components/MapaDiarios';
 import { urlMapa } from '../../utils/geo';
 import { useAuthStore } from '../../store/auth.store';
 import { Link } from 'react-router-dom';
@@ -243,6 +244,31 @@ export const CoordinadorDiariosPage = () => {
                     ))}
                 </div>
             </div>
+
+            {/* MAPA DE ABORDAJES (registros con GPS) */}
+            {(() => {
+                const conGps = filteredDiarios.filter(d => d.latitud != null && d.longitud != null);
+                if (!conGps.length) return null;
+                return (
+                    <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-3">
+                        <div>
+                            <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Mapa de Abordajes</h3>
+                            <p className="text-xs text-gray-400">
+                                {conGps.length} de {filteredDiarios.length} registros tienen ubicación GPS capturada en campo.
+                            </p>
+                        </div>
+                        <MapaDiarios puntos={conGps.map(d => ({
+                            latitud: d.latitud!,
+                            longitud: d.longitud!,
+                            tipoActividad: d.tipoActividad,
+                            nnaNombre: d.nnaNombre,
+                            educadorNombre: d.educadorNombre,
+                            fecha: d.fecha,
+                            ubicacion: d.ubicacion,
+                        }))} />
+                    </div>
+                );
+            })()}
 
             {/* FILTROS Y BANDEJA PRINCIPAL */}
             <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4">
