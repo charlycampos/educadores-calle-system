@@ -163,14 +163,14 @@ async def get_documento_file(
     """Obtener el stream del PDF de un documento subido utilizando autenticación vía header o query param."""
     import os
     from fastapi.responses import FileResponse
-    from src.infrastructure.http.middleware.jwt_middleware import verificar_token
+    from src.infrastructure.http.middleware.jwt_middleware import verificar_token_descarga
 
-    # Validar el token usando query param si get_current_user no lo pudo obtener por cabecera
+    # Token por query param: solo se acepta el token corto de descarga (scope=download)
     if not user:
         if not token:
             raise HTTPException(status_code=401, detail="No autorizado: Token faltante")
         try:
-            user = verificar_token(token)
+            user = verificar_token_descarga(token)
         except Exception:
             raise HTTPException(status_code=401, detail="No autorizado: Token inválido")
 

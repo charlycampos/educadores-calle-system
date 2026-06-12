@@ -1,4 +1,5 @@
 import { getToken } from '../../../utils/auth';
+import { confirmar } from '../../../components/ui/ConfirmDialog';
 import { NNA_API_URL, DERIVACION_API_URL, INTERVENCION_API_URL, AUTH_API_URL, EXPEDIENTE_API_URL } from '../../../config/api';
 import { useState, useEffect, useMemo } from 'react';
 import { Printer, Save, Plus, Edit2, Trash2, X, ArrowLeft, User, Users, GraduationCap, HeartPulse, Target, Clock, Timer, Briefcase, AlertCircle, School, CheckCircle2, XCircle } from 'lucide-react';
@@ -811,8 +812,8 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
         setShowFamilyModal(true);
     };
 
-    const handleDeleteFamily = (index: number) => {
-        if (confirm('¿Eliminar a este integrante de la familia?')) {
+    const handleDeleteFamily = async (index: number) => {
+        if (await confirmar('¿Eliminar a este integrante de la familia?', { titulo: 'Eliminar integrante', textoConfirmar: 'Eliminar', peligro: true })) {
             const newFam = [...formData.familiares];
             newFam.splice(index, 1);
             setFormData({ ...formData, familiares: newFam });
@@ -881,8 +882,8 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
         setShowNeedModal(true);
     };
 
-    const handleDeleteNeed = (index: number) => {
-        if (confirm('¿Eliminar esta necesidad?')) {
+    const handleDeleteNeed = async (index: number) => {
+        if (await confirmar('¿Eliminar esta necesidad?', { titulo: 'Eliminar necesidad', textoConfirmar: 'Eliminar', peligro: true })) {
             const newNeeds = [...formData.necesidades];
             newNeeds.splice(index, 1);
             setFormData({ ...formData, necesidades: newNeeds });

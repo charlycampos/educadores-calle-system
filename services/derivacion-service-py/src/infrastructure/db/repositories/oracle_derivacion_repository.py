@@ -89,8 +89,19 @@ class OracleDerivacionRepository:
         async with pool.acquire() as conn:
             async with conn.cursor() as cur:
                 await cur.execute(
-                    "SELECT * FROM DERIVACION WHERE SEDE_ID = :1 AND ESTADO = 'PENDIENTE'"
-                    " ORDER BY FECHA_DERIVACION DESC FETCH FIRST 500 ROWS ONLY", [sede_id])
+                    """SELECT d.*,
+           ur.NOMBRE_COMPLETO AS REMITENTE_NOMBRE,
+           ud.NOMBRE_COMPLETO AS DESTINATARIO_NOMBRE,
+           TRIM(n.NOMBRES || ' ' || n.APELLIDO_PATERNO || ' ' || NVL(n.APELLIDO_MATERNO, '')) AS NNA_NOMBRE,
+           n.ID AS NNA_ID, n.CARPETA_ID,
+           c.CODIGO_CASO
+      FROM DERIVACION d
+      LEFT JOIN SEC_USUARIO ur ON ur.ID = d.REMITENTE_ID
+      LEFT JOIN SEC_USUARIO ud ON ud.ID = d.DESTINATARIO_ID
+      LEFT JOIN NNA_CASO c ON c.ID = d.CASO_ID
+      LEFT JOIN NNA n ON n.ID = c.NNA_ID
+                     WHERE d.SEDE_ID = :1 AND d.ESTADO = 'PENDIENTE'
+                     ORDER BY d.FECHA_DERIVACION ASC FETCH FIRST 500 ROWS ONLY""", [sede_id])
                 columns = [col[0].lower() for col in cur.description]
                 return [self._row_to_dict(row, columns) for row in await cur.fetchall()]
 
@@ -99,8 +110,19 @@ class OracleDerivacionRepository:
         async with pool.acquire() as conn:
             async with conn.cursor() as cur:
                 await cur.execute(
-                    "SELECT * FROM DERIVACION WHERE DESTINATARIO_ID = :1 AND ESTADO = 'PENDIENTE'"
-                    " ORDER BY FECHA_DERIVACION DESC FETCH FIRST 500 ROWS ONLY", [usuario_id])
+                    """SELECT d.*,
+           ur.NOMBRE_COMPLETO AS REMITENTE_NOMBRE,
+           ud.NOMBRE_COMPLETO AS DESTINATARIO_NOMBRE,
+           TRIM(n.NOMBRES || ' ' || n.APELLIDO_PATERNO || ' ' || NVL(n.APELLIDO_MATERNO, '')) AS NNA_NOMBRE,
+           n.ID AS NNA_ID, n.CARPETA_ID,
+           c.CODIGO_CASO
+      FROM DERIVACION d
+      LEFT JOIN SEC_USUARIO ur ON ur.ID = d.REMITENTE_ID
+      LEFT JOIN SEC_USUARIO ud ON ud.ID = d.DESTINATARIO_ID
+      LEFT JOIN NNA_CASO c ON c.ID = d.CASO_ID
+      LEFT JOIN NNA n ON n.ID = c.NNA_ID
+                     WHERE d.DESTINATARIO_ID = :1 AND d.ESTADO = 'PENDIENTE'
+                     ORDER BY d.FECHA_DERIVACION ASC FETCH FIRST 500 ROWS ONLY""", [usuario_id])
                 columns = [col[0].lower() for col in cur.description]
                 return [self._row_to_dict(row, columns) for row in await cur.fetchall()]
 

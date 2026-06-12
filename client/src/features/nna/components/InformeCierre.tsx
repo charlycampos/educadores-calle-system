@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { toast } from '../../../components/ui/Toast';
 import {
     CheckCircle2, FileText,
     ShieldCheck, Home, Flag, GraduationCap, X
@@ -49,7 +50,7 @@ export const InformeCierre = ({ casoId, onClose }: InformeCierreProps) => {
 
     const handleSave = async () => {
         if (!motivoEgreso) {
-            alert("Debe seleccionar un motivo de egreso");
+            toast.error("Debe seleccionar un motivo de egreso");
             return;
         }
 
@@ -69,7 +70,7 @@ export const InformeCierre = ({ casoId, onClose }: InformeCierreProps) => {
             // setTimeout(() => onClose && onClose(), 2000);
         } catch (error) {
             console.error(error);
-            alert("Error al cerrar el caso");
+            toast.error("Error al cerrar el caso");
         } finally {
             setIsLoading(false);
         }

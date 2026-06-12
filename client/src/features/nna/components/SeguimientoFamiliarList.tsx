@@ -1,4 +1,5 @@
 import { getToken } from '../../../utils/auth';
+import { toast } from '../../../components/ui/Toast';
 import React, { useState, useEffect } from 'react';
 import { Plus, Calendar, Users, MapPin, X, Home, ClipboardCheck, Pencil, FolderInput, CheckCheck } from 'lucide-react';
 import { useNnaStore } from '../../../store/nna.store';
@@ -188,7 +189,9 @@ export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any })
         setIsRegistering(true);
         try {
             // 1. Trigger PDF generation on the server (waits until the file is ready)
-            const pdfRes = await fetch(`${INTERVENCION_API_URL}/seguimiento/${ficha.id}/pdf?token=${token}`);
+            const pdfRes = await fetch(`${INTERVENCION_API_URL}/seguimiento/${ficha.id}/pdf`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
             if (!pdfRes.ok) throw new Error('Error al generar el PDF en el servidor');
 
             const pdfUrl = `${INTERVENCION_API_URL}/seguimiento/${ficha.id}/pdf`;
@@ -214,14 +217,14 @@ export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any })
                 code: `SEG-F12-${ficha.id}`,
                 pages: 1,
                 nombreResponsable: 'Educador Registrado',
-                pdfUrl: `${pdfUrl}?token=${token}`,
+                pdfUrl,
                 status: 'APROBADO',
             });
 
             setRegisteredIds(prev => new Set(prev).add(ficha.id));
         } catch (e) {
             console.error(e);
-            alert('Error al registrar en el expediente digital');
+            toast.error('Error al registrar en el expediente digital');
         } finally {
             setIsRegistering(false);
         }

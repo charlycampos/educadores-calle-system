@@ -31,7 +31,9 @@ def get_current_user(
     token_param = request.query_params.get("token")
     if token_param:
         try:
-            return _verificar_token(token_param)
+            payload = _verificar_token(token_param)
+            if payload.get("scope") == "download":
+                return payload
         except Exception:
             pass
     return None
@@ -59,6 +61,9 @@ class JWTMiddleware(BaseHTTPMiddleware):
 
             try:
                 payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+                # Token por query param: solo se acepta el token corto de descarga
+                if not (auth_header and auth_header.startswith("Bearer ")) and payload.get("scope") != "download":
+                    return JSONResponse(status_code=401, content={"detail": "Se requiere token de descarga"})
                 request.state.user_id = payload.get("userId")
                 request.state.email = payload.get("email")
                 request.state.rol = payload.get("rol")

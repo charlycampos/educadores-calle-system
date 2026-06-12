@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { toast } from '../../../components/ui/Toast';
 import { CheckCircle2, AlertTriangle, Printer, ChevronDown, ChevronUp, User, FileText, Plus, Edit, Eye, Download } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
@@ -346,11 +347,11 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
             });
 
             setInforme(data);
-            alert('Borrador de Ficha de Egreso guardado correctamente.');
+            toast.success('Borrador de Ficha de Egreso guardado correctamente.');
             setShowForm(false);
         } catch (e) {
             console.error(e);
-            alert('Error al guardar borrador');
+            toast.error('Error al guardar borrador');
         } finally {
             setLoading(false);
         }
@@ -406,11 +407,11 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
             });
 
             setInforme(data);
-            alert('Ficha de Egreso finalizada y registrada correctamente.');
+            toast.success('Ficha de Egreso finalizada y registrada correctamente.');
             window.location.reload();
         } catch (e) {
             console.error(e);
-            alert('Error al finalizar el egreso');
+            toast.error('Error al finalizar el egreso');
         } finally {
             setLoading(false);
             setIsGenerating(false);
@@ -434,7 +435,7 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
             pdf.save(`F13_Ficha_Egreso_${nna.nombres}_${nna.apellidoPaterno}.pdf`);
         } catch (e) {
             console.error(e);
-            alert('Error al generar PDF');
+            toast.error('Error al generar PDF');
         } finally {
             setIsGenerating(false);
             setCurrentPrintFicha(null);

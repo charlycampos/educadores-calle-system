@@ -1,4 +1,5 @@
 import { NNA_API_URL, DERIVACION_API_URL, INTERVENCION_API_URL, AUTH_API_URL, EXPEDIENTE_API_URL } from '../../../config/api';
+import { toast } from '../../../components/ui/Toast';
 import { useRef, useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { X, Send, Loader2, Building2, UserCircle, CheckCircle2, FileDown } from 'lucide-react';
@@ -118,7 +119,7 @@ export const DerivacionModal = ({ isOpen, onClose, casoId, nnaName }: Derivacion
         const element = document.getElementById(elementId);
 
         if (!element) {
-            alert('Error: No se encontró el formato para imprimir');
+            toast.error('Error: No se encontró el formato para imprimir');
             return;
         }
 
@@ -174,7 +175,7 @@ export const DerivacionModal = ({ isOpen, onClose, casoId, nnaName }: Derivacion
             pdf.save(`${filename}.pdf`);
         } catch (error) {
             console.error('Error generating PDF:', error);
-            alert('Error al generar el PDF.');
+            toast.error('Error al generar el PDF.');
         } finally {
             setIsGeneratingPDF(false);
         }

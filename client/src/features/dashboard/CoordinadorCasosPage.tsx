@@ -1,4 +1,7 @@
 import { useState, useEffect } from 'react';
+import { toast } from '../../components/ui/Toast';
+import { confirmar } from '../../components/ui/ConfirmDialog';
+import { ampliarVigencia } from '../../api/pti.api';
 import { useAuthStore } from '../../store/auth.store';
 import { 
     Users, Clock, Check, X, ArrowLeft, RefreshCw, AlertTriangle, 
@@ -15,124 +18,65 @@ export const CoordinadorCasosPage = () => {
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
 
-    // --- ESTADO 1: ASIGNACIONES Y RATIOS ---
-    const [casosNna, setCasosNna] = useState([
-        { id: 101, nombre: 'Gómez Ruiz Sofía', edad: 11, perfil: 'Vida en Calle', educadorId: 1, educadorNombre: 'Juan Educador García', carpeta: 'CAR-26-0112' },
-        { id: 102, nombre: 'Méndez Castro Luis', edad: 14, perfil: 'Trabajo Infantil', educadorId: 2, educadorNombre: 'Rosa Educadora Sede 1', carpeta: 'CAR-26-0089' },
-        { id: 103, nombre: 'Quispe Choque Carmen', edad: 8, perfil: 'Mendicidad', educadorId: 1, educadorNombre: 'Juan Educador García', carpeta: 'CAR-26-0105' },
-        { id: 104, nombre: 'Álvarez Ríos Juan', edad: 12, perfil: 'Trabajo Infantil', educadorId: 3, educadorNombre: 'Carlos Educador Sede 1', carpeta: 'CAR-26-0043' },
-        { id: 105, nombre: 'Mendoza Ticona Raúl', edad: 16, perfil: 'Vida en Calle', educadorId: 2, educadorNombre: 'Rosa Educadora Sede 1', carpeta: 'CAR-26-0145' }
-    ]);
+    // --- ESTADO 1: ASIGNACIONES Y RATIOS (datos reales del endpoint de supervisión) ---
+    const [casosNna, setCasosNna] = useState<any[]>([]);
+    const [educadoresDisponibles, setEducadoresDisponibles] = useState<any[]>([]);
 
-    const [educadoresDisponibles, setEducadoresDisponibles] = useState([
-        { id: 1, nombre: 'Juan Educador García', carga: 24, max: 30, perfilExclusivo: 'Vida en Calle/Mendicidad' },
-        { id: 2, nombre: 'Rosa Educadora Sede 1', carga: 29, max: 30, perfilExclusivo: 'Vida en Calle/Mendicidad' },
-        { id: 3, nombre: 'Carlos Educador Sede 1', carga: 42, max: 60, perfilExclusivo: 'Trabajo Infantil' },
-        { id: 4, nombre: 'Elena Educadora Campo', carga: 12, max: 30, perfilExclusivo: 'Vida en Calle/Mendicidad' }
-    ]);
-
-    // --- ESTADO 2: SEMÁFORO METODOLÓGICO Y CANDADOS ---
-    const [casosSemaforo, setCasosSemaforo] = useState([
-        { 
-            id: 101, 
-            nombre: 'Gómez Ruiz Sofía', 
-            fase: 'Fase 1: Contacto', 
-            diasTranscurridos: 82, 
-            diasLimite: 90, 
-            faltaF04: true, 
-            faltaPti: false, 
-            estadoPlazo: 'ADVERTENCIA',
-            ampliado: false 
-        },
-        { 
-            id: 102, 
-            nombre: 'Méndez Castro Luis', 
-            fase: 'Fase 1: Contacto', 
-            diasTranscurridos: 94, 
-            diasLimite: 90, 
-            faltaF04: true, 
-            faltaPti: true, 
-            estadoPlazo: 'CRÍTICO',
-            ampliado: false 
-        },
-        { 
-            id: 105, 
-            nombre: 'Mendoza Ticona Raúl', 
-            fase: 'Fase 2: Intervención', 
-            diasTranscurridos: 410, 
-            diasLimite: 450, 
-            faltaF04: false, 
-            faltaPti: false, 
-            estadoPlazo: 'ÓPTIMO',
-            ampliado: false 
-        }
-    ]);
+    // --- ESTADO 2: SEMÁFORO METODOLÓGICO (datos reales) ---
+    const [casosSemaforo, setCasosSemaforo] = useState<any[]>([]);
+    const [loadingData, setLoadingData] = useState(true);
 
     useEffect(() => {
         loadData();
     }, []);
 
     const loadData = async () => {
+        setLoadingData(true);
         try {
-            // 1. Cargar casos reales
-            const resCasos = await fetch(`${NNA_API_URL}/casos`, {
+            const res = await fetch(`${NNA_API_URL}/casos/supervision/sede`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            if (resCasos.ok) {
-                const dataCasos = await resCasos.json();
-                if (dataCasos && dataCasos.length > 0) {
-                    const mappedCasos = dataCasos.map((c: any) => ({
-                        id: c.id,
-                        nombre: c.nna_nombre || `NNA ID: ${c.nna_id}`,
-                        edad: 12,
-                        perfil: c.perfil === 'VIDA_EN_CALLE' ? 'Vida en Calle' : c.perfil === 'MENDICIDAD' ? 'Mendicidad' : 'Trabajo Infantil',
-                        educadorId: c.responsable_id || 1,
-                        educadorNombre: c.responsable_nombre || 'Sin educador asignado',
-                        carpeta: c.codigo_caso || `CAS-26-${c.id.toString().padStart(4, '0')}`
-                    }));
-                    setCasosNna(mappedCasos);
-                    
-                    const mappedSemaforo = dataCasos.map((c: any) => {
-                        const dias = 45; 
-                        let estadoPlazo = 'ÓPTIMO';
-                        let diasLimite = 90;
-                        if (c.estado === 'CRITICO' || c.estado === 'ALTO') {
-                            estadoPlazo = 'CRÍTICO';
-                        }
-                        return {
-                            id: c.id,
-                            nombre: c.nna_nombre || `NNA ID: ${c.nna_id}`,
-                            fase: c.perfil === 'VIDA_EN_CALLE' ? 'Fase 1: Contacto' : 'Fase 2: Intervención',
-                            diasTranscurridos: dias,
-                            diasLimite: diasLimite,
-                            faltaF04: !c.zona_intervencion,
-                            faltaPti: false,
-                            estadoPlazo: estadoPlazo,
-                            ampliado: false
-                        };
-                    });
-                    setCasosSemaforo(mappedSemaforo);
-                }
-            }
+            if (!res.ok) throw new Error('Error consultando supervisión de sede');
+            const data = await res.json();
 
-            // 2. Cargar educadores reales
-            const listUsers = await getUsers();
-            if (listUsers && listUsers.length > 0) {
-                const edus = listUsers
-                    .filter((u: any) => u.rol === 'EDUCADOR')
-                    .map((u: any) => ({
-                        id: u.id,
-                        nombre: u.nombreCompleto || u.nombre_completo || u.email,
-                        carga: 15, 
-                        max: 30,
-                        perfilExclusivo: 'Vida en Calle/Mendicidad'
-                    }));
-                if (edus.length > 0) {
-                    setEducadoresDisponibles(edus);
-                }
-            }
+            const PERFIL_LABEL: Record<string, string> = {
+                VIDA_EN_CALLE: 'Vida en Calle', MENDICIDAD: 'Mendicidad', TRABAJO_INFANTIL: 'Trabajo Infantil',
+            };
+
+            setCasosNna((data.casos || []).map((c: any) => ({
+                id: c.id,
+                nombre: c.nna_nombre || `NNA ID: ${c.nna_id}`,
+                edad: c.edad ?? '—',
+                perfil: PERFIL_LABEL[c.perfil] || c.perfil || '—',
+                educadorId: c.responsable_id,
+                educadorNombre: c.responsable_nombre || 'Sin educador asignado',
+                carpeta: c.codigo_caso || `CAS-${c.id}`,
+                nnaId: c.nna_id,
+                carpetaId: c.carpeta_id,
+            })));
+
+            setCasosSemaforo((data.casos || []).map((c: any) => ({
+                id: c.id,
+                nombre: c.nna_nombre || `NNA ID: ${c.nna_id}`,
+                fase: c.fase,
+                diasTranscurridos: c.dias_transcurridos,
+                diasLimite: c.dias_limite,
+                faltaF04: !c.tiene_f04,
+                faltaPti: !c.tiene_pti,
+                estadoPlazo: c.estado_plazo,
+                ptiId: c.pti_id,
+                ampliado: false,
+            })));
+
+            setEducadoresDisponibles((data.educadores || []).map((e: any) => ({
+                id: e.id, nombre: e.nombre, carga: e.carga, max: e.max || 30,
+                perfilExclusivo: '',
+            })));
         } catch (e) {
             console.error('Error loadData in CoordinadorCasosPage:', e);
+            toast.error('No se pudieron cargar los datos de supervisión de la sede.');
+        } finally {
+            setLoadingData(false);
         }
     };
 
@@ -142,7 +86,7 @@ export const CoordinadorCasosPage = () => {
 
         // Validar candado de ratio de carga de trabajo
         if (educador.carga >= educador.max) {
-            alert(`⚠️ ALERTA DE RATIO: ${educador.nombre} ha alcanzado su límite máximo de carga laboral (${educador.carga}/${educador.max} NNA). No se puede asignar más casos según el protocolo del INABIF.`);
+            toast.error(`⚠️ ALERTA DE RATIO: ${educador.nombre} ha alcanzado su límite máximo de carga laboral (${educador.carga}/${educador.max} NNA). No se puede asignar más casos según el protocolo del INABIF.`);
             return;
         }
 
@@ -162,68 +106,42 @@ export const CoordinadorCasosPage = () => {
                 setCasosNna(prev => 
                     prev.map(c => c.id === nnaId ? { ...c, educadorId: nuevoEducadorId, educadorNombre: educador.nombre } : c)
                 );
-                alert(`Caso reasignado exitosamente a: ${educador.nombre}. Se notificará al educador vía alerta en su tablero.`);
+                toast.success(`Caso reasignado exitosamente a: ${educador.nombre}. Se notificará al educador vía alerta en su tablero.`);
             } else {
-                alert('Error al reasignar caso en la base de datos.');
+                toast.error('Error al reasignar caso en la base de datos.');
             }
         } catch (e) {
             console.error(e);
-            alert('Error al conectar con el servidor.');
+            toast.error('Error al conectar con el servidor.');
         }
     };
 
     // --- ESTADO 2: SEMÁFORO METODOLÓGICO Y CANDADOS ---
     // (Mapeado dinámico ya inicializado en loadData)
 
-    const handleAutorizarAmpliacion = (id: number) => {
-        const resolucion = prompt('Ingrese el número de la Resolución Jefatural / Informe Técnico Sustentado de Ampliación de Sede:');
-        if (resolucion === null) return;
-        if (!resolucion.trim()) {
-            alert('Debe ingresar un sustento válido para la ampliación.');
+    const handleAutorizarAmpliacion = async (id: number) => {
+        const caso = casosSemaforo.find(c => c.id === id);
+        if (!caso) return;
+        if (!caso.ptiId) {
+            toast.info('Este caso no tiene un Plan de Intervención activo. La ampliación de plazo se autoriza desde el PII (Informe de Ampliación).');
             return;
         }
-
-        setCasosSemaforo(prev =>
-            prev.map(c => c.id === id ? { 
-                ...c, 
-                diasLimite: c.diasLimite + 30, 
-                estadoPlazo: 'ÓPTIMO', 
-                ampliado: true 
-            } : c)
-        );
-        alert(`Ampliación de 30 días autorizada bajo el sustento: ${resolucion}. El caso ha sido desbloqueado en el sistema.`);
+        if (!(await confirmar(
+            `Se ampliará en 30 días la vigencia del plan de ${caso.nombre}. Registra el sustento en el Informe de Ampliación del PII.`,
+            { titulo: 'Autorizar ampliación de plazo', textoConfirmar: 'Autorizar +30 días' }
+        ))) return;
+        try {
+            await ampliarVigencia(caso.ptiId, 30);
+            toast.success('Ampliación de 30 días autorizada. El plazo del caso fue actualizado.');
+            await loadData();
+        } catch {
+            toast.error('No se pudo registrar la ampliación.');
+        }
     };
 
     // --- ESTADO 3: CONTROL TERRITORIAL F01 ---
-    const [zonasPropuestas, setZonasPropuestas] = useState([
-        {
-            id: 1,
-            zona: 'Plaza San Martín y Jr. Carabaya',
-            educador: 'Juan Educador García',
-            horario: '18:00 - 22:00 (Ruta Nocturna)',
-            aliadas: 'DEMUNA Cercado, Comisaría de Alfonso Ugarte',
-            concentracionEstimada: 18,
-            fechaPropuesta: '2026-05-19',
-            estado: 'PENDIENTE'
-        },
-        {
-            id: 2,
-            zona: 'Mercado Central - Puerta 4',
-            educador: 'Rosa Educadora Sede 1',
-            horario: '10:00 - 14:00 (Ruta Diurna)',
-            aliadas: 'Asociación de Comerciantes, Parroquia de la zona',
-            concentracionEstimada: 8,
-            fechaPropuesta: '2026-05-22',
-            estado: 'PENDIENTE'
-        }
-    ]);
-
-    const handleResponderZona = (id: number, decision: 'APROBADO' | 'RECHAZADO') => {
-        setZonasPropuestas(prev =>
-            prev.map(z => z.id === id ? { ...z, estado: decision } : z)
-        );
-        alert(`Zona de intervención ${decision === 'APROBADO' ? 'aprobada' : 'rechazada'} formalmente. Se ha actualizado la Ficha F01 de la sede.`);
-    };
+    // Módulo no operativo: el mapeo de zonas F01 aún no está implementado en el sistema.
+    // No mostrar datos simulados para evitar decisiones sobre información falsa.
 
     const handleRefresh = async () => {
         setIsRefreshing(true);
@@ -270,7 +188,7 @@ export const CoordinadorCasosPage = () => {
                             onClick={() => setActiveTab('territorial')}
                             className={`px-3 py-1.5 rounded-md text-[11px] font-bold uppercase transition-all duration-150 ${activeTab === 'territorial' ? 'bg-white text-blue-600 shadow-sm' : 'text-blue-100 hover:text-white'}`}
                         >
-                            Zonas F01 ({zonasPropuestas.filter(z => z.estado === 'PENDIENTE').length})
+                            Zonas F01
                         </button>
                     </div>
                 </div>
@@ -438,62 +356,17 @@ export const CoordinadorCasosPage = () => {
                 </div>
             )}
 
-            {/* CONTENIDO PESTAÑA 3: APROBACIÓN TERRITORIAL (F01 CONTEO Y ZONAS) */}
+            {/* CONTENIDO PESTAÑA 3: APROBACIÓN TERRITORIAL (F01) — módulo pendiente de implementación */}
             {activeTab === 'territorial' && (
-                <div className="bg-surface rounded-xl border border-border p-5 space-y-4 shadow-sm animate-fadeIn">
-                    <div>
-                        <h3 className="text-sm font-black text-fg uppercase tracking-widest">
-                            Aprobación de Zonas de Intervención (F01 Conteo)
-                        </h3>
-                        <p className="text-xs text-fg-secondary">
-                            Valide y autorice formalmente los cuadrantes de abordaje callejero propuestos por su equipo de educadores
+                <div className="bg-surface rounded-xl border border-border p-5 shadow-sm animate-fadeIn">
+                    <div className="text-center py-12 bg-surface-muted/30 rounded-xl border border-dashed border-border max-w-xl mx-auto">
+                        <MapPin className="mx-auto mb-3 text-fg-muted" size={28} />
+                        <p className="font-bold text-[13px] text-fg">Módulo en construcción</p>
+                        <p className="text-xs text-fg-muted mt-2 max-w-sm mx-auto leading-relaxed">
+                            La aprobación de Zonas de Intervención (F01 Conteo) estará disponible cuando
+                            el registro de zonas esté mapeado en el sistema. Mientras tanto, las zonas se
+                            gestionan según el procedimiento manual vigente.
                         </p>
-                    </div>
-
-                    <div className="space-y-3">
-                        {zonasPropuestas.map(z => (
-                            <div 
-                                key={z.id}
-                                className="p-4 rounded-xl border border-border bg-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-all hover:shadow-sm"
-                            >
-                                <div className="space-y-1.5 flex-1 min-w-0">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <span className="text-[13px] font-bold text-fg">{z.zona}</span>
-                                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${
-                                            z.estado === 'PENDIENTE' ? 'bg-warning-soft text-warning' : z.estado === 'APROBADO' ? 'bg-success-soft text-success' : 'bg-danger-soft text-danger'
-                                        }`}>
-                                            {z.estado}
-                                        </span>
-                                    </div>
-                                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-fg-muted font-medium">
-                                        <span className="flex items-center gap-1"><MapPin size={12} className="text-primary" /> Horario: {z.horario}</span>
-                                        <span>Proponente: <strong className="text-fg-secondary">{z.educador}</strong></span>
-                                        <span>Fecha: {z.fechaPropuesta}</span>
-                                    </div>
-                                    <div className="flex flex-wrap gap-x-4 text-[11px] text-fg-muted font-normal leading-relaxed mt-1">
-                                        <span><strong>Redes Aliadas Locales:</strong> {z.aliadas}</span>
-                                        <span>• <strong>NNA Estimados en Conteo:</strong> <strong className="text-fg-secondary">{z.concentracionEstimada}</strong></span>
-                                    </div>
-                                </div>
-
-                                {z.estado === 'PENDIENTE' && (
-                                    <div className="flex items-center gap-2 shrink-0 self-end md:self-center w-full md:w-auto">
-                                        <button
-                                            onClick={() => handleResponderZona(z.id, 'APROBADO')}
-                                            className="flex-1 md:flex-initial px-3.5 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-[10px] font-black uppercase transition-all shadow-sm flex items-center justify-center gap-1"
-                                        >
-                                            <Check size={12} /> Aprobar
-                                        </button>
-                                        <button
-                                            onClick={() => handleResponderZona(z.id, 'RECHAZADO')}
-                                            className="flex-1 md:flex-initial px-3.5 py-1.5 bg-white hover:bg-red-50 text-red-600 border border-red-200 rounded-lg text-[10px] font-black uppercase transition-all shadow-sm flex items-center justify-center gap-1"
-                                        >
-                                            <X size={12} /> Rechazar
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                        ))}
                     </div>
                 </div>
             )}

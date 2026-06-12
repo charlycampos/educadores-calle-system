@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { toast } from '../../components/ui/Toast';
 import { useAuthStore } from '../../store/auth.store';
 import { Search, MapPin, ArrowRight, RefreshCw, Check, X, Clock, ArrowLeftRight, ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -13,41 +14,7 @@ export const MonitorTrasladosPage = () => {
     const [selectedDestino, setSelectedDestino] = useState('TODAS');
 
     // Datos reactivos de traslados nacionales para pruebas locales e interactividad en frontend
-    const [trasladosNacionales, setTrasladosNacionales] = useState([
-        {
-            id: 1,
-            nnaNombre: 'Álvarez Ríos Juan',
-            edad: 12,
-            origen: 'Lima Metropolitana (LIM-01)',
-            destino: 'Trujillo (LAL-01)',
-            solicitante: 'María Pérez (Coordinadora)',
-            motivo: 'Traslado familiar debido al cambio de empleo del tutor y reubicación en la zona norte de Trujillo.',
-            fecha: '2026-05-20',
-            estado: 'PENDIENTE'
-        },
-        {
-            id: 2,
-            nnaNombre: 'Salvatierra Paredes Rosa',
-            edad: 15,
-            origen: 'Arequipa (AQP-01)',
-            destino: 'Cusco (CUS-01)',
-            solicitante: 'Julio Salas (Coordinador)',
-            motivo: 'Traslado por ingreso formal a Centro de Acogida Residencial (CAR) de destino en Cusco.',
-            fecha: '2026-05-22',
-            estado: 'PENDIENTE'
-        },
-        {
-            id: 3,
-            nnaNombre: 'Huamán Castro Kevin',
-            edad: 10,
-            origen: 'Huancayo (JUN-01)',
-            destino: 'Lima Metropolitana (LIM-01)',
-            solicitante: 'Rosario Flores (Coordinadora)',
-            motivo: 'Traslado por reunificación familiar tras retorno voluntario de la madre a la capital.',
-            fecha: '2026-05-18',
-            estado: 'PENDIENTE'
-        }
-    ]);
+    const [trasladosNacionales, setTrasladosNacionales] = useState<any[]>([]);
 
     useEffect(() => {
         loadTraslados();
@@ -62,8 +29,8 @@ export const MonitorTrasladosPage = () => {
             });
             if (res.ok) {
                 const data = await res.json();
-                if (data && data.length > 0) {
-                    const mapped = data.map((t: any) => ({
+                {
+                    const mapped = (data || []).map((t: any) => ({
                         id: t.id,
                         nnaNombre: t.nnaNombre || `Caso ID: ${t.caso_id}`,
                         edad: t.edad || 12,
@@ -103,13 +70,13 @@ export const MonitorTrasladosPage = () => {
                 setTrasladosNacionales(prev =>
                     prev.map(t => t.id === id ? { ...t, estado: 'APROBADO' } : t)
                 );
-                alert('Traslado externo nacional aprobado con éxito. Se ha emitido automáticamente el Oficio de Aprobación de la Dirección de la DGNNA.');
+                toast.success('Traslado externo nacional aprobado con éxito. Se ha emitido automáticamente el Oficio de Aprobación de la Dirección de la DGNNA.');
             } else {
-                alert('Error al responder el traslado en el servidor.');
+                toast.error('Error al responder el traslado en el servidor.');
             }
         } catch (e) {
             console.error(e);
-            alert('Error al conectar con la base de datos.');
+            toast.error('Error al conectar con la base de datos.');
         }
     };
 
@@ -117,7 +84,7 @@ export const MonitorTrasladosPage = () => {
         const obs = prompt('Ingrese detalladamente el motivo técnico del rechazo de la solicitud:');
         if (obs === null) return; // cancelado
         if (!obs.trim()) {
-            alert('Debe ingresar un motivo para el rechazo.');
+            toast.info('Debe ingresar un motivo para el rechazo.');
             return;
         }
         try {
@@ -136,13 +103,13 @@ export const MonitorTrasladosPage = () => {
                 setTrasladosNacionales(prev =>
                     prev.map(t => t.id === id ? { ...t, estado: 'RECHAZADO' } : t)
                 );
-                alert('Traslado rechazado con éxito.');
+                toast.success('Traslado rechazado con éxito.');
             } else {
-                alert('Error al responder el traslado en el servidor.');
+                toast.error('Error al responder el traslado en el servidor.');
             }
         } catch (e) {
             console.error(e);
-            alert('Error al conectar con la base de datos.');
+            toast.error('Error al conectar con la base de datos.');
         }
     };
 

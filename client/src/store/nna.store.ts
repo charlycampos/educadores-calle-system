@@ -407,7 +407,8 @@ export const useNnaStore = create<NnaState>((set, get) => ({
                     let diagPages = 1;
                     try {
                         const pagesResp = await fetch(
-                            `${INTERVENCION_API_URL}/diagnostico/${diag.id}/pdf/pages?token=${token}`
+                            `${INTERVENCION_API_URL}/diagnostico/${diag.id}/pdf/pages`,
+                            { headers: { Authorization: `Bearer ${token}` } }
                         );
                         if (pagesResp.ok) {
                             const pagesData = await pagesResp.json();
@@ -423,7 +424,7 @@ export const useNnaStore = create<NnaState>((set, get) => ({
                         date: diag.created_at || new Date().toISOString(),
                         pages: diagPages,
                         nombreResponsable: nnaData.casos?.[0]?.responsableNombre || 'Trabajadora Social',
-                        pdfUrl: `${INTERVENCION_API_URL}/diagnostico/${diag.id}/pdf?token=${token}`,
+                        pdfUrl: `${INTERVENCION_API_URL}/diagnostico/${diag.id}/pdf`,
                         status: 'APROBADO',
                     });
                 }
@@ -498,7 +499,7 @@ export const useNnaStore = create<NnaState>((set, get) => ({
                             pages,
                             nombreResponsable: f.nombreResponsable || 'Usuario Autenticado',
                             ...(usePdfUrl
-                                ? { pdfUrl: `${resolvedArchivoUrl}?token=${token}` }
+                                ? { pdfUrl: resolvedArchivoUrl }
                                 : { filename: resolvedArchivoUrl.split('/').pop() }
                             ),
                             status: 'APROBADO'

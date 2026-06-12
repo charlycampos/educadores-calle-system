@@ -23,6 +23,14 @@ def generar_token(payload: dict[str, Any]) -> str:
 
 
 
+def verificar_token_descarga(token: str) -> dict[str, Any]:
+    """Valida un token recibido por query param: debe ser de descarga (scope=download)."""
+    payload = verificar_token(token)
+    if payload.get("scope") != "download":
+        raise HTTPException(status_code=401, detail="Se requiere token de descarga")
+    return payload
+
+
 def verificar_token(token: str) -> dict[str, Any]:
     try:
         return jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])

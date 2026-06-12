@@ -31,6 +31,17 @@ def verificar_token(token: str) -> dict[str, Any]:
         )
 
 
+def verificar_token_descarga(token: str) -> dict[str, Any]:
+    """Valida un token recibido por query param: debe ser de descarga (scope=download)."""
+    payload = verificar_token(token)
+    if payload.get("scope") != "download":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Se requiere token de descarga",
+        )
+    return payload
+
+
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
 ) -> dict[str, Any]:

@@ -1,4 +1,6 @@
 import { getToken } from '../../utils/auth';
+import { CronologiaNna } from './components/CronologiaNna';
+import { toast } from '../../components/ui/Toast';
 import { NNA_API_URL, DERIVACION_API_URL, INTERVENCION_API_URL, AUTH_API_URL, EXPEDIENTE_API_URL } from '../../config/api';
 import { useState, useEffect } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
@@ -31,7 +33,7 @@ import {
     BookOpen,
     Users,
     Files
-} from 'lucide-react';
+, History } from 'lucide-react';
 import { NnaFichaPage } from './NnaFichaPage';
 import { Formato4Social } from './components/Formato4Social';
 import { DiagnosticoSocialList } from './components/DiagnosticoSocialList';
@@ -138,6 +140,16 @@ export const ExpedientePage = () => {
         switch (activeTab) {
             case 'dashboard':
                 return <ResumenCaso nna={mainNna} caso={activeCase} familia={selectedExpediente || [mainNna]} />;
+            case 'cronologia':
+                return activeCase ? (
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+                        <h2 className="text-lg font-black text-gray-800 mb-1">Cronología del NNA</h2>
+                        <p className="text-xs text-gray-500 mb-4">
+                            Toda la historia de intervención en una línea de tiempo: diarios, talleres, derivaciones, planes e informes.
+                        </p>
+                        <CronologiaNna nnaId={mainNna.id} casoId={activeCase.id} />
+                    </div>
+                ) : <p className="text-sm text-gray-400 p-6">No hay un caso activo para mostrar la cronología.</p>;
             case 'ficha':
                 return <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden"><NnaFichaPage embed={true} /></div>;
             case 'social':
@@ -414,6 +426,12 @@ export const ExpedientePage = () => {
                     Resumen
                 </button>
                 <button
+                    onClick={() => setActiveTab('cronologia')}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-colors ${activeTab === 'cronologia' ? 'bg-primary-soft text-primary border-primary/20' : 'bg-surface text-fg-muted border-border'}`}
+                >
+                    Cronología
+                </button>
+                <button
                     onClick={() => setActiveTab('social')}
                     className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-colors ${activeTab === 'social' ? 'bg-primary-soft text-primary border-primary/20' : 'bg-surface text-fg-muted border-border'}`}
                 >
@@ -468,6 +486,13 @@ export const ExpedientePage = () => {
                             onClick={() => setActiveTab('dashboard')}
                             icon={LayoutDashboard}
                             label="Resumen del Caso"
+                        />
+                        <NavButton
+                            active={activeTab === 'cronologia'}
+                            onClick={() => setActiveTab('cronologia')}
+                            icon={History}
+                            label="Cronología"
+                            subLabel="Línea de tiempo completa"
                         />
                     </div>
 
@@ -685,7 +710,7 @@ export const ExpedienteDigitalDocs = ({ nna, caso }: any) => {
         try {
             await uploadPhysicalDocument(nna.id, newDocData.file, newDocData.type);
         } catch (error: any) {
-            alert(`Error al subir documento: ${error.message}`);
+            toast.error(`Error al subir documento: ${error.message}`);
         }
         setIsUploadModalOpen(false);
     };
@@ -940,7 +965,7 @@ export const ExpedienteDigitalDocs = ({ nna, caso }: any) => {
                                         </button>
                                     ) : (
                                         <button
-                                            onClick={() => alert('La visualización directa en este momento solo está habilitada para las Fichas de Inscripción F03 en formato PDF y archivos PDF cargados.')}
+                                            onClick={() => toast.info('La visualización directa en este momento solo está habilitada para las Fichas de Inscripción F03 en formato PDF y archivos PDF cargados.')}
                                             className="text-fg-muted/40 p-1.5 rounded cursor-not-allowed"
                                             title="Vista previa no disponible"
                                         >

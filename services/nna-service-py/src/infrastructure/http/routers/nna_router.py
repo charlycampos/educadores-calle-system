@@ -903,22 +903,26 @@ def _caso_to_dict(caso) -> dict:
 async def get_nna_pdf(nna_id: int, request: Request, token: Optional[str] = None):
     from fastapi.responses import FileResponse
     from src.infrastructure.services.pdf_generator import generate_f03_pdf
-    from src.infrastructure.http.middleware.jwt_middleware import verificar_token
+    from src.infrastructure.http.middleware.jwt_middleware import verificar_token, verificar_token_descarga
     import os
 
     # Extraer token del header o query param
     actual_token = None
     auth_header = request.headers.get("authorization")
+    es_query_token = False
     if auth_header and auth_header.startswith("Bearer "):
         actual_token = auth_header.split(" ")[1]
     elif token:
         actual_token = token
+        es_query_token = True  # por query param solo se acepta token de descarga
 
     if not actual_token:
         raise HTTPException(status_code=401, detail="No autorizado: Token faltante")
 
     try:
-        user = verificar_token(actual_token)
+        user = verificar_token_descarga(actual_token) if es_query_token else verificar_token(actual_token)
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(status_code=401, detail="No autorizado: Token inválido")
 
@@ -968,22 +972,26 @@ async def get_nna_pdf(nna_id: int, request: Request, token: Optional[str] = None
 async def get_nna_pdf_pages_count(nna_id: int, request: Request, token: Optional[str] = None):
     """Genera la ficha F03 si no existe, cuenta las páginas exactas con pypdf, y las devuelve."""
     from src.infrastructure.services.pdf_generator import generate_f03_pdf
-    from src.infrastructure.http.middleware.jwt_middleware import verificar_token
+    from src.infrastructure.http.middleware.jwt_middleware import verificar_token, verificar_token_descarga
     from pypdf import PdfReader
     import os
 
     actual_token = None
     auth_header = request.headers.get("authorization")
+    es_query_token = False
     if auth_header and auth_header.startswith("Bearer "):
         actual_token = auth_header.split(" ")[1]
     elif token:
         actual_token = token
+        es_query_token = True  # por query param solo se acepta token de descarga
 
     if not actual_token:
         raise HTTPException(status_code=401, detail="No autorizado: Token faltante")
 
     try:
-        user = verificar_token(actual_token)
+        user = verificar_token_descarga(actual_token) if es_query_token else verificar_token(actual_token)
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(status_code=401, detail="No autorizado: Token inválido")
 

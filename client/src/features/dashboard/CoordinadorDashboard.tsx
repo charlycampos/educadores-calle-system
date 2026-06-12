@@ -1,8 +1,13 @@
 import { NNA_API_URL, DERIVACION_API_URL, INTERVENCION_API_URL, AUTH_API_URL, EXPEDIENTE_API_URL } from '../../config/api';
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '../../store/auth.store';
-import { LogOut, Users, Target, CheckCircle2, AlertTriangle, TrendingUp, Check, X, Clock, ArrowRightCircle } from 'lucide-react';
+import { 
+    LogOut, Users, Target, CheckCircle2, AlertTriangle, TrendingUp, 
+    Check, X, Clock, ArrowRightCircle, BookOpen, ClipboardList, Camera, PenTool 
+} from 'lucide-react';
 import { getDerivacionesPendientes, responderDerivacion } from '../../api/derivacion.api';
+import { clsx } from 'clsx';
+import { Link } from 'react-router-dom';
 
 const API_URL = AUTH_API_URL;
 
@@ -33,7 +38,7 @@ const ProgressBar = ({ label, value, max, color }: any) => {
         <div className="mb-4">
             <div className="flex justify-between text-sm mb-1">
                 <span className="font-medium text-gray-700">{label}</span>
-                <span className="text-gray-500">{value} casos ({percentage}%)</span>
+                <span className="text-gray-500">{value} ({percentage}%)</span>
             </div>
             <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
                 <div
@@ -50,7 +55,55 @@ export const CoordinadorDashboard = () => {
     const [stats, setStats] = useState<any>(null);
     const [loading, setLoading] = useState(true);
 
+    // Estadísticas reales de diarios (endpoint /diario/stats/sede)
+    const [diariosStats, setDiariosStats] = useState({
+        totalHoy: 0,
+        totalConFirma: 0,
+        totalConFoto: 0,
+        porcentajeEvidencia: 0,
+        totalDiarios: 0,
+        distribucionTipo: [] as { tipo: string; label: string; cantidad: number; color: string }[],
+        progresoEducadores: [] as { nombre: string; registrados: number; meta: number; totalHistorico: number; estado: string }[],
+    });
+
     useEffect(() => {
+        const TIPO_CFG: Record<string, { label: string; color: string }> = {
+            CONSEJERIA: { label: 'Consejerías', color: 'bg-indigo-500' },
+            VISITA: { label: 'Visitas Dom.', color: 'bg-amber-500' },
+            COORDINACION: { label: 'Coordinaciones', color: 'bg-purple-500' },
+            RECORRIDO: { label: 'Abordajes / Campo', color: 'bg-emerald-500' },
+        };
+
+        const fetchDiariosStats = async () => {
+            try {
+                const res = await fetch(`${INTERVENCION_API_URL}/diario/stats/sede`, { headers: getHeaders() });
+                if (!res.ok) return;
+                const d = await res.json();
+                setDiariosStats({
+                    totalHoy: d.totalHoy || 0,
+                    totalConFirma: d.totalConFirma || 0,
+                    totalConFoto: d.totalConFoto || 0,
+                    porcentajeEvidencia: d.porcentajeEvidencia || 0,
+                    totalDiarios: d.totalDiarios || 0,
+                    distribucionTipo: (d.distribucionTipo || []).map((t: any) => ({
+                        tipo: t.tipo,
+                        label: TIPO_CFG[t.tipo]?.label || t.tipo,
+                        cantidad: t.cantidad || 0,
+                        color: TIPO_CFG[t.tipo]?.color || 'bg-gray-400',
+                    })),
+                    progresoEducadores: (d.educadores || []).map((e: any) => {
+                        const registrados = e.registrados || 0;
+                        let estado = 'CRITICO';
+                        if (registrados >= 4) estado = 'COMPLETO';
+                        else if (registrados >= 2) estado = 'EN_PROGRESO';
+                        else if (registrados >= 1) estado = 'ALERTA';
+                        return { nombre: e.nombre, registrados, meta: 4, totalHistorico: e.totalHistorico || 0, estado };
+                    }),
+                });
+            } catch (e) { console.error('Error stats diarios:', e); }
+        };
+        fetchDiariosStats();
+
         const fetchStats = async () => {
             try {
                 const response = await fetch(`${API_URL}/statistics/dashboard`, {
@@ -90,6 +143,15 @@ export const CoordinadorDashboard = () => {
         }
     };
 
+    const getProgresoColor = (estado: string) => {
+        switch (estado) {
+            case 'COMPLETO': return 'text-green-600 bg-green-50/50 border-green-200';
+            case 'EN_PROGRESO': return 'text-yellow-600 bg-yellow-50/50 border-yellow-200';
+            case 'ALERTA': return 'text-orange-600 bg-orange-50/50 border-orange-200';
+            default: return 'text-red-600 bg-red-50/50 border-red-200';
+        }
+    };
+
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
             {/* HEADER */}
@@ -118,7 +180,7 @@ export const CoordinadorDashboard = () => {
 
             <main className="flex-1 px-4 md:px-6 pb-8 max-w-7xl mx-auto w-full">
 
-                {/* 1. SECCIÓN DE CALIDAD Y ALERTAS (NUEVO) */}
+                {/* 1. SECCIÓN DE CALIDAD Y ALERTAS */}
                 <div className="mb-8">
                     <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
                         <Target className="text-purple-600" size={20} />
@@ -206,7 +268,7 @@ export const CoordinadorDashboard = () => {
                     </div>
                 </div>
 
-                {/* 2. ESTADÍSTICAS GENERALES (ANTERIOR) */}
+                {/* 2. ESTADÍSTICAS GENERALES */}
                 <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
                     <TrendingUp className="text-blue-600" size={20} />
                     Métricas Generales
@@ -238,6 +300,106 @@ export const CoordinadorDashboard = () => {
                         color="text-green-600"
                         icon={CheckCircle2}
                     />
+                </div>
+
+                {/* NUEVO: CUADRO DE INDICADORES / DASHBOARD DE DIARIOS DE CAMPO */}
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 mb-8 space-y-6">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-gray-100 pb-4">
+                        <div>
+                            <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                                <BookOpen className="text-green-600" size={20} />
+                                Monitoreo y Resumen de Diarios de Campo
+                            </h2>
+                            <p className="text-xs text-gray-400 mt-0.5">Control de metas de actividades reportadas y validez de evidencias.</p>
+                        </div>
+                        <Link 
+                            to="/coordinador/diarios" 
+                            className="text-xs font-black text-blue-600 hover:text-blue-700 hover:underline flex items-center gap-1 bg-blue-50 px-3 py-2 rounded-xl transition-colors"
+                        >
+                            Ver bandeja de diarios completos <ArrowRightCircle size={14} />
+                        </Link>
+                    </div>
+
+                    {/* Fila de cantidades y KPIs de Diarios */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="p-4 rounded-xl bg-gray-50 border border-gray-100 text-center">
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Actividades Hoy</p>
+                            <p className="text-2xl font-black text-gray-800 mt-1">{diariosStats.totalHoy}</p>
+                            <p className="text-[9px] text-gray-400">Registradas en sede</p>
+                        </div>
+                        <div className="p-4 rounded-xl bg-gray-50 border border-gray-100 text-center">
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Histórico</p>
+                            <p className="text-2xl font-black text-gray-800 mt-1">{diariosStats.totalDiarios}</p>
+                            <p className="text-[9px] text-gray-400">Diarios acumulados</p>
+                        </div>
+                        <div className="p-4 rounded-xl bg-gray-50 border border-gray-100 text-center">
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Con Firma Digital</p>
+                            <p className="text-2xl font-black text-green-600 mt-1">{diariosStats.totalConFirma}</p>
+                            <p className="text-[9px] text-gray-400">Trazos de conformidad</p>
+                        </div>
+                        <div className="p-4 rounded-xl bg-gray-50 border border-gray-100 text-center">
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Con Foto / Acta</p>
+                            <p className="text-2xl font-black text-blue-600 mt-1">{diariosStats.totalConFoto}</p>
+                            <p className="text-[9px] text-gray-400">Evidencias cargadas</p>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-2">
+                        {/* Cumplimiento de metas de 4 actividades por Educador */}
+                        <div className="space-y-4">
+                            <h3 className="text-xs font-black text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                                <ClipboardList size={14} className="text-gray-400" /> Carga y Registro Hoy
+                            </h3>
+                            <div className="space-y-3">
+                                {diariosStats.progresoEducadores.map((ep, idx) => (
+                                    <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border border-gray-100 hover:shadow-sm transition-all bg-white gap-2">
+                                        <div className="min-w-0">
+                                            <p className="font-semibold text-xs text-gray-800">{ep.nombre}</p>
+                                            <p className="text-[10px] text-gray-400">Total histórico registrado: {ep.totalHistorico} diarios</p>
+                                        </div>
+                                        <div className="flex items-center gap-3 justify-between sm:justify-end">
+                                            <div className="flex gap-1">
+                                                {[1, 2, 3, 4].map((num) => (
+                                                    <div 
+                                                        key={num} 
+                                                        className={clsx(
+                                                            "w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold border transition-colors",
+                                                            ep.registrados >= num 
+                                                                ? "bg-green-600 border-green-600 text-white" 
+                                                                : "bg-white border-gray-200 text-gray-400"
+                                                        )}
+                                                    >
+                                                        {num}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <span className={clsx("px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wide", getProgresoColor(ep.estado))}>
+                                                {ep.registrados}/4
+                                            </span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Distribución por Tipo de Actividad */}
+                        <div className="space-y-4">
+                            <h3 className="text-xs font-black text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                                <TrendingUp size={14} className="text-gray-400" /> Distribución por Tipo de Actividad
+                            </h3>
+                            <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 flex flex-col justify-center min-h-[200px]">
+                                {diariosStats.distribucionTipo.map((item, idx) => (
+                                    <ProgressBar
+                                        key={idx}
+                                        label={item.label}
+                                        value={item.cantidad}
+                                        max={diariosStats.totalDiarios}
+                                        color={item.color}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

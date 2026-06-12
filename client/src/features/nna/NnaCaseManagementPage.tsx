@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { confirmar } from '../../components/ui/ConfirmDialog';
+import { toast } from '../../components/ui/Toast';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useNnaStore } from '../../store/nna.store';
 import { getPtiByCaso, createPti, addAccion, updateAccion, deleteAccion, type PlanTrabajo, type AccionPTI } from '../../api/pti.api';
@@ -93,7 +95,7 @@ export const NnaCaseManagementPage = () => {
             setIsCreatingDerivacion(false);
             resetDerivacion();
             loadDerivaciones(activeCase.id);
-        } catch (error) { alert('Error al guardar derivación'); }
+        } catch (error) { toast.error('Error al guardar derivación'); }
     };
 
     const onCreatePti: SubmitHandler<PtiFormValues> = async (data) => {
@@ -103,7 +105,7 @@ export const NnaCaseManagementPage = () => {
             setIsCreatingPti(false);
             loadPti(activeCase.id);
         } catch (error) {
-            alert('Error al crear PTI');
+            toast.error('Error al crear PTI');
         }
     };
 
@@ -114,18 +116,18 @@ export const NnaCaseManagementPage = () => {
             resetNew();
             loadPti(activeCase.id);
         } catch (error) {
-            alert('Error al agregar acción');
+            toast.error('Error al agregar acción');
         }
     };
 
     const onDeleteAction = async (accionId?: number) => {
         if (!accionId) return;
-        if (!confirm('¿Eliminar acción?')) return;
+        if (!(await confirmar('Se eliminará esta acción del plan.', { titulo: 'Eliminar acción', textoConfirmar: 'Eliminar', peligro: true }))) return;
         try {
             await deleteAccion(accionId);
             loadPti(activeCase.id);
         } catch (error) {
-            alert('Error al eliminar');
+            toast.error('Error al eliminar');
         }
     };
 
@@ -136,7 +138,7 @@ export const NnaCaseManagementPage = () => {
             await updateAccion(accion.id, { estado: newStatus });
             loadPti(activeCase.id);
         } catch (error) {
-            alert('Error al actualizar estado');
+            toast.error('Error al actualizar estado');
         }
     };
 

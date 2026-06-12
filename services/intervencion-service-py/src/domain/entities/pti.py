@@ -3,7 +3,9 @@ from datetime import datetime
 from pydantic import BaseModel
 
 class AccionPTIBase(BaseModel):
-    descripcion: str
+    descripcion: str = " "
+    area: Optional[str] = "OTROS"
+    objetivo: Optional[str] = None
     meta: Optional[str] = None
     plazo: Optional[str] = None
     responsable: Optional[str] = None

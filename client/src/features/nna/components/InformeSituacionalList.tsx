@@ -1,4 +1,7 @@
 import { getToken } from '../../../utils/auth';
+import { confirmar } from '../../../components/ui/ConfirmDialog';
+import { toast } from '../../../components/ui/Toast';
+import { getDownloadToken } from '../../../utils/auth';
 import { EXPEDIENTE_API_URL } from '../../../config/api';
 import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, FileText, AlertCircle, RefreshCw, Eye } from 'lucide-react';
@@ -51,7 +54,7 @@ export const InformeSituacionalList = ({
     }, [casoId]);
 
     const handleEliminar = async () => {
-        if (!window.confirm('¿Estás seguro de eliminar este informe situacional?')) return;
+        if (!(await confirmar('Se eliminará este informe situacional de forma permanente.', { titulo: 'Eliminar informe', textoConfirmar: 'Eliminar', peligro: true }))) return;
         try {
             const token = getToken();
             const res = await fetch(`${EXPEDIENTE_API_URL}/informe-situacional/caso/${casoId}`, {
@@ -61,7 +64,7 @@ export const InformeSituacionalList = ({
             if (res.ok) {
                 setInforme(null);
             } else {
-                alert('No se pudo eliminar el informe');
+                toast.error('No se pudo eliminar el informe');
             }
         } catch (err) {
             console.error('Error eliminando:', err);
@@ -139,8 +142,8 @@ export const InformeSituacionalList = ({
                                             <div className="flex justify-end gap-1.5">
                                                 {informe.estado === 'FINALIZADO' ? (
                                                     <button
-                                                        onClick={() => {
-                                                            const token = getToken();
+                                                        onClick={async () => {
+                                                            const token = await getDownloadToken();
                                                             window.open(`${EXPEDIENTE_API_URL}/informe-situacional/caso/${casoId}/vista?token=${token}`, '_blank');
                                                         }}
                                                         className="p-1.5 text-fg-muted hover:text-primary hover:bg-primary-soft rounded-[4px] transition-colors"
@@ -194,8 +197,8 @@ export const InformeSituacionalList = ({
                             <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/50">
                                 {informe.estado === 'FINALIZADO' ? (
                                     <button
-                                        onClick={() => {
-                                            const token = getToken();
+                                        onClick={async () => {
+                                            const token = await getDownloadToken();
                                             window.open(`${EXPEDIENTE_API_URL}/informe-situacional/caso/${casoId}/vista?token=${token}`, '_blank');
                                         }}
                                         className="flex-1 inline-flex items-center justify-center gap-1.5 bg-primary-soft text-primary py-1.5 rounded-lg text-xs font-bold"

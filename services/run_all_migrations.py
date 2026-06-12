@@ -32,6 +32,10 @@ SQL_FILES = [
     "intervencion-service-py/src/infrastructure/db/migrations/001_create_intervencion_tables.sql",
     "intervencion-service-py/src/infrastructure/db/migrations/002_create_urgencias_f15.sql",
     "intervencion-service-py/src/infrastructure/db/migrations/003_add_datos_extra_urgencia.sql",
+    "intervencion-service-py/src/infrastructure/db/migrations/004_add_fecha_termino_seguimiento.sql",
+    "intervencion-service-py/src/infrastructure/db/migrations/005_add_informe_ampliacion_pti.sql",
+    "intervencion-service-py/src/infrastructure/db/migrations/006_add_area_objetivo_accion_pti.sql",
+    "intervencion-service-py/src/infrastructure/db/migrations/007_add_ciclo_vida_plan_trabajo.sql",
     "talleres-service-py/src/infrastructure/db/migrations/001_create_taller_tables.sql",
     "derivacion-service-py/src/infrastructure/db/migrations/001_create_derivacion.sql"
 ]

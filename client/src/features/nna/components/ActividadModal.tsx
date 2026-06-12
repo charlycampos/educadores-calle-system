@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { toast } from '../../../components/ui/Toast';
 import type { ActividadPerfil, AgendaSemanal, HorarioDia } from './actividades.types';
 import { defaultAgenda } from './actividades.types';
 import { X } from 'lucide-react';
@@ -111,7 +112,7 @@ export const ActividadModal: React.FC<ActividadModalProps> = ({ isOpen, onClose,
     const handleSave = () => {
         const tiempoFinal = tiempoModo === 'simple' ? tiempoValor : tiempoDetalle;
         if (!actividad || !tiempoFinal) {
-            alert('Por favor complete la actividad y la duración.');
+            toast.info('Por favor complete la actividad y la duración.');
             return;
         }
 

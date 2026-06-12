@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { confirmar } from '../../components/ui/ConfirmDialog';
+import { toast } from '../../components/ui/Toast';
 import { useNavigate, useParams } from 'react-router-dom';
 import { createUrgencia, getUrgenciaById, updateUrgencia, type UrgenciaF15, updateEstadoUrgencia } from '../../api/urgencia.api';
 import { Siren, ArrowLeft, Save, AlertCircle, Sparkles } from 'lucide-react';
@@ -475,13 +477,13 @@ export const FormularioF15Page = () => {
 
     const handleNoLocalizado = async () => {
         if (!id) return;
-        if (window.confirm("¿Seguro que deseas marcar al NNA como NO LOCALIZADO? Esto cerrará el caso de urgencia.")) {
+        if (await confirmar('Se marcará al NNA como NO LOCALIZADO y se cerrará el caso de urgencia.', { titulo: 'Marcar como no localizado', textoConfirmar: 'Confirmar', peligro: true })) {
             try {
                 setIsSaving(true);
                 await updateEstadoUrgencia(Number(id), 'NO_LOCALIZADO');
                 navigate('/urgencias');
             } catch {
-                alert("Error al actualizar estado");
+                toast.error("Error al actualizar estado");
             } finally {
                 setIsSaving(false);
             }
@@ -502,7 +504,7 @@ export const FormularioF15Page = () => {
                 await updateEstadoUrgencia(Number(id), 'DERIVADO_EXTERNO');
                 navigate('/urgencias');
             } catch {
-                alert("Error al derivar el caso");
+                toast.error("Error al derivar el caso");
             } finally {
                 setIsSaving(false);
             }

@@ -1,6 +1,7 @@
+import { useState, useEffect } from 'react';
 import { X, FileWarning } from 'lucide-react';
-import { useAuthStore } from '../../../store/auth.store';
 import { NNA_API_URL, EXPEDIENTE_API_URL } from '../../../config/api';
+import { getDownloadToken } from '../../../utils/auth';
 
 interface PdfViewerModalProps {
     isOpen: boolean;
@@ -14,18 +15,22 @@ interface PdfViewerModalProps {
 }
 
 export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({ isOpen, onClose, nnaId, nnaName, documentFilename, title, pdfUrl: pdfUrlProp, codigoFicha03 }) => {
-    const token = useAuthStore.getState().token;
+    // Token corto de descarga (scope=download): el JWT de sesión nunca va en la URL
+    const [dlToken, setDlToken] = useState<string | null>(null);
+    useEffect(() => {
+        if (isOpen) getDownloadToken().then(setDlToken).catch(() => setDlToken(null));
+    }, [isOpen]);
 
     if (!isOpen) return null;
 
     // Check if it is a draft F03 sheet
     const isDraftF03 = !documentFilename && !pdfUrlProp && !codigoFicha03;
 
-    // Direct stream URL using the query parameter token for authentication
-    const pdfUrl = pdfUrlProp
+    const baseUrl = pdfUrlProp
         ?? (documentFilename
-            ? `${EXPEDIENTE_API_URL}/expediente/documento/${encodeURIComponent(documentFilename)}?token=${token}`
-            : `${NNA_API_URL}/nna/${nnaId}/pdf?token=${token}`);
+            ? `${EXPEDIENTE_API_URL}/expediente/documento/${encodeURIComponent(documentFilename)}`
+            : `${NNA_API_URL}/nna/${nnaId}/pdf`);
+    const pdfUrl = dlToken ? `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}token=${dlToken}` : '';
 
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">

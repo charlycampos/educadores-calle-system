@@ -9,10 +9,13 @@ class OraclePTIRepository:
         d = dict(zip(columns, row))
         # Aliases camelCase para compatibilidad con el frontend
         for src, dst in [("objetivo_general", "objetivoGeneral"), ("codigo_pti", "codigoPti"),
-                         ("caso_id", "casoId"), ("plan_trabajo_id", "planTrabajoId")]:
+                         ("caso_id", "casoId"), ("plan_trabajo_id", "planTrabajoId"),
+                         ("informe_ampliacion", "informeAmpliacion"),
+                         ("vigencia_dias", "vigenciaDias"),
+                         ("observacion_cierre", "observacionCierre")]:
             if src in d:
                 d[dst] = d[src]
-        for col in ("fecha_inicio", "fecha_revision", "created_at", "updated_at"):
+        for col in ("fecha_inicio", "fecha_revision", "fecha_cierre", "created_at", "updated_at"):
             if col in d and d[col] is not None:
                 val = d[col]
                 camel = "".join(w.capitalize() if i else w for i, w in enumerate(col.split("_")))
@@ -21,7 +24,8 @@ class OraclePTIRepository:
 
     async def update_accion(self, accion_id: int, data: dict) -> dict | None:
         COLS = {"estado": "ESTADO", "descripcion": "DESCRIPCION",
-                "meta": "META", "plazo": "PLAZO", "responsable": "RESPONSABLE"}
+                "meta": "META", "plazo": "PLAZO", "responsable": "RESPONSABLE",
+                "area": "AREA", "objetivo": "OBJETIVO"}
         updates = {k: v for k, v in data.items() if k in COLS}
         if not updates:
             return None
@@ -41,6 +45,47 @@ class OraclePTIRepository:
                 columns = [col[0].lower() for col in cur.description]
                 return self._row_to_dict(row, columns)
 
+    async def cerrar_pti(self, pti_id: int, observacion: str | None) -> bool:
+        """Cierra formalmente el plan (solo si está ACTIVO)."""
+        pool = get_pool()
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    """UPDATE PLAN_TRABAJO
+                       SET ESTADO = 'CERRADO', FECHA_CIERRE = SYSTIMESTAMP,
+                           OBSERVACION_CIERRE = :1, UPDATED_AT = SYSDATE
+                       WHERE ID = :2 AND ESTADO = 'ACTIVO'""",
+                    [observacion, pti_id]
+                )
+                await conn.commit()
+                return cur.rowcount > 0
+
+    async def ampliar_vigencia(self, pti_id: int, dias: int) -> bool:
+        """Amplía la vigencia del plan (Informe de Ampliación de Fase)."""
+        pool = get_pool()
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    """UPDATE PLAN_TRABAJO
+                       SET VIGENCIA_DIAS = NVL(VIGENCIA_DIAS, 90) + :1, UPDATED_AT = SYSDATE
+                       WHERE ID = :2 AND ESTADO = 'ACTIVO'""",
+                    [dias, pti_id]
+                )
+                await conn.commit()
+                return cur.rowcount > 0
+
+    async def update_informe_ampliacion(self, pti_id: int, informe_json: str) -> bool:
+        """Guarda el Informe de Ampliación (JSON) en el plan."""
+        pool = get_pool()
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    "UPDATE PLAN_TRABAJO SET INFORME_AMPLIACION = :1, UPDATED_AT = SYSDATE WHERE ID = :2",
+                    [informe_json, pti_id]
+                )
+                await conn.commit()
+                return cur.rowcount > 0
+
     async def update_pti(self, pti_id: int, objetivo_general: str, acciones: list) -> dict | None:
         pool = get_pool()
         async with pool.acquire() as conn:
@@ -54,11 +99,12 @@ class OraclePTIRepository:
                 await cur.execute("DELETE FROM ACCION_PTI WHERE PLAN_TRABAJO_ID = :1", [pti_id])
                 if acciones:
                     sql_accion = """
-                        INSERT INTO ACCION_PTI (PLAN_TRABAJO_ID, DESCRIPCION, META, PLAZO, RESPONSABLE, ESTADO)
-                        VALUES (:1, :2, :3, :4, :5, :6)
+                        INSERT INTO ACCION_PTI (PLAN_TRABAJO_ID, AREA, OBJETIVO, DESCRIPCION, META, PLAZO, RESPONSABLE, ESTADO)
+                        VALUES (:1, :2, :3, :4, :5, :6, :7, :8)
                     """
                     await cur.executemany(sql_accion, [
-                        (pti_id, a.get("descripcion"), a.get("meta"), a.get("plazo"),
+                        (pti_id, a.get("area", "OTROS"), a.get("objetivo"),
+                         a.get("descripcion") or " ", a.get("meta"), a.get("plazo"),
                          a.get("responsable"), a.get("estado", "PENDIENTE"))
                         for a in acciones
                     ])
@@ -149,11 +195,12 @@ class OraclePTIRepository:
                 # 2. Crear Acciones
                 if data.acciones:
                     sql_accion = """
-                        INSERT INTO ACCION_PTI (PLAN_TRABAJO_ID, DESCRIPCION, META, PLAZO, RESPONSABLE)
-                        VALUES (:1, :2, :3, :4, :5)
+                        INSERT INTO ACCION_PTI (PLAN_TRABAJO_ID, AREA, OBJETIVO, DESCRIPCION, META, PLAZO, RESPONSABLE)
+                        VALUES (:1, :2, :3, :4, :5, :6, :7)
                     """
                     acciones_data = [
-                        (plan_id, acc.descripcion, acc.meta, acc.plazo, acc.responsable)
+                        (plan_id, acc.area or "OTROS", acc.objetivo,
+                         acc.descripcion or " ", acc.meta, acc.plazo, acc.responsable)
                         for acc in data.acciones
                     ]
                     await cur.executemany(sql_accion, acciones_data)
@@ -187,12 +234,12 @@ class OraclePTIRepository:
                 row = await cur.fetchone()
                 if not row:
                     return None
-                
+
                 columns = [col[0].lower() for col in cur.description]
                 pti = self._row_to_dict(row, columns)
-                
+
                 await cur.execute("SELECT * FROM ACCION_PTI WHERE PLAN_TRABAJO_ID = :1 ORDER BY CREATED_AT ASC", [pti["id"]])
                 acc_columns = [col[0].lower() for col in cur.description]
                 pti["acciones"] = [self._row_to_dict(r, acc_columns) for r in await cur.fetchall()]
-                
+
                 return pti

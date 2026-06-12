@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { getDownloadToken } from '../../utils/auth';
 import { useAuthStore } from '../../store/auth.store';
 import { Search, FileText, ArrowLeft, RefreshCw, ClipboardCheck, AlertTriangle, ShieldCheck, Check, X, ExternalLink } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -42,16 +43,7 @@ export const MonitorAuditoriaPage = () => {
     };
 
     // Datos mock para auditoría de calidad nacional (mantenidos en sintonía con la arquitectura del sistema)
-    const [auditoriaNnas, setAuditoriaNnas] = useState([
-        { id: 1, nombre: 'Álvarez Ríos Juan', carpeta: 'CAR-26-0043', sede: 'Lima Metropolitana', f03: true, f04: true, sis: true, dni: true, estadoExp: 'ÓPTIMO' },
-        { id: 2, nombre: 'Méndez Castro Luis', carpeta: 'CAR-26-0089', sede: 'Huancayo', f03: true, f04: false, sis: true, dni: false, estadoExp: 'CRÍTICO' },
-        { id: 3, nombre: 'Quispe Choque Carmen', carpeta: 'CAR-26-0105', sede: 'Puno', f03: true, f04: true, sis: false, dni: true, estadoExp: 'ADVERTENCIA' },
-        { id: 4, fontName: 'Gómez Ruiz Sofía', nombre: 'Gómez Ruiz Sofía', carpeta: 'CAR-26-0112', sede: 'Huaral', f03: true, f04: true, sis: true, dni: true, estadoExp: 'ÓPTIMO' },
-        { id: 5, nombre: 'Mendoza Ticona Raúl', carpeta: 'CAR-26-0145', sede: 'Arequipa', f03: true, f04: false, sis: true, dni: true, estadoExp: 'ADVERTENCIA' },
-        { id: 6, nombre: 'Rojas Paredes María', carpeta: 'CAR-26-0210', sede: 'Cusco', f03: true, f04: true, sis: true, dni: false, estadoExp: 'ADVERTENCIA' },
-        { id: 7, nombre: 'Huamán Torres Carlos', carpeta: 'CAR-26-0301', sede: 'Trujillo', f03: false, f04: false, sis: false, dni: false, estadoExp: 'CRÍTICO' },
-        { id: 8, nombre: 'Salvatierra Elena', carpeta: 'CAR-26-0315', sede: 'Iquitos', f03: true, f04: true, sis: true, dni: true, estadoExp: 'ÓPTIMO' }
-    ]);
+    const [auditoriaNnas, setAuditoriaNnas] = useState<any[]>([]);
 
     useEffect(() => {
         loadAuditoriaData();
@@ -416,15 +408,16 @@ export const MonitorAuditoriaPage = () => {
                                                     </div>
                                                 </div>
                                                 {doc.pdfUrl && (
-                                                    <a 
-                                                        href={doc.pdfUrl} 
-                                                        target="_blank" 
-                                                        rel="noreferrer"
+                                                    <button
+                                                        onClick={async () => {
+                                                            const t = await getDownloadToken();
+                                                            window.open(`${doc.pdfUrl}${doc.pdfUrl.includes('?') ? '&' : '?'}token=${t}`, '_blank');
+                                                        }}
                                                         className="p-1.5 text-primary hover:bg-primary-soft rounded-md transition-colors"
                                                         title="Ver PDF"
                                                     >
                                                         <ExternalLink size={14} />
-                                                    </a>
+                                                    </button>
                                                 )}
                                             </div>
                                         ))}

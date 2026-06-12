@@ -1,4 +1,5 @@
 import { getToken } from '../../../utils/auth';
+import { confirmar } from '../../../components/ui/ConfirmDialog';
 import { INTERVENCION_API_URL } from '../../../config/api';
 import { useState, useEffect } from 'react';
 import { Plus, Eye, Edit, Trash2, FileText, AlertCircle, RefreshCw } from 'lucide-react';
@@ -69,7 +70,7 @@ export const DiagnosticoSocialList = ({
     }, [nnaId]);
 
     const handleEliminar = async (id: number) => {
-        if (!window.confirm('¿Estás seguro de eliminar este diagnóstico social?')) return;
+        if (!(await confirmar('Se eliminará este diagnóstico social de forma permanente.', { titulo: 'Eliminar diagnóstico', textoConfirmar: 'Eliminar', peligro: true }))) return;
         try {
             const token = getToken();
             const res = await fetch(`${INTERVENCION_API_URL}/diagnostico/${id}`, {
@@ -281,7 +282,7 @@ export const DiagnosticoSocialList = ({
                     nnaId={nnaId}
                     nnaName={nnaFullName || '---'}
                     title="Diagnóstico Social F04"
-                    pdfUrl={`${INTERVENCION_API_URL}/diagnostico/${pdfDiagId}/pdf?token=${token}`}
+                    pdfUrl={`${INTERVENCION_API_URL}/diagnostico/${pdfDiagId}/pdf`}
                 />
             )}
         </div>

@@ -60,6 +60,8 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 import { MainMenu } from './features/dashboard/MainMenu';
+import { ToastContainer } from './components/ui/Toast';
+import { ConfirmDialogContainer } from './components/ui/ConfirmDialog';
 
 const AdminNacionalDashboard      = lazy(() => import('./features/dashboard/AdminNacionalDashboard').then(m => ({ default: m.AdminNacionalDashboard })));
 const SedesPage                   = lazy(() => import('./features/sedes/SedesPage').then(m => ({ default: m.SedesPage })));
@@ -68,6 +70,7 @@ const MonitorAuditoriaPage        = lazy(() => import('./features/dashboard/Moni
 const MonitorTrasladosPage        = lazy(() => import('./features/dashboard/MonitorTrasladosPage').then(m => ({ default: m.MonitorTrasladosPage })));
 const CoordinadorDerivacionesPage = lazy(() => import('./features/dashboard/CoordinadorDerivacionesPage').then(m => ({ default: m.CoordinadorDerivacionesPage })));
 const CoordinadorCasosPage        = lazy(() => import('./features/dashboard/CoordinadorCasosPage').then(m => ({ default: m.CoordinadorCasosPage })));
+const CoordinadorDiariosPage      = lazy(() => import('./features/dashboard/CoordinadorDiariosPage').then(m => ({ default: m.CoordinadorDiariosPage })));
 
 // Indicador de carga mientras se descarga el código de la página
 const PageLoader = () => (
@@ -85,6 +88,8 @@ function App() {
 
   return (
     <BrowserRouter>
+      <ToastContainer />
+      <ConfirmDialogContainer />
       <Suspense fallback={<PageLoader />}>
       <Routes>
         <Route path="/login" element={
@@ -115,6 +120,12 @@ function App() {
         <Route path="/coordinador/casos" element={
           <ProtectedRoute>
             <CoordinadorCasosPage />
+          </ProtectedRoute>
+        } />
+
+        <Route path="/coordinador/diarios" element={
+          <ProtectedRoute>
+            <CoordinadorDiariosPage />
           </ProtectedRoute>
         } />
 

@@ -162,6 +162,16 @@ export const MainMenu = () => {
             theme: 'warning',
         },
         {
+            id: 'supervision-diarios',
+            titulo: 'Monitoreo de Diarios',
+            descripcion: 'Indicadores, metas de actividades y firmas digitales',
+            icono: <ClipboardList className="w-[18px] h-[18px]" />,
+            ruta: '/coordinador/diarios',
+            disponible: true,
+            roles: [ROLES.COORDINADOR],
+            theme: 'primary',
+        },
+        {
             id: 'derivaciones',
             titulo: 'Bandeja de Derivaciones',
             descripcion: 'Aprobaciones y traslados de la sede',
@@ -294,4 +304,3 @@ export const MainMenu = () => {
         </div>
     );
 };
-

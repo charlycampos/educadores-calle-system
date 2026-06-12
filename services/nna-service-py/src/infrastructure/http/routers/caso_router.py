@@ -60,6 +60,80 @@ async def list_casos(user: dict = Depends(get_current_user)):
     ]
 
 
+@router.get("/supervision/sede")
+async def supervision_sede(user: dict = Depends(get_current_user)):
+    """Bandeja del coordinador: semáforo metodológico con datos reales
+    (días transcurridos, F04, PTI activo) y carga real por educador."""
+    rol = user.get("rol")
+    if rol not in ("COORDINADOR", "ADMIN_SEDE", "ADMIN_NACIONAL", "MONITOR"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acceso denegado")
+    sede_id = user.get("sedeId")
+
+    from src.infrastructure.db.connection import get_pool
+    pool = get_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor() as cur:
+            # Casos activos con indicadores reales
+            await cur.execute(
+                """SELECT c.ID, c.CODIGO_CASO, c.PERFIL, c.RESPONSABLE_ID,
+                          u.NOMBRE_COMPLETO AS RESPONSABLE_NOMBRE,
+                          TRIM(n.NOMBRES || ' ' || n.APELLIDO_PATERNO || ' ' || NVL(n.APELLIDO_MATERNO, '')) AS NNA_NOMBRE,
+                          n.EDAD, n.ID AS NNA_ID, n.CARPETA_ID,
+                          TRUNC(SYSDATE - CAST(c.FECHA_APERTURA AS DATE)) AS DIAS,
+                          (SELECT COUNT(*) FROM DIAGNOSTICO_SOCIAL d WHERE d.NNA_ID = n.ID) AS N_F04,
+                          (SELECT COUNT(*) FROM PLAN_TRABAJO p WHERE p.CASO_ID = c.ID AND p.ESTADO = 'ACTIVO') AS N_PTI,
+                          (SELECT MAX(NVL(p.VIGENCIA_DIAS, 90)) FROM PLAN_TRABAJO p WHERE p.CASO_ID = c.ID AND p.ESTADO = 'ACTIVO') AS PTI_VIGENCIA,
+                          (SELECT MAX(p.ID) FROM PLAN_TRABAJO p WHERE p.CASO_ID = c.ID AND p.ESTADO = 'ACTIVO') AS PTI_ID
+                     FROM NNA_CASO c
+                     JOIN NNA n ON n.ID = c.NNA_ID
+                     LEFT JOIN SEC_USUARIO u ON u.ID = c.RESPONSABLE_ID
+                    WHERE c.SEDE_ID = :sede AND c.ESTADO != 'CERRADO'
+                    ORDER BY c.FECHA_APERTURA ASC
+                    FETCH FIRST 500 ROWS ONLY""",
+                {"sede": sede_id},
+            )
+            casos = []
+            for r in await cur.fetchall():
+                (cid, codigo, perfil, resp_id, resp_nombre, nna_nombre,
+                 edad, nna_id, carpeta_id, dias, n_f04, n_pti, pti_vig, pti_id) = r
+                dias = int(dias or 0)
+                tiene_pti = (n_pti or 0) > 0
+                # Fase real: con PTI activo => Fase 2; sin PTI => Fase 1 (contacto/diagnóstico)
+                fase = "Fase 2: Intervención" if tiene_pti else "Fase 1: Contacto y Diagnóstico"
+                # Límite: Fase 1 = 90 días desde apertura; Fase 2 = 90 + vigencia del PTI
+                dias_limite = 90 if not tiene_pti else 90 + int(pti_vig or 90)
+                pct = dias / dias_limite if dias_limite else 0
+                estado_plazo = "CRÍTICO" if pct >= 1 else "ADVERTENCIA" if pct >= 0.8 else "ÓPTIMO"
+                casos.append({
+                    "id": cid, "codigo_caso": codigo, "perfil": perfil,
+                    "responsable_id": resp_id, "responsable_nombre": resp_nombre,
+                    "nna_id": nna_id, "carpeta_id": carpeta_id,
+                    "nna_nombre": nna_nombre, "edad": edad,
+                    "dias_transcurridos": dias, "dias_limite": dias_limite,
+                    "tiene_f04": (n_f04 or 0) > 0, "tiene_pti": tiene_pti,
+                    "fase": fase, "estado_plazo": estado_plazo,
+                    "pti_id": pti_id,
+                })
+
+            # Carga real por educador de la sede
+            await cur.execute(
+                """SELECT u.ID, u.NOMBRE_COMPLETO, COUNT(c.ID) AS CARGA
+                     FROM SEC_USUARIO u
+                     JOIN SEC_ROL r ON r.ID = u.ROL_ID
+                     LEFT JOIN NNA_CASO c ON c.RESPONSABLE_ID = u.ID AND c.ESTADO != 'CERRADO'
+                    WHERE u.SEDE_ID = :sede AND u.ACTIVO = 1 AND UPPER(r.NOMBRE) = 'EDUCADOR'
+                    GROUP BY u.ID, u.NOMBRE_COMPLETO
+                    ORDER BY u.NOMBRE_COMPLETO""",
+                {"sede": sede_id},
+            )
+            educadores = [
+                {"id": r[0], "nombre": r[1], "carga": int(r[2] or 0), "max": 30}
+                for r in await cur.fetchall()
+            ]
+
+    return {"casos": casos, "educadores": educadores}
+
+
 @router.get("/{caso_id}")
 async def get_caso(caso_id: int, user: dict = Depends(get_current_user)):
     rol = user.get("rol")

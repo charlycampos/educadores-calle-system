@@ -5,7 +5,7 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 from src.infrastructure.db.repositories.oracle_informe_situacional_repository import OracleInformeSituacionalRepository
-from src.infrastructure.http.middleware.jwt_middleware import get_current_user, verificar_token
+from src.infrastructure.http.middleware.jwt_middleware import get_current_user, verificar_token, verificar_token_descarga
 
 import os
 from fastapi.responses import FileResponse
@@ -121,7 +121,7 @@ async def exportar_pdf_informe_situacional(
         if not token:
             raise HTTPException(status_code=401, detail="No autorizado")
         try:
-            user = verificar_token(token)
+            user = verificar_token_descarga(token)
         except Exception:
             raise HTTPException(status_code=401, detail="Token inválido")
             
@@ -170,7 +170,7 @@ async def vista_informe_situacional(
         if not token:
             raise HTTPException(status_code=401, detail="No autorizado")
         try:
-            user = verificar_token(token)
+            user = verificar_token_descarga(token)
         except Exception:
             raise HTTPException(status_code=401, detail="Token inválido")
 

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { toast } from '../../components/ui/Toast';
 import { useParams, Link } from 'react-router-dom';
 import { useNnaStore } from '../../store/nna.store';
 import { Printer, ArrowLeft, Send } from 'lucide-react';
@@ -45,7 +46,7 @@ export const NnaFichaPage = ({ embed = false }: NnaFichaPageProps) => {
 
     const handleDerivar = () => {
         if (!activeCase) {
-            alert('No hay un caso activo para derivar.');
+            toast.info('No hay un caso activo para derivar.');
             return;
         }
         setIsDerivacionOpen(true);

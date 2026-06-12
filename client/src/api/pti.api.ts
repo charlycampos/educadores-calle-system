@@ -11,6 +11,10 @@ const getHeaders = () => {
 
 export interface AccionPTI {
     id?: number;
+    /** Área de intervención: SALUD, EDUCACION, IDENTIDAD, FAMILIA, OTROS */
+    area?: string;
+    /** Objetivo específico al que pertenece la actividad */
+    objetivo?: string;
     descripcion: string;
     meta?: string;
     plazo?: string;
@@ -29,7 +33,50 @@ export interface PlanTrabajo {
     estado: string;
     acciones: AccionPTI[];
     createdAt: string;
+    /** Duración del plan en días (default 90; se amplía con el Informe de Ampliación) */
+    vigenciaDias?: number;
+    fechaCierre?: string | null;
+    observacionCierre?: string | null;
+    /** JSON del Informe Técnico de Ampliación: {antecedentes, analisis, sustento, conclusiones, fecha} */
+    informeAmpliacion?: string | null;
 }
+
+export interface InformeAmpliacionData {
+    antecedentes: string;
+    analisis: string;
+    sustento: string;
+    conclusiones: string;
+}
+
+export const cerrarPti = async (ptiId: number, observacion?: string) => {
+    const response = await fetch(`${API_URL}/pti/${ptiId}/cerrar`, {
+        method: 'PUT',
+        headers: getHeaders(),
+        body: JSON.stringify({ observacion: observacion || null })
+    });
+    if (!response.ok) throw new Error('Error cerrando el plan');
+    return response.json();
+};
+
+export const ampliarVigencia = async (ptiId: number, dias: number = 30) => {
+    const response = await fetch(`${API_URL}/pti/${ptiId}/ampliar-vigencia`, {
+        method: 'PUT',
+        headers: getHeaders(),
+        body: JSON.stringify({ dias })
+    });
+    if (!response.ok) throw new Error('Error ampliando la vigencia');
+    return response.json();
+};
+
+export const saveInformeAmpliacion = async (ptiId: number, data: InformeAmpliacionData) => {
+    const response = await fetch(`${API_URL}/pti/${ptiId}/informe-ampliacion`, {
+        method: 'PUT',
+        headers: getHeaders(),
+        body: JSON.stringify(data)
+    });
+    if (!response.ok) throw new Error('Error guardando informe de ampliación');
+    return response.json();
+};
 
 export const getPtiByCaso = async (casoId: number): Promise<PlanTrabajo | null> => {
     const response = await fetch(`${API_URL}/pti/caso/${casoId}`, {

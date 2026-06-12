@@ -21,6 +21,17 @@ def generar_token(payload: dict[str, Any]) -> str:
     return jwt.encode(data, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
+def generar_token_descarga(user: dict[str, Any]) -> str:
+    """Token corto (5 min) solo para descargas de PDF vía query param."""
+    data = {
+        "userId": user.get("userId"), "sedeId": user.get("sedeId"),
+        "rol": user.get("rol"), "scope": "download",
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=5),
+        "iat": datetime.now(timezone.utc),
+    }
+    return jwt.encode(data, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+
+
 def verificar_token(token: str) -> dict[str, Any]:
     try:
         return jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])

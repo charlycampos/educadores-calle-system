@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { confirmar } from '../../../components/ui/ConfirmDialog';
+import { toast } from '../../../components/ui/Toast';
 import {
     Plus, Trash2, Save, Printer, AlertTriangle, ArrowLeft, Loader2, FileDown,
     Eye, Calendar, ClipboardCheck, Heart, BookOpen, CreditCard, Users, Circle,
@@ -8,8 +10,8 @@ import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import { useNnaStore } from '../../../store/nna.store';
 import { Formato9Print } from './Formato9Print';
-import { getAllPtisByCaso, createPti, updatePti, updateAccion } from '../../../api/pti.api';
-import type { PlanTrabajo, AccionPTI } from '../../../api/pti.api';
+import { getAllPtisByCaso, createPti, updatePti, updateAccion, saveInformeAmpliacion, cerrarPti, ampliarVigencia } from '../../../api/pti.api';
+import type { PlanTrabajo, AccionPTI, InformeAmpliacionData } from '../../../api/pti.api';
 
 // ── Colores de área (clases completas para que Tailwind las escanee) ─────────
 const AREA_CFG: Record<string, {
@@ -143,14 +145,12 @@ const FILTERS = [
 export const PlanIntervencion = ({ nna, onClose }: PIIProps) => {
     const { registerDocument } = useNnaStore();
 
-    // Informe de Ampliación
+    // Informe de Ampliación (se persiste en el plan; empieza vacío)
+    const EMPTY_INFORME: InformeAmpliacionData = { antecedentes: '', analisis: '', sustento: '', conclusiones: '' };
     const [showInforme, setShowInforme] = useState(false);
-    const [informeData, setInformeData] = useState({
-        antecedentes: 'El NNA ingresó al servicio hace 3 meses...',
-        analisis: 'Se observan avances parciales en la integración, sin embargo...',
-        sustento: 'Se requiere un mes adicional para consolidar el vínculo de confianza y completar el diagnóstico social.',
-        conclusiones: 'Es procedente la ampliación de la Fase I por 30 días.',
-    });
+    const [informeData, setInformeData] = useState<InformeAmpliacionData>(EMPTY_INFORME);
+    const [informeDirty, setInformeDirty] = useState(false);
+    const [savingInforme, setSavingInforme] = useState(false);
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
     // Navegación
@@ -160,6 +160,14 @@ export const PlanIntervencion = ({ nna, onClose }: PIIProps) => {
     const [errorPlans, setErrorPlans] = useState<string | null>(null);
     const [selectedPlan, setSelectedPlan] = useState<PlanTrabajo | null>(null);
     const [isSaving, setIsSaving] = useState(false);
+    // Cambios del tablero sin guardar (los cambios de estado en planes existentes se autoguardan)
+    const [isDirty, setIsDirty] = useState(false);
+    // Cierre de plan
+    const [cierreOpen, setCierreOpen] = useState(false);
+    const [obsCierre, setObsCierre] = useState('');
+    const [isClosing, setIsClosing] = useState(false);
+    const [isAmpliando, setIsAmpliando] = useState(false);
+    const planCerrado = selectedPlan?.estado === 'CERRADO';
 
     // Estado del tablero
     const [objetivoGeneral, setObjetivoGeneral] = useState(
@@ -194,14 +202,48 @@ export const PlanIntervencion = ({ nna, onClose }: PIIProps) => {
 
     useEffect(() => { fetchPlans(); }, [caso?.id]);
 
+    const loadInformeFromPlan = (plan: PlanTrabajo | null) => {
+        if (plan?.informeAmpliacion) {
+            try {
+                const parsed = JSON.parse(plan.informeAmpliacion);
+                setInformeData({
+                    antecedentes: parsed.antecedentes || '', analisis: parsed.analisis || '',
+                    sustento: parsed.sustento || '', conclusiones: parsed.conclusiones || '',
+                });
+            } catch { setInformeData(EMPTY_INFORME); }
+        } else {
+            setInformeData(EMPTY_INFORME);
+        }
+        setInformeDirty(false);
+    };
+
+    const handleSaveInforme = async () => {
+        if (!selectedPlan?.id) { toast.info('Guarda primero el plan para poder guardar el informe.'); return; }
+        setSavingInforme(true);
+        try {
+            await saveInformeAmpliacion(selectedPlan.id, informeData);
+            setInformeDirty(false);
+            setSelectedPlan(p => p ? { ...p, informeAmpliacion: JSON.stringify(informeData) } : p);
+        } catch { toast.error('Error al guardar el informe de ampliación.'); }
+        finally { setSavingInforme(false); }
+    };
+
     const loadPlanIntoState = (plan: PlanTrabajo) => {
         setObjetivoGeneral(plan.objetivoGeneral || '');
         const rebuilt: ObjetivoEspecifico[] = [];
         (plan.acciones || []).forEach((accion, idx) => {
-            const parts = (accion.descripcion || '').split(' | ');
-            const area = (parts[0] || 'OTROS') as any;
-            const objDesc = parts[1] || '';
-            const actDesc = parts[2] || '';
+            // Formato nuevo: columnas AREA e OBJETIVO propias; legacy: 'AREA | objetivo | actividad'
+            let area: any, objDesc: string, actDesc: string;
+            if (accion.area) {
+                area = accion.area;
+                objDesc = accion.objetivo || '';
+                actDesc = (accion.descripcion || '').trim();
+            } else {
+                const parts = (accion.descripcion || '').split(' | ');
+                area = (parts[0] || 'OTROS') as any;
+                objDesc = parts[1] || '';
+                actDesc = parts[2] || '';
+            }
             const [fechaInicio = '', fechaFin = ''] = (accion.plazo || '').split(' a ');
             const actEstado: 'PENDIENTE' | 'EN_PROCESO' | 'COMPLETADO' =
                 accion.estado === 'CUMPLIDO' ? 'COMPLETADO' :
@@ -223,17 +265,50 @@ export const PlanIntervencion = ({ nna, onClose }: PIIProps) => {
     };
 
     const goToBoard = (plan: PlanTrabajo | null, mode: 'create' | 'detail') => {
+        loadInformeFromPlan(plan);
         if (plan) { setSelectedPlan(plan); loadPlanIntoState(plan); }
         else {
             setSelectedPlan(null);
             setObjetivoGeneral('Lograr la restitución de los derechos vulnerados del NNA y su reinserción familiar/escolar.');
             setObjetivos([{ id: 1, area: 'IDENTIDAD', descripcion: 'Gestionar la obtención del DNI del NNA.', indicador: 'NNA cuenta con DNI físico.', actividades: [{ id: 101, descripcion: 'Coordinación con RENIEC', responsable: 'Educador', fechaInicio: '', fechaFin: '', estado: 'PENDIENTE' }] }]);
         }
-        setPtiFilter('todos'); setMobjIdx(null); setViewMode(mode);
+        setPtiFilter('todos'); setMobjIdx(null); setIsDirty(false); setViewMode(mode);
+    };
+
+    // Aviso del navegador si se cierra/recarga con cambios sin guardar
+    useEffect(() => {
+        const handler = (e: BeforeUnloadEvent) => {
+            if (isDirty || informeDirty) { e.preventDefault(); e.returnValue = ''; }
+        };
+        window.addEventListener('beforeunload', handler);
+        return () => window.removeEventListener('beforeunload', handler);
+    }, [isDirty, informeDirty]);
+
+    const confirmLeaveBoard = async () => {
+        if (isDirty && !(await confirmar('Hay cambios sin guardar en el plan. ¿Salir de todas formas?', { titulo: 'Cambios sin guardar', textoConfirmar: 'Salir sin guardar', peligro: true }))) return false;
+        setIsDirty(false);
+        return true;
+    };
+
+    const validarPlan = (): string | null => {
+        if (!objetivoGeneral.trim()) return 'El objetivo general no puede estar vacío.';
+        if (objetivos.length === 0) return 'El plan debe tener al menos un objetivo.';
+        for (let i = 0; i < objetivos.length; i++) {
+            const obj = objetivos[i];
+            if (!obj.descripcion.trim()) return `El objetivo ${i + 1} (${AREA_CFG[obj.area]?.label || obj.area}) no tiene título.`;
+            for (const act of obj.actividades) {
+                if (!act.descripcion.trim()) return `Hay una actividad sin descripción en "${obj.descripcion}".`;
+                if (act.fechaInicio && act.fechaFin && act.fechaFin < act.fechaInicio)
+                    return `En "${obj.descripcion}", la fecha fin de una actividad es anterior a su inicio.`;
+            }
+        }
+        return null;
     };
 
     const handleSave = async () => {
-        if (!caso?.id) { alert('No hay un caso activo.'); return; }
+        if (!caso?.id) { toast.error('No hay un caso activo.'); return; }
+        const error = validarPlan();
+        if (error) { toast.error(error); return; }
         setIsSaving(true);
         try {
             const acciones: AccionPTI[] = [];
@@ -241,10 +316,10 @@ export const PlanIntervencion = ({ nna, onClose }: PIIProps) => {
                 if (obj.actividades.length) {
                     obj.actividades.forEach(act => {
                         const estado: any = act.estado === 'COMPLETADO' ? 'CUMPLIDO' : act.estado;
-                        acciones.push({ descripcion: `${obj.area} | ${obj.descripcion} | ${act.descripcion}`, meta: obj.indicador, plazo: `${act.fechaInicio} a ${act.fechaFin}`, responsable: act.responsable, estado });
+                        acciones.push({ area: obj.area, objetivo: obj.descripcion, descripcion: act.descripcion, meta: obj.indicador, plazo: `${act.fechaInicio} a ${act.fechaFin}`, responsable: act.responsable, estado });
                     });
                 } else {
-                    acciones.push({ descripcion: `${obj.area} | ${obj.descripcion} | `, meta: obj.indicador, plazo: 'a', responsable: '', estado: 'PENDIENTE' });
+                    acciones.push({ area: obj.area, objetivo: obj.descripcion, descripcion: '', meta: obj.indicador, plazo: 'a', responsable: '', estado: 'PENDIENTE' });
                 }
             });
             if (selectedPlan?.id) {
@@ -252,10 +327,11 @@ export const PlanIntervencion = ({ nna, onClose }: PIIProps) => {
             } else {
                 await createPti(caso.id, { caso_id: caso.id, objetivo_general: objetivoGeneral, acciones } as any);
             }
-            alert('Plan de intervención guardado con éxito.');
+            toast.success('Plan de intervención guardado con éxito.');
+            setIsDirty(false);
             setViewMode('list');
             fetchPlans();
-        } catch { alert('Error al guardar el plan.'); }
+        } catch { toast.error('Error al guardar el plan.'); }
         finally { setIsSaving(false); }
     };
 
@@ -266,12 +342,14 @@ export const PlanIntervencion = ({ nna, onClose }: PIIProps) => {
         })));
         if (selectedPlan?.id) {
             try { await updateAccion(actId, { estado: nuevoEstado as any }); } catch { /* silent */ }
+        } else {
+            setIsDirty(true); // plan nuevo: el estado solo existe en memoria hasta guardar
         }
     };
 
     const handleDownloadPDF = async () => {
         const el = document.getElementById('formato-9-print-pii');
-        if (!el) { alert('Error: No se encontró el formato'); return; }
+        if (!el) { toast.error('No se encontró el formato para generar el PDF'); return; }
         setIsGeneratingPDF(true);
         try {
             const iframe = document.createElement('iframe');
@@ -291,8 +369,8 @@ export const PlanIntervencion = ({ nna, onClose }: PIIProps) => {
             const w = pdf.internal.pageSize.getWidth();
             pdf.addImage(canvas.toDataURL('image/png', 1), 'PNG', 0, 0, w, canvas.height * w / canvas.width, undefined, 'FAST');
             pdf.save(`F9_Acta_${nna?.nombres?.replace(/\s+/g, '_')}.pdf`);
-            registerDocument({ nnaId: nna.id, type: 'ACTA DE COMPROMISO (FORMATO 09)', code: `ACT-${new Date().getFullYear()}-001`, date: new Date().toISOString(), pages: 1, user: 'Usuario Sistema', status: 'GENERADO' });
-        } catch { alert('Error al generar el PDF.'); }
+            registerDocument({ nnaId: nna.id, type: 'ACTA DE COMPROMISO (FORMATO 09)', code: selectedPlan?.codigoPti ? `ACT-${selectedPlan.codigoPti}` : `ACT-${new Date().getFullYear()}-${String(selectedPlan?.id ?? 0).padStart(4, '0')}`, date: new Date().toISOString(), pages: 1, user: 'Usuario Sistema', status: 'GENERADO' });
+        } catch { toast.error('Error al generar el PDF.'); }
         finally { setIsGeneratingPDF(false); }
     };
 
@@ -306,6 +384,7 @@ export const PlanIntervencion = ({ nna, onClose }: PIIProps) => {
     const addObjetivo = (area = 'SALUD', desc = '') => {
         const newIdx = objetivos.length;
         setObjetivos(prev => [...prev, { id: Date.now(), area: area as any, descripcion: desc, indicador: '', actividades: [] }]);
+        setIsDirty(true);
         setMptiOpen(false);
         setTimeout(() => setMobjIdx(newIdx), 60);
     };
@@ -316,12 +395,14 @@ export const PlanIntervencion = ({ nna, onClose }: PIIProps) => {
             id: Date.now(), area: area as any, descripcion: templateAct, indicador: '',
             actividades: [{ id: Date.now() + 1, descripcion: templateAct, responsable: 'Educador', fechaInicio: '', fechaFin: '', estado: 'PENDIENTE' }],
         }]);
+        setIsDirty(true);
         setMptiOpen(false);
         setTimeout(() => setMobjIdx(newIdx), 60);
     };
 
     const removeObjetivo = (idx: number) => {
         setObjetivos(prev => prev.filter((_, i) => i !== idx));
+        setIsDirty(true);
         setMobjIdx(null);
     };
 
@@ -331,6 +412,7 @@ export const PlanIntervencion = ({ nna, onClose }: PIIProps) => {
             next[objIdx] = { ...next[objIdx], actividades: [...next[objIdx].actividades, { id: Date.now(), descripcion: '', responsable: 'Educador', fechaInicio: '', fechaFin: '', estado: 'PENDIENTE' }] };
             return next;
         });
+        setIsDirty(true);
     };
 
     const removeActividad = (objIdx: number, actId: number) => {
@@ -339,6 +421,7 @@ export const PlanIntervencion = ({ nna, onClose }: PIIProps) => {
             next[objIdx] = { ...next[objIdx], actividades: next[objIdx].actividades.filter(a => a.id !== actId) };
             return next;
         });
+        setIsDirty(true);
     };
 
     const updateActividadField = (objIdx: number, actId: number, key: string, value: string) => {
@@ -348,17 +431,43 @@ export const PlanIntervencion = ({ nna, onClose }: PIIProps) => {
             (next[objIdx].actividades[ai] as any)[key] = value;
             return next;
         });
+        setIsDirty(true);
     };
 
     const updateObjetivoField = (idx: number, key: string, value: string) => {
         setObjetivos(prev => { const next = [...prev]; (next[idx] as any)[key] = value; return next; });
+        setIsDirty(true);
     };
 
-    const getVigencia = (fechaInicio?: string) => {
+    const getVigencia = (fechaInicio?: string, vigenciaDias: number = 90) => {
         if (!fechaInicio) return null;
-        const v = new Date(fechaInicio); v.setDate(v.getDate() + 90);
+        const v = new Date(fechaInicio); v.setDate(v.getDate() + (vigenciaDias || 90));
         const dias = Math.ceil((v.getTime() - Date.now()) / 86400000);
         return { dias, vencido: dias < 0, urgente: dias >= 0 && dias <= 15 };
+    };
+
+    const handleCerrarPlan = async () => {
+        if (!selectedPlan?.id) return;
+        setIsClosing(true);
+        try {
+            await cerrarPti(selectedPlan.id, obsCierre.trim() || undefined);
+            setCierreOpen(false); setObsCierre(''); setIsDirty(false);
+            setViewMode('list');
+            fetchPlans();
+        } catch { toast.error('Error al cerrar el plan.'); }
+        finally { setIsClosing(false); }
+    };
+
+    const handleAmpliarVigencia = async () => {
+        if (!selectedPlan?.id) return;
+        if (!(await confirmar('Se sumarán 30 días a la vigencia del plan. Se recomienda guardar primero el Informe de Ampliación como sustento.', { titulo: 'Ampliar vigencia', textoConfirmar: 'Ampliar +30 días' }))) return;
+        setIsAmpliando(true);
+        try {
+            await ampliarVigencia(selectedPlan.id, 30);
+            setSelectedPlan(p => p ? { ...p, vigenciaDias: (p.vigenciaDias || 90) + 30 } : p);
+            fetchPlans();
+        } catch { toast.error('Error al ampliar la vigencia.'); }
+        finally { setIsAmpliando(false); }
     };
 
     const getSemaforo = (pct: number) => {
@@ -372,14 +481,36 @@ export const PlanIntervencion = ({ nna, onClose }: PIIProps) => {
         <div className="bg-bg min-h-screen p-6 print:p-0 print:bg-white">
             <div className="max-w-4xl mx-auto">
                 <div className="flex justify-between items-center mb-5 print:hidden">
-                    <button onClick={() => setShowInforme(false)}
+                    <button onClick={async () => {
+                        if (informeDirty && !(await confirmar('Hay cambios sin guardar en el informe. ¿Salir de todas formas?', { titulo: 'Cambios sin guardar', textoConfirmar: 'Salir sin guardar', peligro: true }))) return;
+                        loadInformeFromPlan(selectedPlan);
+                        setShowInforme(false);
+                    }}
                         className="flex items-center gap-1.5 text-fg-muted hover:text-fg text-[13px] font-medium px-3 py-2 rounded-lg hover:bg-surface border border-transparent hover:border-border transition-all">
                         <ArrowLeft size={15} /> Volver al Plan
                     </button>
-                    <button onClick={() => window.print()}
-                        className="flex items-center gap-1.5 bg-surface border border-border-strong text-fg px-4 py-2 rounded-lg text-[13px] font-medium hover:bg-surface-muted transition-colors">
-                        <Printer size={15} /> Imprimir Informe
-                    </button>
+                    <div className="flex items-center gap-2">
+                        {informeDirty && (
+                            <span className="text-[11px] font-semibold text-warning bg-warning-soft px-2 py-1 rounded-full">
+                                Cambios sin guardar
+                            </span>
+                        )}
+                        {selectedPlan?.id && selectedPlan.estado === 'ACTIVO' && (
+                            <button onClick={handleAmpliarVigencia} disabled={isAmpliando}
+                                className="flex items-center gap-1.5 bg-warning-soft border border-warning/30 text-warning px-4 py-2 rounded-lg text-[13px] font-semibold hover:opacity-80 transition-all disabled:opacity-50"
+                                title="Suma 30 días a la vigencia del plan">
+                                {isAmpliando ? <Loader2 size={15} className="animate-spin" /> : <Calendar size={15} />} Ampliar +30 días
+                            </button>
+                        )}
+                        <button onClick={handleSaveInforme} disabled={savingInforme || !informeDirty}
+                            className="flex items-center gap-1.5 bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg text-[13px] font-bold transition-colors disabled:opacity-50">
+                            {savingInforme ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} Guardar Informe
+                        </button>
+                        <button onClick={() => window.print()}
+                            className="flex items-center gap-1.5 bg-surface border border-border-strong text-fg px-4 py-2 rounded-lg text-[13px] font-medium hover:bg-surface-muted transition-colors">
+                            <Printer size={15} /> Imprimir Informe
+                        </button>
+                    </div>
                 </div>
                 <div className="bg-white border border-border rounded px-14 py-12 print:shadow-none print:border-none"
                     style={{ fontFamily: '"Times New Roman", Times, serif', fontSize: '13px', lineHeight: '1.7' }}>
@@ -405,7 +536,8 @@ export const PlanIntervencion = ({ nna, onClose }: PIIProps) => {
                             <div key={key}>
                                 <p className="font-bold underline mb-2">{label}</p>
                                 <textarea value={(informeData as any)[key]}
-                                    onChange={e => setInformeData(p => ({ ...p, [key]: e.target.value }))} rows={rows}
+                                    onChange={e => { setInformeData(p => ({ ...p, [key]: e.target.value })); setInformeDirty(true); }} rows={rows}
+                                    placeholder="Escribir aquí..."
                                     className="w-full border border-dotted border-[#bbb] p-2 rounded-sm outline-none resize-vertical text-[13px] print:border-none print:p-0"
                                     style={{ fontFamily: 'inherit', lineHeight: 1.5 }} />
                             </div>
@@ -486,7 +618,7 @@ export const PlanIntervencion = ({ nna, onClose }: PIIProps) => {
                             </thead>
                             <tbody className="divide-y divide-border text-[13px] font-medium">
                                 {plans.map(plan => {
-                                    const vig = getVigencia(plan.fechaInicio || plan.createdAt);
+                                    const vig = getVigencia(plan.fechaInicio || plan.createdAt, plan.vigenciaDias);
                                     const total = plan.acciones?.length ?? 0;
                                     const done = plan.acciones?.filter(a => (a.estado as any) === 'CUMPLIDO' || (a.estado as any) === 'COMPLETADO').length ?? 0;
                                     const pct = total ? Math.round(done / total * 100) : 0;
@@ -545,7 +677,7 @@ export const PlanIntervencion = ({ nna, onClose }: PIIProps) => {
                     {/* Tarjetas (Móvil) */}
                     <div className="md:hidden divide-y divide-border">
                         {plans.map(plan => {
-                            const vig = getVigencia(plan.fechaInicio || plan.createdAt);
+                            const vig = getVigencia(plan.fechaInicio || plan.createdAt, plan.vigenciaDias);
                             const total = plan.acciones?.length ?? 0;
                             const done = plan.acciones?.filter(a => (a.estado as any) === 'CUMPLIDO' || (a.estado as any) === 'COMPLETADO').length ?? 0;
                             const pct = total ? Math.round(done / total * 100) : 0;
@@ -634,7 +766,7 @@ export const PlanIntervencion = ({ nna, onClose }: PIIProps) => {
             {/* ── Header ── */}
             <div className="bg-surface border-b border-border px-4 sm:px-6 py-3.5 flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden">
                 <div className="flex items-center gap-3">
-                    <button onClick={() => setViewMode('list')}
+                    <button onClick={async () => { if (await confirmLeaveBoard()) setViewMode('list'); }}
                         className="flex items-center gap-1.5 text-fg-muted hover:text-fg text-[13px] font-medium px-3 py-2 rounded-lg hover:bg-surface-muted border border-transparent hover:border-border transition-all">
                         <ArrowLeft size={14} /> Planes
                     </button>
@@ -701,8 +833,8 @@ export const PlanIntervencion = ({ nna, onClose }: PIIProps) => {
                             )}
                         </div>
                         <div className="text-center sm:text-right w-full sm:w-auto pt-3 sm:pt-0 border-t sm:border-t-0 border-border">
-                            <span className="inline-flex px-2 py-1 rounded-full bg-info-soft text-info text-[10px] font-bold uppercase mb-1">
-                                Fase 2 · Activo
+                            <span className={`inline-flex px-2 py-1 rounded-full text-[10px] font-bold uppercase mb-1 ${planCerrado ? 'bg-surface-muted text-fg-muted' : 'bg-info-soft text-info'}`}>
+                                {selectedPlan ? (planCerrado ? 'Cerrado' : `Activo · ${selectedPlan.vigenciaDias || 90} días`) : 'Nuevo plan'}
                             </span>
                             <p className="text-[11px] text-fg-muted">{objDone} de {objetivos.length} completados</p>
                         </div>
@@ -725,7 +857,7 @@ export const PlanIntervencion = ({ nna, onClose }: PIIProps) => {
                         <label className="block text-[11px] font-bold text-fg-muted uppercase tracking-wider mb-1.5">
                             Objetivo General de la Intervención
                         </label>
-                        <textarea value={objetivoGeneral} onChange={e => setObjetivoGeneral(e.target.value)} rows={2}
+                        <textarea value={objetivoGeneral} onChange={e => { setObjetivoGeneral(e.target.value); setIsDirty(true); }} rows={2}
                             className="w-full border border-border rounded-lg bg-surface text-fg text-[13px] outline-none resize-none focus:border-primary transition-colors"
                             style={{ padding: '10px 12px' }} />
                     </div>
@@ -841,13 +973,30 @@ export const PlanIntervencion = ({ nna, onClose }: PIIProps) => {
 
             {/* ── Footer ── */}
             <div className="bg-surface border-t border-border px-4 sm:px-6 py-3.5 flex items-center justify-between print:hidden">
-                <div />
+                <div className="flex items-center gap-2">
+                    {isDirty && !planCerrado && (
+                        <span className="text-[11px] font-semibold text-warning bg-warning-soft px-2.5 py-1 rounded-full">
+                            Cambios sin guardar
+                        </span>
+                    )}
+                    {planCerrado && (
+                        <span className="text-[11px] font-semibold text-fg-muted bg-surface-muted px-2.5 py-1 rounded-full">
+                            Plan cerrado · solo lectura
+                        </span>
+                    )}
+                    {selectedPlan?.id && !planCerrado && (
+                        <button onClick={() => setCierreOpen(true)}
+                            className="flex items-center gap-1.5 text-[12px] font-semibold text-danger hover:bg-danger-soft px-3 py-2 rounded-lg transition-colors">
+                            <X size={13} /> Cerrar Plan
+                        </button>
+                    )}
+                </div>
                 <div className="flex gap-2 w-full sm:w-auto">
-                    <button onClick={() => setMptiOpen(true)}
-                        className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-surface border border-border text-fg px-4 py-2 rounded-lg text-[13px] font-semibold hover:bg-surface-muted transition-all">
+                    <button onClick={() => setMptiOpen(true)} disabled={planCerrado}
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-surface border border-border text-fg px-4 py-2 rounded-lg text-[13px] font-semibold hover:bg-surface-muted transition-all disabled:opacity-40">
                         <Plus size={13} /> Nuevo Objetivo
                     </button>
-                    <button onClick={handleSave} disabled={isSaving}
+                    <button onClick={handleSave} disabled={isSaving || planCerrado}
                         className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-primary hover:bg-primary-hover text-white px-5 py-2 rounded-lg text-[13px] font-bold shadow-sm active:scale-95 transition-all disabled:opacity-50">
                         {isSaving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} Guardar Plan
                     </button>
@@ -963,13 +1112,47 @@ export const PlanIntervencion = ({ nna, onClose }: PIIProps) => {
 
                         {/* Modal footer */}
                         <div className="flex items-center justify-between border-t border-border px-4 py-3">
-                            <button onClick={() => { if (confirm('¿Eliminar este objetivo del plan?')) removeObjetivo(mobjIdx); }}
+                            <button onClick={async () => { if (await confirmar('Se eliminará el objetivo con todas sus actividades.', { titulo: 'Eliminar objetivo', textoConfirmar: 'Eliminar', peligro: true })) removeObjetivo(mobjIdx); }}
                                 className="flex items-center gap-1.5 text-[12px] font-semibold text-danger hover:bg-danger-soft px-3 py-2 rounded-lg transition-colors">
                                 <Trash2 size={13} /> Eliminar Objetivo
                             </button>
                             <button onClick={() => setMobjIdx(null)}
                                 className="flex items-center gap-1.5 bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg text-[13px] font-bold active:scale-95 transition-all">
                                 <CheckCircle size={13} /> Listo
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Modal: Cerrar plan ── */}
+            {cierreOpen && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-3 sm:p-4"
+                    onClick={() => setCierreOpen(false)}>
+                    <div className="bg-surface rounded-xl w-full max-w-md shadow-[var(--shadow-3)] overflow-hidden mx-auto"
+                        onClick={e => e.stopPropagation()}>
+                        <div className="border-b border-border px-4 py-3.5">
+                            <h3 className="text-[14px] font-semibold text-fg">Cerrar Plan de Intervención</h3>
+                            <p className="text-[11px] text-fg-muted mt-0.5">
+                                El plan pasará a solo lectura. Esta acción no se puede deshacer.
+                            </p>
+                        </div>
+                        <div className="px-4 py-4">
+                            <label className="block text-[11px] font-bold text-fg-muted uppercase tracking-wider mb-1.5">
+                                Observación de cierre (opcional)
+                            </label>
+                            <textarea value={obsCierre} onChange={e => setObsCierre(e.target.value)} rows={3}
+                                placeholder="Ej: Objetivos cumplidos; el NNA fue reinsertado al sistema educativo..."
+                                className="w-full border border-border rounded-lg bg-surface text-fg text-[13px] outline-none resize-none focus:border-primary transition-colors p-2.5" />
+                        </div>
+                        <div className="flex items-center justify-end gap-2 border-t border-border px-4 py-3">
+                            <button onClick={() => setCierreOpen(false)}
+                                className="text-[13px] font-medium text-fg-muted hover:text-fg px-4 py-2 rounded-lg hover:bg-surface-muted transition-colors">
+                                Cancelar
+                            </button>
+                            <button onClick={handleCerrarPlan} disabled={isClosing}
+                                className="flex items-center gap-1.5 bg-danger text-white px-4 py-2 rounded-lg text-[13px] font-bold active:scale-95 transition-all disabled:opacity-50">
+                                {isClosing ? <Loader2 size={13} className="animate-spin" /> : <X size={13} />} Cerrar Plan
                             </button>
                         </div>
                     </div>

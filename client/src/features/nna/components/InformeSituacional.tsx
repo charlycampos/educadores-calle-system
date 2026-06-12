@@ -1,4 +1,6 @@
 import { getToken } from '../../../utils/auth';
+import { confirmar } from '../../../components/ui/ConfirmDialog';
+import { toast } from '../../../components/ui/Toast';
 import { useState, useEffect } from 'react';
 import { Printer, Save, CheckCircle2 as CheckIcon, ClipboardList, MapPin, Users, CheckCircle2, FileSignature, PenLine } from 'lucide-react';
 import { EXPEDIENTE_API_URL } from '../../../config/api';
@@ -99,7 +101,7 @@ export const InformeSituacional = ({ nna, caso, onClose }: InformeSituacionalPro
     };
  
     const handleSaveBorrador = async () => {
-        if (!caso?.id) { alert('No existe un caso activo para este NNA'); return; }
+        if (!caso?.id) { toast.error('No existe un caso activo para este NNA'); return; }
         setIsSaving(true);
         try {
             const data = await saveToApi('BORRADOR');
@@ -107,18 +109,18 @@ export const InformeSituacional = ({ nna, caso, onClose }: InformeSituacionalPro
             if (data && data.codigo_informe) {
                 setCodigoInforme(data.codigo_informe);
             }
-            alert('Borrador guardado correctamente');
+            toast.success('Borrador guardado correctamente');
         } catch (e) {
             console.error(e);
-            alert('Error al guardar el borrador');
+            toast.error('Error al guardar el borrador');
         } finally {
             setIsSaving(false);
         }
     };
  
     const handleFinalizar = async () => {
-        if (!caso?.id) { alert('No existe un caso activo para este NNA'); return; }
-        if (!window.confirm('¿Confirmas que el informe situacional está completo y deseas finalizarlo? Esta acción lo registrará en el Expediente Digital.')) return;
+        if (!caso?.id) { toast.error('No existe un caso activo para este NNA'); return; }
+        if (!(await confirmar('El informe se registrará en el Expediente Digital y no podrá editarse.', { titulo: 'Finalizar informe situacional', textoConfirmar: 'Finalizar' }))) return;
         setIsFinalizing(true);
         try {
             const data = await saveToApi('FINALIZADO');
@@ -130,11 +132,11 @@ export const InformeSituacional = ({ nna, caso, onClose }: InformeSituacionalPro
             // Recargar los documentos en el store del expediente digital
             await useNnaStore.getState().loadDocuments(nna.id, nna);
  
-            alert('Informe finalizado y registrado en el Expediente Digital.');
+            toast.success('Informe finalizado y registrado en el Expediente Digital.');
             onClose();
         } catch (e) {
             console.error(e);
-            alert('Error al finalizar el informe');
+            toast.error('Error al finalizar el informe');
         } finally {
             setIsFinalizing(false);
         }

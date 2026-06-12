@@ -5,7 +5,7 @@ from slowapi.util import get_remote_address
 
 from src.domain.use_cases.login_use_case import LoginUseCase, LoginInput, UnauthorizedError
 from src.infrastructure.db.repositories.oracle_usuario_repository import OracleUsuarioRepository
-from src.infrastructure.http.middleware.jwt_middleware import generar_token, get_current_user
+from src.infrastructure.http.middleware.jwt_middleware import generar_token, generar_token_descarga, get_current_user
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -30,13 +30,13 @@ async def login(request: Request, body: LoginRequest):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
 
 
+@router.post("/download-token")
+async def download_token(current_user: dict = Depends(get_current_user)):
+    """Emite un token corto (5 min) para descargas de PDF en URLs."""
+    return {"token": generar_token_descarga(current_user), "expiresInSeconds": 300}
+
+
 @router.get("/me")
 async def me(current_user: dict = Depends(get_current_user)):
     """Devuelve el payload del token actual."""
-    return current_user
-
-
-@router.post("/verify")
-async def verify_token(current_user: dict = Depends(get_current_user)):
-    """Verifica que el token sea válido (usado por otros servicios)."""
-    return {"valid": True, "user": current_user}
+    ret

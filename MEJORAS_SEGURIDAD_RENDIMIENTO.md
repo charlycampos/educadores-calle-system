@@ -23,7 +23,7 @@ En todos los `main.py`. Cualquier web puede llamar a la API con el token del usu
 `/api/expediente/upload` valida solo la extensión `.pdf` y lee todo el archivo en memoria (`await file.read()`). Un archivo gigante tumba el servicio; un PDF falso se acepta.
 **Fix:** verificar magic bytes (`content[:5] == b"%PDF-"`), límite de tamaño (p. ej. 10 MB) leyendo por chunks, y sanitizar `file.filename` (ya usa UUID de prefijo, bien, pero el nombre original va al filesystem).
 
-### 6. Token JWT por query param en descargas de PDF
+### 6. Token JWT por query param en descargas de PDF ✅ APLICADO (token corto scope=download, 5 min)
 `/documento/{filename}?token=...` — los tokens quedan en logs del servidor, historial del navegador y cabeceras Referer.
 **Fix:** usar cookie o header; si el query param es inevitable (visor PDF), emitir un token corto de un solo uso para descargas.
 

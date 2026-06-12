@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { confirmar } from '../../components/ui/ConfirmDialog';
+import { toast } from '../../components/ui/Toast';
 import {
     Presentation, Plus, X, Edit, FileText, LayoutGrid, List as ListIcon,
     Calendar as CalendarIcon, Clock, Users, MapPin, CheckCircle2,
@@ -130,7 +132,7 @@ export const TalleresPage = () => {
             setTimeout(() => setSaveSuccess(false), 3500);
         } catch (error) {
             console.error("Error saving taller", error);
-            alert("Error al guardar el taller. Verifique los datos.");
+            toast.error("Error al guardar el taller. Verifique los datos.");
         } finally {
             setLoading(false);
         }
@@ -138,7 +140,7 @@ export const TalleresPage = () => {
 
     const handleAddParticipant = async (nna: { id: number }) => {
         if (!currentTaller?.id) {
-            alert("Primero guarda el taller para agregar participantes.");
+            toast.info("Primero guarda el taller para agregar participantes.");
             return;
         }
         try {
@@ -148,7 +150,7 @@ export const TalleresPage = () => {
             setTalleres(prev => prev.map(t => t.id === updated.id ? updated : t));
         } catch (error) {
             console.error("Error adding participant", error);
-            alert("Error o ya agregado.");
+            toast.error("Error o ya agregado.");
         }
         setSearchTerm('');
     };
@@ -195,7 +197,7 @@ export const TalleresPage = () => {
 
     const handleRemoveParticipant = async (nnaId: number) => {
         if (!currentTaller?.id) return;
-        if (!confirm('¿Estás seguro de eliminar a este participante del taller?')) return;
+        if (!(await confirmar('Se eliminará a este participante del taller.', { titulo: 'Eliminar participante', textoConfirmar: 'Eliminar', peligro: true }))) return;
 
         try {
             await removeParticipante(currentTaller.id, nnaId);
@@ -204,7 +206,7 @@ export const TalleresPage = () => {
             setTalleres(prev => prev.map(t => t.id === updated.id ? updated : t));
         } catch (error) {
             console.error("Error removing participant", error);
-            alert("Error al eliminar participante.");
+            toast.error("Error al eliminar participante.");
         }
     };
 
@@ -237,7 +239,7 @@ export const TalleresPage = () => {
             setCurrentTaller(updated);
             setTalleres(prev => prev.map(t => t.id === updated.id ? updated : t));
         } catch (error) {
-            alert("Error guardando evaluación");
+            toast.error("Error guardando evaluación");
         }
     };
 
@@ -255,7 +257,7 @@ export const TalleresPage = () => {
         const element = document.getElementById(elementId);
         if (!element) {
             console.error(`[PDF] Elemento no encontrado: ${elementId}`);
-            alert(`Error técnico: No se pudo encontrar el documento para generar el PDF (${elementId}).`);
+            toast.error(`Error técnico: No se pudo encontrar el documento para generar el PDF (${elementId}).`);
             return;
         }
 
@@ -312,7 +314,7 @@ export const TalleresPage = () => {
             pdf.save(`${filename}.pdf`);
         } catch (error) {
             console.error('Error generating PDF:', error);
-            alert('Error al generar el PDF. Por favor, intente de nuevo.');
+            toast.error('Error al generar el PDF. Por favor, intente de nuevo.');
         } finally {
             setIsGeneratingPDF(false);
         }
@@ -811,7 +813,7 @@ export const TalleresPage = () => {
                                         <button
                                             onClick={() => {
                                                 if (!currentTaller.id) {
-                                                    alert("Guarda la planificación primero para agregar participantes.");
+                                                    toast.info("Guarda la planificación primero para agregar participantes.");
                                                     return;
                                                 }
                                                 setShowNnaSelector(true);

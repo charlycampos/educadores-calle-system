@@ -1,24 +1,18 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { toast } from '../../components/ui/Toast';
 import { useForm } from 'react-hook-form';
-import { X, Search, ChevronLeft, Mic, MicOff, Calendar, MapPin, BookOpen, User } from 'lucide-react';
+import { X, Search, ChevronLeft, Mic, MicOff, Calendar, MapPin, BookOpen, User, Camera, FileImage, PenTool } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useNnaStore } from '../../store/nna.store';
 import { createEntradaDiario } from '../../api/diario.api';
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 
-const ESTADO_FISICO = [
-    { value: 'BUENO',   label: 'Bueno',   cls: 'bg-green-100 border-green-400 text-green-800' },
-    { value: 'REGULAR', label: 'Regular', cls: 'bg-yellow-100 border-yellow-400 text-yellow-800' },
-    { value: 'MALO',    label: 'Malo',    cls: 'bg-red-100 border-red-400 text-red-800' },
-];
-
-const ESTADO_ANIMO = [
-    { value: 'TRANQUILO', label: 'Tranquilo', emoji: '😌' },
-    { value: 'ALEGRE',    label: 'Alegre',    emoji: '😊' },
-    { value: 'TRISTE',    label: 'Triste',    emoji: '😢' },
-    { value: 'AGRESIVO',  label: 'Agresivo',  emoji: '😡' },
-    { value: 'ANSIOSO',   label: 'Ansioso',   emoji: '😰' },
+const TIPOS_ACTIVIDAD = [
+    { value: 'CONSEJERIA', label: 'Consejería', icon: '💬', color: 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100' },
+    { value: 'COORDINACION', label: 'Coordinación', icon: '🤝', color: 'bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100' },
+    { value: 'VISITA', label: 'Visita Domiciliaria', icon: '🏠', color: 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100' },
+    { value: 'RECORRIDO', label: 'Abordaje / Campo', icon: '🚶', color: 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100' },
 ];
 
 const getSpeechAPI = () =>
@@ -30,8 +24,7 @@ interface DiarioFormValues {
     fecha: string;
     ubicacion: string;
     actividad: string;
-    estadoFisico: string;
-    estadoAnimo: string;
+    tipoActividad: string;
 }
 
 interface NnaOption {
@@ -58,6 +51,11 @@ export const DiarioCampoModal: React.FC<Props> = ({ open, onClose }) => {
     const [saving, setSaving]           = useState(false);
     const [savedOk, setSavedOk]         = useState(false);
 
+    // Evidencias: Foto y Firma
+    const [fotoB64, setFotoB64] = useState<string | null>(null);
+    const [isDrawing, setIsDrawing] = useState(false);
+    const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
     // Voz
     const [isListening, setIsListening] = useState(false);
     const [interim, setInterim]         = useState('');
@@ -69,14 +67,12 @@ export const DiarioCampoModal: React.FC<Props> = ({ open, onClose }) => {
             fecha:        new Date().toISOString().slice(0, 16),
             ubicacion:    '',
             actividad:    '',
-            estadoFisico: 'BUENO',
-            estadoAnimo:  'TRANQUILO',
+            tipoActividad: 'CONSEJERIA',
         },
     });
 
-    const narracion    = watch('actividad');
-    const estadoFisico = watch('estadoFisico');
-    const estadoAnimo  = watch('estadoAnimo');
+    const narracion     = watch('actividad');
+    const tipoActividad = watch('tipoActividad');
 
     // Cargar NNAs al abrir
     useEffect(() => {
@@ -86,12 +82,12 @@ export const DiarioCampoModal: React.FC<Props> = ({ open, onClose }) => {
             setSearch('');
             setSelected(null);
             setSavedOk(false);
+            setFotoB64(null);
             reset({
                 fecha: new Date().toISOString().slice(0, 16),
                 ubicacion: '',
                 actividad: '',
-                estadoFisico: 'BUENO',
-                estadoAnimo: 'TRANQUILO',
+                tipoActividad: 'CONSEJERIA',
             });
         }
     }, [open]);
@@ -131,23 +127,103 @@ export const DiarioCampoModal: React.FC<Props> = ({ open, onClose }) => {
         setStep('formulario');
     };
 
+    // ── Manejo de Firma (Canvas) ──────────────────────────────────────────────
+
+    const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = '#1e293b';
+
+        const rect = canvas.getBoundingClientRect();
+        const x = ('touches' in e) ? e.touches[0].clientX - rect.left : e.clientX - rect.left;
+        const y = ('touches' in e) ? e.touches[0].clientY - rect.top : e.clientY - rect.top;
+
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        setIsDrawing(true);
+    };
+
+    const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+        if (!isDrawing) return;
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        const rect = canvas.getBoundingClientRect();
+        const x = ('touches' in e) ? e.touches[0].clientX - rect.left : e.clientX - rect.left;
+        const y = ('touches' in e) ? e.touches[0].clientY - rect.top : e.clientY - rect.top;
+
+        ctx.lineTo(x, y);
+        ctx.stroke();
+    };
+
+    const stopDrawing = () => {
+        setIsDrawing(false);
+    };
+
+    const clearSignature = () => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    };
+
+    // ── Carga de Foto ────────────────────────────────────────────────────────
+
+    const handleFotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setFotoB64(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+    };
+
     // ── Guardar ────────────────────────────────────────────────────────────────
 
     const onSave = async (data: DiarioFormValues) => {
         if (!data.actividad.trim() || !selected) return;
         setSaving(true);
+
+        // Obtener firma del canvas
+        let signatureB64 = '';
+        const canvas = canvasRef.current;
+        if (canvas) {
+            const blank = document.createElement('canvas');
+            blank.width = canvas.width;
+            blank.height = canvas.height;
+            if (canvas.toDataURL() !== blank.toDataURL()) {
+                signatureB64 = canvas.toDataURL();
+            }
+        }
+
+        // Serializamos metadatos en "observaciones"
+        const obsJson = JSON.stringify({
+            tipoActividad: data.tipoActividad,
+            foto: fotoB64 || undefined,
+            firma: signatureB64 || undefined,
+            fechaRegistro: new Date().toISOString()
+        });
+
         try {
             await createEntradaDiario(selected.casoId, {
                 fecha:        data.fecha,
                 ubicacion:    data.ubicacion,
                 actividad:    data.actividad,
-                estadoFisico: data.estadoFisico,
-                estadoAnimo:  data.estadoAnimo,
+                observaciones: obsJson,
             });
             setSavedOk(true);
             setTimeout(() => onClose(), 1400);
         } catch {
-            alert('Error al guardar. Intente nuevamente.');
+            toast.error('Error al guardar. Intente nuevamente.');
         } finally {
             setSaving(false);
         }
@@ -197,7 +273,7 @@ export const DiarioCampoModal: React.FC<Props> = ({ open, onClose }) => {
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
 
             {/* Panel */}
-            <div className="relative bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl shadow-2xl flex flex-col max-h-[92vh] overflow-hidden">
+            <div className="relative bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl shadow-2xl flex flex-col max-h-[95vh] overflow-hidden">
 
                 {/* ── Header ── */}
                 <div className="flex items-center justify-between px-4 py-3.5 bg-green-600 text-white flex-shrink-0">
@@ -277,6 +353,31 @@ export const DiarioCampoModal: React.FC<Props> = ({ open, onClose }) => {
 
                         <div className="overflow-y-auto flex-1 p-4 space-y-4">
 
+                            {/* Selector de Tipo de Actividad */}
+                            <div>
+                                <label className="block text-[11px] font-bold text-gray-500 uppercase mb-2">
+                                    Tipo de Actividad Obligatoria
+                                </label>
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                    {TIPOS_ACTIVIDAD.map(({ value, label, icon, color }) => (
+                                        <button
+                                            key={value}
+                                            type="button"
+                                            onClick={() => setValue('tipoActividad', value)}
+                                            className={clsx(
+                                                'px-3 py-2 rounded-xl border-2 font-bold text-xs flex flex-col items-center gap-1 transition-all active:scale-95 text-center',
+                                                tipoActividad === value
+                                                    ? 'bg-green-50 border-green-500 text-green-700 ring-2 ring-green-100 scale-102 font-black'
+                                                    : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                                            )}
+                                        >
+                                            <span className="text-lg">{icon}</span>
+                                            <span>{label}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
                             {/* Fecha + Ubicación */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
@@ -301,45 +402,6 @@ export const DiarioCampoModal: React.FC<Props> = ({ open, onClose }) => {
                                 </div>
                             </div>
 
-                            {/* Estado físico */}
-                            <div>
-                                <label className="block text-[11px] font-bold text-gray-500 uppercase mb-2">Estado físico observado</label>
-                                <div className="flex gap-2 flex-wrap">
-                                    {ESTADO_FISICO.map(({ value, label, cls }) => (
-                                        <button key={value} type="button"
-                                            onClick={() => setValue('estadoFisico', value)}
-                                            className={clsx(
-                                                'px-4 py-2 rounded-xl border-2 font-bold text-sm transition-all active:scale-95',
-                                                estadoFisico === value
-                                                    ? cls + ' ring-2 ring-offset-1 ring-current scale-105'
-                                                    : 'bg-white border-gray-200 text-gray-500'
-                                            )}>
-                                            {label}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Estado ánimo */}
-                            <div>
-                                <label className="block text-[11px] font-bold text-gray-500 uppercase mb-2">Estado de ánimo</label>
-                                <div className="flex gap-2 flex-wrap">
-                                    {ESTADO_ANIMO.map(({ value, label, emoji }) => (
-                                        <button key={value} type="button"
-                                            onClick={() => setValue('estadoAnimo', value)}
-                                            className={clsx(
-                                                'px-3 py-2 rounded-xl border-2 font-bold text-sm flex items-center gap-1.5 transition-all active:scale-95',
-                                                estadoAnimo === value
-                                                    ? 'bg-blue-100 border-blue-400 text-blue-800 ring-2 ring-offset-1 ring-blue-400 scale-105'
-                                                    : 'bg-white border-gray-200 text-gray-500'
-                                            )}>
-                                            <span>{emoji}</span>
-                                            <span className="hidden sm:inline">{label}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
                             {/* Narración */}
                             <div>
                                 <div className="flex items-center justify-between mb-1.5">
@@ -360,7 +422,7 @@ export const DiarioCampoModal: React.FC<Props> = ({ open, onClose }) => {
                                 </div>
                                 <div className="relative">
                                     <textarea
-                                        rows={6}
+                                        rows={5}
                                         value={narracion}
                                         onChange={e => setValue('actividad', e.target.value)}
                                         placeholder={isListening
@@ -379,12 +441,57 @@ export const DiarioCampoModal: React.FC<Props> = ({ open, onClose }) => {
                                         </div>
                                     )}
                                 </div>
-                                {hasSpeech && (
-                                    <p className="text-[10px] text-gray-400 mt-1">
-                                        Toca <strong>Dictar</strong> y habla — el texto aparece automáticamente.
-                                    </p>
-                                )}
                             </div>
+
+                            {/* Evidencias: Foto y Firma */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-gray-100 pt-4">
+                                {/* Foto Evidencia */}
+                                <div>
+                                    <label className="block text-[11px] font-bold text-gray-500 uppercase mb-2">
+                                        <Camera size={12} className="inline mr-1" /> Foto / Documento Evidencia
+                                    </label>
+                                    <div className="border-2 border-dashed border-gray-200 rounded-xl p-3 flex flex-col items-center justify-center bg-gray-50 min-h-[100px] relative overflow-hidden">
+                                        {fotoB64 ? (
+                                            <div className="w-full h-full flex flex-col items-center justify-center">
+                                                <img src={fotoB64} alt="Evidencia" className="max-h-[70px] rounded border" />
+                                                <button type="button" onClick={() => setFotoB64(null)} className="mt-1 text-[10px] font-bold text-red-500 hover:underline">Quitar</button>
+                                            </div>
+                                        ) : (
+                                            <label className="cursor-pointer flex flex-col items-center justify-center w-full h-full">
+                                                <FileImage className="text-gray-300 mb-0.5" size={20} />
+                                                <span className="text-[10px] font-bold text-gray-500">Subir foto</span>
+                                                <input type="file" accept="image/*" onChange={handleFotoChange} className="hidden" />
+                                            </label>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Firma Digital */}
+                                <div>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <label className="block text-[11px] font-bold text-gray-500 uppercase">
+                                            <PenTool size={12} className="inline mr-1" /> Firma Tutor / NNA
+                                        </label>
+                                        <button type="button" onClick={clearSignature} className="text-[10px] font-bold text-gray-400 hover:text-red-500">Limpiar</button>
+                                    </div>
+                                    <div className="border-2 border-dashed border-gray-200 rounded-xl overflow-hidden bg-white h-[100px]">
+                                        <canvas
+                                            ref={canvasRef}
+                                            width={240}
+                                            height={100}
+                                            onMouseDown={startDrawing}
+                                            onMouseMove={draw}
+                                            onMouseUp={stopDrawing}
+                                            onMouseLeave={stopDrawing}
+                                            onTouchStart={startDrawing}
+                                            onTouchMove={draw}
+                                            onTouchEnd={stopDrawing}
+                                            className="w-full h-full cursor-crosshair touch-none"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
                         </div>
 
                         {/* Botón guardar — fijo en el footer */}

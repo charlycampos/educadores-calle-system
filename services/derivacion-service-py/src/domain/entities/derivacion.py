@@ -32,6 +32,14 @@ class DerivacionResponse(DerivacionBase):
     fecha_respuesta: Optional[datetime] = None
     observaciones: Optional[str] = None
 
+    # Datos enriquecidos para las bandejas (nombres en vez de IDs)
+    remitente_nombre: Optional[str] = None
+    destinatario_nombre: Optional[str] = None
+    nna_nombre: Optional[str] = None
+    nna_id: Optional[int] = None
+    carpeta_id: Optional[int] = None
+    codigo_caso: Optional[str] = None
+
     class Config:
         from_attributes = True
 

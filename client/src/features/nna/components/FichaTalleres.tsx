@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { confirmar } from '../../../components/ui/ConfirmDialog';
+import { toast } from '../../../components/ui/Toast';
 import {
     Calendar, MapPin, CheckCircle2, User, Plus, Link2,
     StickyNote, AlertTriangle, Lightbulb, BookOpen,
@@ -101,7 +103,7 @@ export const FichaTalleres = ({ nna }: FichaTalleresProps) => {
             pdf.save(`${filename}.pdf`);
         } catch (error) {
             console.error('Error generating PDF:', error);
-            alert('Error al generar el PDF. Por favor, intente de nuevo.');
+            toast.error('Error al generar el PDF. Por favor, intente de nuevo.');
         } finally {
             setIsGeneratingPDF(false);
         }
@@ -184,13 +186,13 @@ export const FichaTalleres = ({ nna }: FichaTalleresProps) => {
                 cierreActividad: ''
             });
         } catch (err) {
-            alert('Error al crear taller');
+            toast.error('Error al crear taller');
         }
     };
 
     // Bug 3 fix: ejecutar taller directamente desde el expediente
     const handleEjecutar = async (taller: any) => {
-        if (!confirm(`¿Confirmar que el taller "${taller.nombre}" ya fue ejecutado?`)) return;
+        if (!(await confirmar(`¿Confirmar que el taller "${taller.nombre}" ya fue ejecutado?`, { titulo: 'Registrar ejecución', textoConfirmar: 'Sí, ejecutado' }))) return;
         try {
             setLoading(true);
             // Obtener lista completa de participantes para no perderlos al ejecutar
@@ -203,7 +205,7 @@ export const FichaTalleres = ({ nna }: FichaTalleresProps) => {
             await loadTalleres();
         } catch (err) {
             console.error(err);
-            alert('Error al registrar la ejecución del taller.');
+            toast.error('Error al registrar la ejecución del taller.');
         } finally {
             setLoading(false);
         }
@@ -215,7 +217,7 @@ export const FichaTalleres = ({ nna }: FichaTalleresProps) => {
             setShowInscribirModal(false);
             loadTalleres();
         } catch (err) {
-            alert('Error al inscribir');
+            toast.error('Error al inscribir');
         }
     };
 
@@ -228,7 +230,7 @@ export const FichaTalleres = ({ nna }: FichaTalleresProps) => {
             setSelectedTaller(null);
             loadTalleres();
         } catch (err) {
-            alert('Error al guardar evaluación');
+            toast.error('Error al guardar evaluación');
         }
     };
 

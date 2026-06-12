@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { toast } from '../../components/ui/Toast';
 import { useNnaStore } from '../../store/nna.store';
 import { useAuthStore } from '../../store/auth.store';
 import { ROLES } from '../../config/api';
@@ -53,7 +54,7 @@ export const NnaListPage = () => {
             });
             setIsDerivacionOpen(true);
         } else {
-            alert('Este beneficiario no tiene casos activos para derivar.');
+            toast.info('Este beneficiario no tiene casos activos para derivar.');
         }
     };
 

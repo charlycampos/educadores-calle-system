@@ -1,5 +1,6 @@
 
 import { useState } from 'react';
+import { toast } from '../../../components/ui/Toast';
 import { Plus, FileText, Printer, Calendar, Save, Trash2, Edit, Loader2, FileDown } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -80,7 +81,7 @@ export const InformesMensualesList = ({ nna }: { nna: any }) => {
 
         } catch (e) {
             console.error(e);
-            alert('Error al generar PDF');
+            toast.error('Error al generar PDF');
         } finally {
             setIsGenerating(false);
             document.body.removeChild(hiddenDiv);

@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { confirmar } from '../../components/ui/ConfirmDialog';
+import { toast } from '../../components/ui/Toast';
 import { useAuthStore } from '../../store/auth.store';
 import { getUsers, createUser, updateUser, deleteUser, type Usuario } from '../../api/usuario.api';
 import { getSedesAll, type Sede } from '../../api/sedes.api';
@@ -95,13 +97,13 @@ export const UserListPage = () => {
             if (editingUser) {
                 await updateUser(editingUser.id, payload);
             } else {
-                if (!payload.password) { alert('La contraseña es requerida'); return; }
+                if (!payload.password) { toast.info('La contraseña es requerida'); return; }
                 await createUser(payload);
             }
             closeModal();
             loadUsers();
         } catch (e: any) {
-            alert(e.message || 'Error al guardar usuario');
+            toast.error(e.message || 'Error al guardar usuario');
         }
     };
 
@@ -136,12 +138,12 @@ export const UserListPage = () => {
     };
 
     const handleDelete = async (id: number) => {
-        if (!confirm('¿Seguro de eliminar este usuario? Esta acción no se puede deshacer.')) return;
+        if (!(await confirmar('Se eliminará este usuario de forma permanente. Esta acción no se puede deshacer.', { titulo: 'Eliminar usuario', textoConfirmar: 'Eliminar', peligro: true }))) return;
         try {
             await deleteUser(id);
             loadUsers();
         } catch (e: any) {
-            alert(e.message || 'Error al eliminar usuario');
+            toast.error(e.message || 'Error al eliminar usuario');
         }
     };
 
