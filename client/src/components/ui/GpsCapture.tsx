@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { LocateFixed, Loader2, X } from 'lucide-react';
-import { capturarUbicacion, type Coordenadas } from '../../utils/geo';
+import { capturarUbicacion, urlMapa, type Coordenadas } from '../../utils/geo';
 
 // Botón de captura GPS para el diario de campo.
 // Opcional por diseño: si el permiso falla, el registro sigue con la ubicación en texto.
@@ -30,9 +30,14 @@ export const GpsCapture = ({ coords, onChange }: Props) => {
     return (
         <div className="flex items-center gap-2 mt-1.5 flex-wrap">
             {coords ? (
-                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-green-700 bg-green-50 border border-green-200 px-2.5 py-1 rounded-lg">
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-green-700 bg-green-50 border border-green-200 px-2.5 py-1 rounded-lg flex-wrap">
                     <LocateFixed size={12} />
-                    Ubicación capturada (±{coords.precision} m)
+                    <span className="font-mono">{coords.latitud.toFixed(5)}, {coords.longitud.toFixed(5)}</span>
+                    <span className="font-medium text-green-600">(±{coords.precision} m)</span>
+                    <a href={urlMapa(coords.latitud, coords.longitud)} target="_blank" rel="noreferrer"
+                        className="text-blue-600 hover:underline" title="Verificar el punto en el mapa">
+                        ver
+                    </a>
                     <button type="button" onClick={() => onChange(null)}
                         className="opacity-50 hover:opacity-100 transition-opacity" title="Quitar coordenadas">
                         <X size={11} />
