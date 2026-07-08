@@ -61,17 +61,21 @@ export const Formato3Print = ({ nna, expediente, caso }: Formato3Props) => {
             <table style={tableStyle as any}>
                 <tbody>
                     <tr>
-                        <td style={tdStyle} width="33%">
-                            <span style={labelStyle as any}>Distrito Intervención</span>
-                            <div style={valueStyle as any}>{caso?.zonaIntervencion}</div>
+                        <td style={tdStyle} width="25%">
+                            <span style={labelStyle as any}>Región / Dpto.</span>
+                            <div style={valueStyle as any}>{caso?.departamentoIntervencion || '---'}</div>
                         </td>
-                        <td style={tdStyle} width="33%">
-                            <span style={labelStyle as any}>Provincia / Región Dom.</span>
-                            <div style={valueStyle as any}>{nna.provinciaDom || 'LIMA'} / {nna.departamentoDom || 'LIMA'}</div>
+                        <td style={tdStyle} width="25%">
+                            <span style={labelStyle as any}>Provincia</span>
+                            <div style={valueStyle as any}>{caso?.provinciaIntervencion || '---'}</div>
                         </td>
-                        <td style={tdStyle} width="33%">
+                        <td style={tdStyle} width="25%">
+                            <span style={labelStyle as any}>Distrito / Zona</span>
+                            <div style={valueStyle as any}>{caso?.distritoIntervencion || '---'} / {caso?.zonaIntervencion || '---'}</div>
+                        </td>
+                        <td style={tdStyle} width="25%">
                             <span style={labelStyle as any}>Modalidad Permanencia</span>
-                            <div style={valueStyle as any}>{caso?.situacionCalle?.replace(/_/g, ' ')}</div>
+                            <div style={valueStyle as any}>{caso?.situacionCalle?.replace(/_/g, ' ') || '---'}</div>
                         </td>
                     </tr>
                     <tr>

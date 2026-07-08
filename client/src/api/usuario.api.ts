@@ -25,13 +25,13 @@ export interface Usuario {
 }
 
 export const getUsers = async (): Promise<Usuario[]> => {
-    const response = await fetch(`${API_URL}/usuarios`, { headers: getHeaders() });
+    const response = await fetch(`${API_URL}/usuarios/`, { headers: getHeaders() });
     if (!response.ok) throw new Error('Error fetching users');
     return response.json();
 };
 
 export const createUser = async (user: Partial<Usuario>) => {
-    const response = await fetch(`${API_URL}/usuarios`, {
+    const response = await fetch(`${API_URL}/usuarios/`, {
         method: 'POST',
         headers: getHeaders(),
         body: JSON.stringify(user)

@@ -6,7 +6,9 @@ import { useForm } from 'react-hook-form';
 import { X, Search, ChevronLeft, Mic, MicOff, Calendar, MapPin, BookOpen, User, Camera, FileImage, PenTool } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useNnaStore } from '../../store/nna.store';
-import { createEntradaDiario } from '../../api/diario.api';
+import { createEntradaDiario, updateEntradaDiario } from '../../api/diario.api';
+import { getToken } from '../../utils/auth';
+import { INTERVENCION_API_URL, EXPEDIENTE_API_URL } from '../../config/api';
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 
@@ -27,6 +29,15 @@ interface DiarioFormValues {
     ubicacion: string;
     actividad: string;
     tipoActividad: string;
+    tipoInstitucion?: string;
+    nombreInstitucion?: string;
+    contactoInstitucion?: string;
+    actividadProgramada?: string;
+    estadoActividad?: string;
+    horaInicio?: string;
+    horaFin?: string;
+    resultadosObtenidos?: string;
+    observacionesTexto?: string;
 }
 
 interface NnaOption {
@@ -39,12 +50,13 @@ interface NnaOption {
 interface Props {
     open: boolean;
     onClose: () => void;
+    entradaEditar?: any | null;
 }
 
 // ── Componente ────────────────────────────────────────────────────────────────
 
-export const DiarioCampoModal: React.FC<Props> = ({ open, onClose }) => {
-    const { nnas, fetchAllNnas } = useNnaStore();
+export const DiarioCampoModal: React.FC<Props> = ({ open, onClose, entradaEditar }) => {
+    const { nnas, fetchAllNnas, registerDocument } = useNnaStore();
 
     // Pasos: 'buscar' | 'formulario'
     const [step, setStep]               = useState<'buscar' | 'formulario'>('buscar');
@@ -52,6 +64,7 @@ export const DiarioCampoModal: React.FC<Props> = ({ open, onClose }) => {
     const [selected, setSelected]       = useState<NnaOption | null>(null);
     const [saving, setSaving]           = useState(false);
     const [savedOk, setSavedOk]         = useState(false);
+    const [esInstitucional, setEsInstitucional] = useState(false);
 
     // Coordenadas GPS (opcionales)
     const [coords, setCoords] = useState<Coordenadas | null>(null);
@@ -73,30 +86,125 @@ export const DiarioCampoModal: React.FC<Props> = ({ open, onClose }) => {
             ubicacion:    '',
             actividad:    '',
             tipoActividad: 'CONSEJERIA',
+            actividadProgramada: '',
+            estadoActividad: 'PENDIENTE',
+            horaInicio: '',
+            horaFin: '',
+            resultadosObtenidos: '',
+            observacionesTexto: '',
         },
     });
 
     const narracion     = watch('actividad');
     const tipoActividad = watch('tipoActividad');
+    const estadoActividadVal = watch('estadoActividad');
+    const isPendiente = estadoActividadVal === 'PENDIENTE';
 
     // Cargar NNAs al abrir
     useEffect(() => {
         if (open) {
             fetchAllNnas();
-            setStep('buscar');
-            setSearch('');
-            setSelected(null);
             setSavedOk(false);
-            setFotoB64(null);
-            setCoords(null);
-            reset({
-                fecha: new Date().toISOString().slice(0, 16),
-                ubicacion: '',
-                actividad: '',
-                tipoActividad: 'CONSEJERIA',
-            });
+
+            if (entradaEditar) {
+                if (entradaEditar.id) {
+                    setStep('formulario');
+                    setEsInstitucional(!!entradaEditar.esInstitucional);
+                    if (entradaEditar.casoId || entradaEditar.nnaNombre) {
+                        setSelected({
+                            nnaId: 0,
+                            casoId: entradaEditar.casoId || 0,
+                            nombre: entradaEditar.nnaNombre
+                        });
+                    } else {
+                        setSelected(null);
+                    }
+                    setFotoB64(entradaEditar.foto || null);
+                    if (entradaEditar.latitud && entradaEditar.longitud) {
+                        setCoords({ latitud: entradaEditar.latitud, longitud: entradaEditar.longitud, precision: 0 });
+                    } else {
+                        setCoords(null);
+                    }
+                    reset({
+                        fecha: entradaEditar.fecha ? new Date(entradaEditar.fecha).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16),
+                        ubicacion: entradaEditar.ubicacion || '',
+                        actividad: (entradaEditar.actividad === "(Pendiente de ejecución)" ? '' : (entradaEditar.actividad || '')),
+                        tipoActividad: entradaEditar.tipoActividad || 'CONSEJERIA',
+                        tipoInstitucion: entradaEditar.tipoInstitucion || 'OTRO',
+                        nombreInstitucion: entradaEditar.nombreInstitucion || '',
+                        contactoInstitucion: entradaEditar.contactoInstitucion || '',
+                        actividadProgramada: entradaEditar.actividadProgramada || '',
+                        estadoActividad: entradaEditar.estadoActividad || 'PENDIENTE',
+                        horaInicio: entradaEditar.horaInicio || '',
+                        horaFin: entradaEditar.horaFin || '',
+                        resultadosObtenidos: entradaEditar.resultadosObtenidos || '',
+                        observacionesTexto: entradaEditar.observacionesTexto || '',
+                    });
+                } else {
+                    setStep('buscar');
+                    setSearch('');
+                    setSelected(null);
+                    setFotoB64(null);
+                    setCoords(null);
+                    setEsInstitucional(false);
+                    reset({
+                        fecha: entradaEditar.fecha ? new Date(entradaEditar.fecha).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16),
+                        ubicacion: '',
+                        actividad: '',
+                        tipoActividad: 'CONSEJERIA',
+                        actividadProgramada: '',
+                        estadoActividad: 'PENDIENTE',
+                        horaInicio: '',
+                        horaFin: '',
+                        resultadosObtenidos: '',
+                        observacionesTexto: '',
+                    });
+                }
+            } else {
+                setStep('buscar');
+                setSearch('');
+                setSelected(null);
+                setFotoB64(null);
+                setCoords(null);
+                setEsInstitucional(false);
+                reset({
+                    fecha: new Date().toISOString().slice(0, 16),
+                    ubicacion: '',
+                    actividad: '',
+                    tipoActividad: 'CONSEJERIA',
+                    actividadProgramada: '',
+                    estadoActividad: 'PENDIENTE',
+                    horaInicio: '',
+                    horaFin: '',
+                    resultadosObtenidos: '',
+                    observacionesTexto: '',
+                });
+            }
         }
-    }, [open]);
+    }, [open, entradaEditar]);
+ 
+    // Cargar la firma en el canvas si existe al abrir el formulario
+    useEffect(() => {
+        if (open && step === 'formulario') {
+            const timer = setTimeout(() => {
+                const canvas = canvasRef.current;
+                if (canvas) {
+                    const ctx = canvas.getContext('2d');
+                    if (ctx) {
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        if (entradaEditar?.firma) {
+                            const img = new Image();
+                            img.onload = () => {
+                                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                            };
+                            img.src = entradaEditar.firma;
+                        }
+                    }
+                }
+            }, 100);
+            return () => clearTimeout(timer);
+        }
+    }, [open, entradaEditar, step]);
 
     // Detener micrófono al cerrar
     useEffect(() => {
@@ -196,7 +304,17 @@ export const DiarioCampoModal: React.FC<Props> = ({ open, onClose }) => {
     // ── Guardar ────────────────────────────────────────────────────────────────
 
     const onSave = async (data: DiarioFormValues) => {
-        if (!data.actividad.trim() || !selected) return;
+        if (data.estadoActividad !== 'PENDIENTE') {
+            if (!data.actividad?.trim()) {
+                toast.error('Debe ingresar la narración/desarrollo para guardar una actividad realizada, reprogramada o cancelada.');
+                return;
+            }
+            if (!data.ubicacion?.trim()) {
+                toast.error('Debe ingresar la ubicación para guardar una actividad realizada, reprogramada o cancelada.');
+                return;
+            }
+        }
+        if (!esInstitucional && !selected) return;
         setSaving(true);
 
         // Obtener firma del canvas
@@ -211,23 +329,110 @@ export const DiarioCampoModal: React.FC<Props> = ({ open, onClose }) => {
             }
         }
 
-        // Serializamos metadatos en "observaciones"
+        // Serializamos metadatos en "observaciones" — foto y firma se guardan aparte como archivos
         const obsJson = JSON.stringify({
             tipoActividad: data.tipoActividad,
-            foto: fotoB64 || undefined,
-            firma: signatureB64 || undefined,
-            fechaRegistro: new Date().toISOString()
+            fechaRegistro: new Date().toISOString(),
+            esInstitucional: esInstitucional,
+            tipoInstitucion: data.tipoInstitucion || undefined,
+            nombreInstitucion: data.nombreInstitucion || undefined,
+            contactoInstitucion: data.contactoInstitucion || undefined,
+            actividadProgramada: data.actividadProgramada || undefined,
+            estadoActividad: data.estadoActividad || 'PENDIENTE',
+            horaInicio: data.horaInicio || undefined,
+            horaFin: data.horaFin || undefined,
+            resultadosObtenidos: data.resultadosObtenidos || undefined,
+            observacionesTexto: data.observacionesTexto || undefined,
         });
 
         try {
-            await createEntradaDiario(selected.casoId, {
-                fecha:        data.fecha,
-                ubicacion:    data.ubicacion,
-                actividad:    data.actividad,
-                observaciones: obsJson,
-                latitud:      coords?.latitud,
-                longitud:     coords?.longitud,
-            });
+            let created: any = null;
+            const actividadVal = data.actividad?.trim() || '';
+            const resolvedCasoId = selected?.casoId || entradaEditar?.casoId;
+
+            if (entradaEditar?.id) {
+                created = await updateEntradaDiario(entradaEditar.id, esInstitucional ? null : resolvedCasoId, {
+                    fecha:        data.fecha,
+                    ubicacion:    data.ubicacion,
+                    actividad:    actividadVal || "(Pendiente de ejecución)",
+                    observaciones: obsJson,
+                    latitud:      coords?.latitud,
+                    longitud:     coords?.longitud,
+                });
+            } else {
+                created = await createEntradaDiario(esInstitucional ? null : resolvedCasoId, {
+                    fecha:        data.fecha,
+                    ubicacion:    data.ubicacion,
+                    actividad:    actividadVal || "(Pendiente de ejecución)",
+                    observaciones: obsJson,
+                    latitud:      coords?.latitud,
+                    longitud:     coords?.longitud,
+                });
+            }
+
+            // Guardar foto y firma como archivos en el servidor
+            const token = getToken();
+            if (token && created?.id && (fotoB64 || signatureB64)) {
+                try {
+                    await fetch(`${INTERVENCION_API_URL}/diario/${created.id}/evidencias`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                        body: JSON.stringify({
+                            foto_b64: fotoB64 || undefined,
+                            firma_b64: signatureB64 || undefined,
+                        }),
+                    });
+                } catch {
+                    // no bloquea el flujo principal
+                }
+            }
+
+            // Enviar al expediente digital SOLO si el estado es REALIZADA y no es institucional
+            const resolvedNna = nnas.find(n => n.casos?.some((c: any) => c.id === resolvedCasoId));
+            const nnaId = resolvedNna?.id;
+
+            if (token && data.estadoActividad === 'REALIZADA' && !esInstitucional && resolvedCasoId && nnaId) {
+                try {
+                    const pdfUrl = `${INTERVENCION_API_URL}/diario/${created.id}/pdf`;
+                    const fechaStr = data.fecha.split('T')[0];
+
+                    // 1. Pages check
+                    const pagesRes = await fetch(`${INTERVENCION_API_URL}/diario/${created.id}/pdf/pages`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    const pagesData = pagesRes.ok ? await pagesRes.json() : { pages: 1 };
+
+                    // 2. Register in EXP_FOLIO
+                    const folioRes = await fetch(`${EXPEDIENTE_API_URL}/expediente/caso/${resolvedCasoId}/folio`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({
+                            tipo_documento: 'DIARIO_CAMPO',
+                            titulo: `DIARIO DE CAMPO (${data.tipoActividad}) — ${fechaStr}`,
+                            archivo_url: pdfUrl,
+                            contenido_hash: `DIARIO-${created.id}`.substring(0, 40),
+                        })
+                    });
+
+                    if (folioRes.ok) {
+                        registerDocument({
+                            nnaId: nnaId,
+                            type: `DIARIO DE CAMPO (${data.tipoActividad})`,
+                            code: `DIARIO-${created.id}`,
+                            pages: pagesData.pages || 1,
+                            nombreResponsable: 'Educador Responsable',
+                            pdfUrl,
+                            status: 'COMPLETO'
+                        });
+                    }
+                } catch (expErr) {
+                    console.error('Error al registrar folio en DiarioCampoModal:', expErr);
+                }
+            }
+
             setSavedOk(true);
             setTimeout(() => onClose(), 1400);
         } catch {
@@ -295,8 +500,12 @@ export const DiarioCampoModal: React.FC<Props> = ({ open, onClose }) => {
                         <BookOpen size={18} />
                         <div>
                             <p className="font-bold text-sm leading-tight">Diario de Campo</p>
-                            {step === 'formulario' && selected && (
-                                <p className="text-[11px] text-white/80 leading-tight truncate max-w-[220px]">{selected.nombre}</p>
+                            {step === 'formulario' && (
+                                esInstitucional ? (
+                                    <p className="text-[11px] text-white/80 leading-tight truncate max-w-[220px]">Gestión / Coordinación Institucional</p>
+                                ) : selected && (
+                                    <p className="text-[11px] text-white/80 leading-tight truncate max-w-[220px]">{selected.nombre}</p>
+                                )
                             )}
                         </div>
                     </div>
@@ -309,23 +518,65 @@ export const DiarioCampoModal: React.FC<Props> = ({ open, onClose }) => {
                 {/* ── Paso 1: Buscar NNA ── */}
                 {step === 'buscar' && (
                     <div className="flex flex-col overflow-hidden flex-1">
-                        <div className="px-4 pt-4 pb-2 flex-shrink-0">
-                            <p className="text-xs text-gray-500 mb-3">Selecciona el NNA para registrar una nueva entrada de campo.</p>
-                            <div className="relative">
-                                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <div className="px-4 pt-4 pb-2 flex-shrink-0 space-y-3">
+                            <p className="text-xs text-gray-500">Selecciona el NNA para registrar o activa la casilla para coordinaciones.</p>
+                            
+                            {/* Tarjeta de Checkbox para Institución */}
+                            <label className="flex items-center gap-2.5 p-3 rounded-xl border border-gray-200 bg-gray-50/50 hover:bg-green-50/30 hover:border-green-300 cursor-pointer transition-all select-none">
                                 <input
-                                    autoFocus
-                                    type="text"
-                                    value={search}
-                                    onChange={e => setSearch(e.target.value)}
-                                    placeholder="Buscar por nombre o DNI..."
-                                    className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-green-400 outline-none"
+                                    type="checkbox"
+                                    checked={esInstitucional}
+                                    onChange={(e) => {
+                                        setEsInstitucional(e.target.checked);
+                                        if (e.target.checked) {
+                                            setSelected(null);
+                                        }
+                                    }}
+                                    className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-400"
                                 />
-                            </div>
+                                <div className="text-left">
+                                    <p className="text-xs font-bold text-gray-700">Registrar Coordinación / Gestión Institucional</p>
+                                    <p className="text-[10px] text-gray-400">Coordinación con colegios, postas, DEMUNA u otras redes (sin NNA específico).</p>
+                                </div>
+                            </label>
+
+                            {!esInstitucional && (
+                                <div className="relative">
+                                    <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                    <input
+                                        autoFocus
+                                        type="text"
+                                        value={search}
+                                        onChange={e => setSearch(e.target.value)}
+                                        placeholder="Buscar por nombre o DNI..."
+                                        className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-green-400 outline-none"
+                                    />
+                                </div>
+                            )}
                         </div>
 
-                        <div className="overflow-y-auto flex-1 px-4 pb-4 space-y-1.5">
-                            {opciones.length === 0 ? (
+                        <div className="overflow-y-auto flex-1 px-4 pb-4 space-y-1.5 flex flex-col">
+                            {esInstitucional ? (
+                                <div className="flex-1 flex flex-col items-center justify-center py-8 text-center space-y-4">
+                                    <div className="w-16 h-16 rounded-full bg-green-50 text-green-600 flex items-center justify-center text-3xl">
+                                        🤝
+                                    </div>
+                                    <div>
+                                        <p className="font-bold text-sm text-gray-750">Modo: Gestión Institucional</p>
+                                        <p className="text-xs text-gray-400 max-w-xs mt-1">Registrarás una actividad realizada con una entidad pública, privada o comunitaria de la red.</p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setValue('tipoActividad', 'COORDINACION');
+                                            setStep('formulario');
+                                        }}
+                                        className="px-6 py-3 bg-green-600 text-white font-bold text-sm rounded-xl hover:bg-green-700 shadow-md transition-all active:scale-95 flex items-center gap-2"
+                                    >
+                                        Continuar a Formulario ➔
+                                    </button>
+                                </div>
+                            ) : opciones.length === 0 ? (
                                 <div className="text-center py-10 text-gray-400 text-sm">
                                     <User size={28} className="mx-auto mb-2 opacity-40" />
                                     {search ? 'No se encontraron resultados.' : 'No tienes casos activos asignados.'}
@@ -386,6 +637,54 @@ export const DiarioCampoModal: React.FC<Props> = ({ open, onClose }) => {
                                 </div>
                             </div>
 
+                            {/* Campos de Institución (Solo si esInstitucional) */}
+                            {esInstitucional && (
+                                <div className="bg-gray-50/50 p-4 rounded-xl border border-gray-200 space-y-3">
+                                    <p className="text-xs font-bold text-gray-700 flex items-center gap-1.5 mb-1">
+                                        🏢 Datos de la Institución
+                                    </p>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
+                                                Tipo de Institución
+                                            </label>
+                                            <select
+                                                {...register('tipoInstitucion', { required: esInstitucional })}
+                                                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-green-400 outline-none font-medium text-gray-700"
+                                            >
+                                                <option value="SALUD">🏥 Centro de Salud / Hospital</option>
+                                                <option value="EDUCACION">🏫 Colegio / I.E.</option>
+                                                <option value="JUSTICIA">⚖️ DEMUNA / Fiscalía / Juez</option>
+                                                <option value="SEGURIDAD">👮 Comisaría / PNP</option>
+                                                <option value="MUNICIPALIDAD">🏛️ Municipalidad / Gob. Local</option>
+                                                <option value="ONG">🤝 ONG / Iglesia / Privado</option>
+                                                <option value="OTRO">✏️ Otro</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
+                                                Nombre de la Entidad
+                                            </label>
+                                            <input
+                                                placeholder="Ej: I.E. Mercedes Cabello"
+                                                {...register('nombreInstitucion', { required: esInstitucional })}
+                                                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-green-400 outline-none"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
+                                            Contacto / Cargo del Representante
+                                        </label>
+                                        <input
+                                            placeholder="Ej: Sra. Directora Carmen Rivas"
+                                            {...register('contactoInstitucion')}
+                                            className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-green-400 outline-none"
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Fecha + Ubicación */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
@@ -404,10 +703,64 @@ export const DiarioCampoModal: React.FC<Props> = ({ open, onClose }) => {
                                     </label>
                                     <input
                                         placeholder="Ej: Plaza de Armas..."
-                                        {...register('ubicacion', { required: true })}
+                                        {...register('ubicacion', { required: !isPendiente })}
                                         className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-green-400 outline-none"
                                     />
                                     <GpsCapture coords={coords} onChange={setCoords} />
+                                </div>
+                            </div>
+
+                            {/* Horas de Ejecución (Solo si ya no está Pendiente) */}
+                            {!isPendiente && (
+                                <div className="grid grid-cols-2 gap-3 bg-emerald-50/20 p-3 rounded-xl border border-emerald-100/50">
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
+                                            🕒 Hora Inicio Real
+                                        </label>
+                                        <input
+                                            type="time"
+                                            {...register('horaInicio', { required: !isPendiente })}
+                                            className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-green-400 outline-none font-medium text-gray-700"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
+                                            🕒 Hora Fin Real
+                                        </label>
+                                        <input
+                                            type="time"
+                                            {...register('horaFin', { required: !isPendiente })}
+                                            className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-green-400 outline-none font-medium text-gray-700"
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Actividad Programada y Estado */}
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <div className="sm:col-span-2">
+                                    <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">
+                                        Actividad Programada (Planificación)
+                                    </label>
+                                    <input
+                                        placeholder="Ej: Consejería individual sobre pautas de crianza..."
+                                        {...register('actividadProgramada')}
+                                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-green-400 outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">
+                                        Estado Actividad
+                                    </label>
+                                    <select
+                                        {...register('estadoActividad')}
+                                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-green-400 outline-none font-medium text-gray-700"
+                                    >
+                                        <option value="PENDIENTE">📅 Pendiente</option>
+                                        <option value="REALIZADA">🟢 Realizada</option>
+                                        <option value="REPROGRAMADA">🟡 Reprogramada</option>
+                                        <option value="NO_REALIZADA">🔴 No Realizada</option>
+                                    </select>
                                 </div>
                             </div>
 
@@ -452,6 +805,32 @@ export const DiarioCampoModal: React.FC<Props> = ({ open, onClose }) => {
                                 </div>
                             </div>
 
+                            {/* Resultados Obtenidos */}
+                            <div>
+                                <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">
+                                    Resultados Obtenidos (Logros / Acuerdos)
+                                </label>
+                                <textarea
+                                    rows={3}
+                                    placeholder="Describa los acuerdos, compromisos o resultados logrados..."
+                                    {...register('resultadosObtenidos')}
+                                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none resize-none focus:border-green-400 focus:ring-2 focus:ring-green-100"
+                                />
+                            </div>
+
+                            {/* Observaciones */}
+                            <div>
+                                <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">
+                                    Observaciones Adicionales
+                                </label>
+                                <textarea
+                                    rows={2}
+                                    placeholder="Comentarios adicionales u observaciones sobre el desarrollo de la sesión..."
+                                    {...register('observacionesTexto')}
+                                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none resize-none focus:border-green-400 focus:ring-2 focus:ring-green-100"
+                                />
+                            </div>
+
                             {/* Evidencias: Foto y Firma */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-gray-100 pt-4">
                                 {/* Foto Evidencia */}
@@ -479,7 +858,7 @@ export const DiarioCampoModal: React.FC<Props> = ({ open, onClose }) => {
                                 <div>
                                     <div className="flex items-center justify-between mb-2">
                                         <label className="block text-[11px] font-bold text-gray-500 uppercase">
-                                            <PenTool size={12} className="inline mr-1" /> Firma Tutor / NNA
+                                            <PenTool size={12} className="inline mr-1" /> {esInstitucional ? 'Firma o Sello Institucional' : 'Firma Tutor / NNA'}
                                         </label>
                                         <button type="button" onClick={clearSignature} className="text-[10px] font-bold text-gray-400 hover:text-red-500">Limpiar</button>
                                     </div>
@@ -511,7 +890,7 @@ export const DiarioCampoModal: React.FC<Props> = ({ open, onClose }) => {
                                 </div>
                             ) : (
                                 <button type="submit"
-                                    disabled={saving || !narracion?.trim()}
+                                    disabled={saving || (!isPendiente && !narracion?.trim())}
                                     className="w-full py-3 bg-green-600 text-white font-bold rounded-xl shadow-sm hover:bg-green-700 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm">
                                     {saving ? 'Guardando...' : 'Guardar registro'}
                                 </button>

@@ -9,7 +9,7 @@ export const DatosPerfilSection: React.FC = () => {
 
     return (
         <div className="space-y-6 animate-fadeIn">
-            <SectionHeader title="III. Datos Según Perfil" subtitle="Características de la situación en calle (Entrevista)." />
+            <SectionHeader title="III. Datos Según Perfil de la Niña, Niño y Adolescente (entrevista)" />
             <ActividadesCalleSection control={control} />
         </div>
     );

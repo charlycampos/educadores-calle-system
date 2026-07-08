@@ -20,8 +20,11 @@ class OracleDiarioRepository:
                 created_var = cur.var(oracledb.DB_TYPE_TIMESTAMP)
                 updated_var = cur.var(oracledb.DB_TYPE_TIMESTAMP)
 
+                actividad_val = data.actividad.strip() if (data.actividad and data.actividad.strip()) else "(Pendiente de ejecución)"
+
+                cur.setinputsizes(None, None, None, None, None, oracledb.DB_TYPE_CLOB, None, None, None)
                 await cur.execute(sql, [
-                    data.caso_id, data.ubicacion, data.actividad, data.estado_fisico, data.estado_animo, data.observaciones,
+                    data.caso_id, data.ubicacion, actividad_val, data.estado_fisico, data.estado_animo, data.observaciones,
                     data.latitud, data.longitud, educador_id,
                     id_var, fecha_var, created_var, updated_var
                 ])
@@ -31,7 +34,7 @@ class OracleDiarioRepository:
                     "id": id_var.getvalue()[0],
                     "caso_id": data.caso_id,
                     "ubicacion": data.ubicacion,
-                    "actividad": data.actividad,
+                    "actividad": actividad_val,
                     "estado_fisico": data.estado_fisico,
                     "latitud": data.latitud,
                     "longitud": data.longitud,
@@ -51,6 +54,17 @@ class OracleDiarioRepository:
                 columns = [col[0].lower() for col in cur.description]
                 return [self._row_to_dict(row, columns) for row in await cur.fetchall()]
 
+    async def get_by_id(self, entrada_id: int) -> dict | None:
+        pool = get_pool()
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute("SELECT * FROM DIARIO_CAMPO WHERE ID = :1", [entrada_id])
+                columns = [col[0].lower() for col in cur.description]
+                row = await cur.fetchone()
+                if row:
+                    return self._row_to_dict(row, columns)
+                return None
+
     async def delete_diario(self, entrada_id: int) -> bool:
         pool = get_pool()
         async with pool.acquire() as conn:
@@ -58,3 +72,33 @@ class OracleDiarioRepository:
                 await cur.execute("DELETE FROM DIARIO_CAMPO WHERE ID = :1", [entrada_id])
                 await conn.commit()
                 return cur.rowcount > 0
+
+    async def update_diario(self, entrada_id: int, data: DiarioCampoCreate) -> dict | None:
+        pool = get_pool()
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                sql = """
+                    UPDATE DIARIO_CAMPO 
+                       SET UBICACION = :1, 
+                           ACTIVIDAD = :2, 
+                           OBSERVACIONES = :3, 
+                           LATITUD = :4, 
+                           LONGITUD = :5,
+                           UPDATED_AT = SYSDATE
+                      WHERE ID = :6
+                """
+                actividad_val = data.actividad.strip() if (data.actividad and data.actividad.strip()) else "(Pendiente de ejecución)"
+                cur.setinputsizes(None, None, oracledb.DB_TYPE_CLOB, None, None, None)
+                await cur.execute(sql, [
+                    data.ubicacion, actividad_val, data.observaciones,
+                    data.latitud, data.longitud, entrada_id
+                ])
+                await conn.commit()
+                if cur.rowcount > 0:
+                    # Retornar los datos actualizados
+                    await cur.execute("SELECT * FROM DIARIO_CAMPO WHERE ID = :1", [entrada_id])
+                    columns = [col[0].lower() for col in cur.description]
+                    row = await cur.fetchone()
+                    if row:
+                        return self._row_to_dict(row, columns)
+                return None

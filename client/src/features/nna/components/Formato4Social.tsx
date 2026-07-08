@@ -7,6 +7,7 @@ import { UbigeoSelectorSimple } from './UbigeoSelectorSimple';
 import { ActividadModal } from './ActividadModal';
 import { InputField, SelectField } from '../../../components/ui/FormFields';
 import { useNnaStore } from '../../../store/nna.store';
+import { DISCAPACIDADES_CONADIS } from '../../../data/ubigeo';
 import clsx from 'clsx';
 
 interface Formato4SocialProps {
@@ -147,6 +148,65 @@ const normalizeGradoEstudio = (value: unknown): string => {
 const DIAS_SHORT = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 const DIAS_KEYS = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'] as const;
 
+// Misma lista que SaludSection.tsx (Ficha de Inscripción - V. Salud)
+const SEGUROS_PREDEFINIDOS = [
+    "EsSalud",
+    "Seguro Privado / EPS",
+    "Seguro de FF.AA. o Policiales",
+    "Seguro Escolar Privado",
+    "Seguro Universitario"
+];
+
+// Toggle SI/NO reutilizable. Cada uso se conecta explícitamente a su propia variable de formData,
+// sin indexado dinámico por string. Si se le pasan children, estos se muestran DENTRO de la misma
+// tarjeta cuando value === true, para que quede claro a qué pregunta pertenece cada detalle.
+const ToggleSiNo = ({ label, value, onChange, children }: { label: string; value: boolean; onChange: (val: boolean) => void; children?: React.ReactNode }) => (
+    <div className="p-4 border border-purple-100 rounded-xl bg-purple-50/10 flex flex-col justify-between">
+        <span className="font-bold text-[10px] text-purple-900 uppercase mb-3">{label}</span>
+        <div className="flex gap-2 h-8">
+            <button
+                type="button"
+                onClick={() => onChange(true)}
+                className={`flex-1 flex items-center justify-center font-bold text-[10px] border rounded-lg cursor-pointer transition-colors ${value === true ? 'bg-purple-700 text-white border-purple-700' : 'bg-white text-purple-700 border-purple-200 hover:bg-purple-50'}`}
+            >
+                SÍ
+            </button>
+            <button
+                type="button"
+                onClick={() => onChange(false)}
+                className={`flex-1 flex items-center justify-center font-bold text-[10px] border rounded-lg cursor-pointer transition-colors ${value === false ? 'bg-gray-700 text-white border-gray-700' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}`}
+            >
+                NO
+            </button>
+        </div>
+        {value === true && children && (
+            <div className="mt-3 pt-3 border-t border-purple-100 space-y-2 animate-scaleUp">
+                {children}
+            </div>
+        )}
+    </div>
+);
+
+// Toggle de 3 estados (SI / NO / A VECES), para las preguntas de higiene de la plantilla oficial.
+// Cada uso se conecta explícitamente a su propia variable de formData.
+const Toggle3 = ({ label, value, onChange }: { label: string; value: string; onChange: (val: string) => void }) => (
+    <div className="p-4 border border-purple-100 rounded-xl bg-purple-50/10">
+        <span className="font-bold text-[10px] text-purple-900 uppercase mb-3 block">{label}</span>
+        <div className="flex gap-2">
+            {[{ value: 'SI', label: 'SÍ' }, { value: 'NO', label: 'NO' }, { value: 'A_VECES', label: 'A Veces' }].map(opt => (
+                <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => onChange(opt.value)}
+                    className={`flex-1 flex items-center justify-center font-bold text-[10px] border rounded-lg cursor-pointer transition-colors px-1 py-2 ${value === opt.value ? 'bg-purple-700 text-white border-purple-700' : 'bg-white text-purple-700 border-purple-200 hover:bg-purple-50'}`}
+                >
+                    {opt.label}
+                </button>
+            ))}
+        </div>
+    </div>
+);
+
 export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: Formato4SocialProps) => {
 
     const { parametros, fetchParametros } = useNnaStore();
@@ -269,7 +329,20 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
 
     const [formData, setFormData] = useState({
         // I-III. Datos Generales y Calle
-        noTieneDNI:         !nna?.numeroDoc,
+        apellidoPaterno:    nna?.apellidoPaterno  || '',
+        apellidoMaterno:    nna?.apellidoMaterno  || '',
+        nombres:            nna?.nombres          || '',
+        sexo:               nna?.sexo             || '',
+        numeroDoc:          nna?.numeroDoc        || '',
+        tipoDoc:            String(nna?.tipoDoc || '').split(':')[0].trim(),
+        tienePartidaNacimiento: nna?.tienePartidaNacimiento !== undefined && nna?.tienePartidaNacimiento !== null
+                                    ? !!nna.tienePartidaNacimiento
+                                    : true,
+        detalleSinDoc:      nna?.detalleSinDoc    || '',
+        fechaNacimiento:    nna?.fechaNacimiento  ? new Date(nna.fechaNacimiento).toISOString().split('T')[0] : '',
+        // Fecha en que se inicia/termina de aplicar la entrevista del Formato 4 (no es la fecha de nacimiento del NNA)
+        fechaInicioAplicacion: '',
+        fechaFinAplicacion:    '',
         edad:               nna?.edad        ? String(nna.edad) : '',
         unidadEdad:         nna?.unidadEdad  || 'ANIOS',
         direccionActual:    nna?.domicilioActual    || '',
@@ -285,8 +358,9 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
         situacionCalleDetalle: {
             perfil: perfilCalle,
             tiempo: { cantidad: '', unidad: 'MESES' },
-            explotacionSexual: explotacionSexualF03,
+            explotacionSexual: null as boolean | null,
             ingresoSemanal: '',
+            usoDinero: { gastosFamiliares: false, gastosPropios: false, entregaOtraPersona: false },
             horarios:  { manana: false, tarde: false, noche: false },
             frecuencia: { diario: false, interdiario: false, finesSemana: false, temporadas: false },
             motivo: '',
@@ -317,13 +391,13 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
         tutorEstadoCivil:      tutorPrincipal?.estadoCivil || '',
         tutorOcupacion:        tutorPrincipal?.ocupacion || '',
         tutorIngreso:          tutorPrincipal?.ingresos || '',
-        tutorViveConNna:       tutorPrincipal?.viveCon || 'SI',
+        tutorViveConNna:       tutorPrincipal?.viveCon || '',
         tutorLenguaMaterna:    tutorPrincipal?.lenMatApo || '10',
         tutorEtnia:            tutorPrincipal?.autIdeEtApo || '7',
         tutorTelefono:         tutorPrincipal?.telefono || '',
-        tutorConsumoDrogas:    'NO',
-        tutorRecibeApoyo:      'NO',
-        tutorDeseaDemanda:     'NO',
+        tutorConsumoDrogas:    '',
+        tutorRecibeApoyo:      '',
+        tutorDeseaDemanda:     '',
 
         familiares: familiaresF03.map((f: any) => ({
             primerApellido:    f.priApeTutApo || f.primerApellido || f.nombres?.split(' ')[0] || '',
@@ -350,29 +424,29 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
             autIdeEtEspApo:    f.autIdeEtEspApo || '',
             tipoDiscapApo:     f.tipoDiscapApo || '6',
             certDiscapApo:     f.certDiscapApo || '99',
-            viveCon:           f.viveCon || 'SI',
+            viveCon:           f.viveCon || '',
             telefono:          f.telefono || '',
             esTutorPrincipal:  f.esTutorPrincipal === 'true' || f.esTutorPrincipal === true ? 'true' : 'false'
         })) as FamilyMember[],
         dinamicaFamiliar: {
-            contacto:     'SI',
-            frecuencia:   'DIARIO',
-            rolProtector: 'REGULAR',
-            rolProveedor: 'REGULAR'
+            contacto:     '',
+            frecuencia:   '',
+            rolProtector: '',
+            rolProveedor: ''
         },
 
         // V. Vivienda
-        materialVivienda:    'CONCRETO',
-        numeroAmbientes:     '1',
-        propiedadVivienda:   'PROPIA',
-        serviciosBasicos:    { agua: true, luz: true, desague: true, otros: false },
-        viviendaSisfoh:      'NO',
-        duermeCama:          'SI',
+        materialVivienda:    '',
+        numeroAmbientes:     '',
+        propiedadVivienda:   '',
+        serviciosBasicos:    { agua: false, luz: false, desague: false, otros: false },
+        viviendaSisfoh:      '',
+        duermeCama:          '',
         lugarPernocte:        nna?.lugarPernocte    || '',
         detalleLugarPernocte: nna?.detalleLugarPernocte || '',
         duermeConQuien:       nna?.detalleViveCon  || '',
         duermeSoloAcompanado: 'SOLO',
-        higieneDomicilio:    'BUENO',
+        higieneDomicilio:    '',
         tieneAntecedenteAlbergue:   !!nna?.tieneAntecedenteAlbergue,
         tiempoAlbergue:             '',
         detalleAntecedenteAlbergue: nna?.detalleAntecedenteAlbergue || '',
@@ -383,8 +457,13 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
         motivoAtraso:        '',
         problemasAprendizaje: false,
         problemasConducta:   false,
+        intensidadConducta:  '',
         expulsado:           false,
         vecesExpulsado:      '',
+        faltasTardanzas:     false,
+        seDuermeClase:       false,
+        sufreBullying:       false,
+        tutorConversaDocente: false,
         eduNivel:      normalizeNivelEducativo(nna?.nivelEducativo || '5'),
         eduGrado:      normalizeGradoEstudio(nna?.gradoEstudio || '8'),
         eduTurno:      'MAÑANA',
@@ -398,23 +477,63 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
         afiliadoSIS:              nna?.afiliadoSIS        || 'NO',
         afiliadoOtroSeguro:       nna?.afiliadoOtroSeguro || '',
         detalleOtroSeguro:        nna?.detalleOtroSeguro  || '',
+
+        // Presenta problemas de salud en (checkboxes múltiples, propio del F04)
+        problemasSaludTipo: { piel: false, desnutricion: false, respiratorios: false, its: false, otros: false },
+        problemasSaludOtroDetalle: '',
+
+        // Enfermedad crónica — hereda de la ficha de inscripción
+        enfermedadCronica:        !!(nna?.sufreEnfermedad && nna.sufreEnfermedad !== 'NO' && nna.sufreEnfermedad !== 0),
+        detalleEnfermedadCronica: nna?.detalleEnfermedad  || '',
+        recibeTratamientoEnfermedad: false,
+
+        // Discapacidad — hereda de la ficha de inscripción
         tieneDiscapacidad:        !!(nna?.tieneDiscapacidad && nna.tieneDiscapacidad !== 0),
         tipoDiscapacidad:         nna?.tipoDiscapacidad   || '',
         detalleDiscapacidad:      nna?.detalleDiscapacidad || '',
-        enfermedadCronica:        !!(nna?.sufreEnfermedad && nna.sufreEnfermedad !== 'NO' && nna.sufreEnfermedad !== 0),
-        detalleEnfermedadCronica: nna?.detalleEnfermedad  || '',
-        observacionesSalud:       nna?.observacionesSalud || '',
+        certificadoDiscapacidad:  ['1', '2'].includes(String(nna?.certDiscapNna || '')),
+        dondeTratamientoDiscapacidad: '',
+
+        // Problemas psicológicos
         problemaPsicologico:      false,
         detalleProblemaPsicologico: '',
+        tipoIndicadorPsicologico: { autoestimaBaja: false, depresion: false, ansiedad: false, impulsividad: false },
+
+        // Consumo de sustancias / adicción
         consumeSustancias:        false,
         tipoSustancias:           '',
+        adiccionRecibeTratamiento: false,
+
+        // Salud sexual y reproductiva (propio del F04)
+        seEncuentraGestando:      false,
+        esMadrePadreAdolescente:  false,
+        haSufridoAborto:          false,
+        victimaAbusoSexual:       false,
+
+        // Alimentación
         recibeTresAlimentos:      true,
-        higieneAdecuada:          true,
+        aparentaBienAlimentado:   true,
+        dondeAlimenta:            '',
+        quienAlimenta:            '',
+
+        // Higiene (SI / NO / A VECES)
+        higieneAdecuada:          'SI',
+        ropasLimpias:             '',
+        normasHigieneComer:       '',
+        cabelloUnasLimpias:       '',
+
+        // Disciplina / violencia correctiva
+        violenciaCorrectiva:      false,
+        quienEjerceViolencia:     '',
+        tipoViolencia: { fisica: false, psicologica: false },
+
+        observacionesSalud:       nna?.observacionesSalud || '',
 
         // VIII. Recreación
         tiempoParaJugar:              true,
         vecesJuegaSemana:             '',
         lugarJuego:                   '',
+        lugarJuegoOtroDetalle:        '',
         participaInstitucion:         false,
         tipoInstitucion:              '',
         interesesDeportivos:          false,
@@ -437,7 +556,7 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
     const [currentFamily, setCurrentFamily] = useState<FamilyMember>({
         primerApellido: '', segundoApellido: '', nombres: '', parentesco: '', edad: '', sexo: '', estadoCivil: '', gradoInstruccion: '', ocupacion: '',
         priApeTutApo: '', segApeTutApo: '', nomApeTutApo: '', sexoApo: '', fechaNacApo: '', nacionalidadApo: 'PERUANA', tipDocTutApo: '1', nroDocTutApo: '',
-        vinTutUsu: '1', lenMatApo: '10', lenMatEspApo: '', autIdeEtApo: '7', autIdeEtEspApo: '', tipoDiscapApo: '6', certDiscapApo: '99', viveCon: 'SI', telefono: ''
+        vinTutUsu: '1', lenMatApo: '10', lenMatEspApo: '', autIdeEtApo: '7', autIdeEtEspApo: '', tipoDiscapApo: '6', certDiscapApo: '99', viveCon: '', telefono: ''
     });
 
     const [showNeedModal, setShowNeedModal] = useState(false);
@@ -577,6 +696,52 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                     return 'SI';
                 };
 
+                // Normalizadores para combos: valores heredados de F03/NNA llegan en
+                // formatos que no existen en las opciones y el combo se ve vacío.
+                const normParentesco = (val: any): string => {
+                    const s = normCode(val);
+                    if (['1','2','3','4','5','6'].includes(s)) return s;
+                    const u = String(s).toUpperCase();
+                    if (u.includes('MADRE') || u.includes('PADRE')) return '1';
+                    if (u.includes('TIO') || u.includes('TÍO') || u.includes('TIA') || u.includes('TÍA')) return '2';
+                    if (u.includes('ABUEL')) return '3';
+                    if (u.includes('HERMAN')) return '4';
+                    if (u.includes('FAMILIAR') || u.includes('CUÑAD') || u.includes('PRIM')) return '5';
+                    return s ? '6' : '';
+                };
+                const normEstadoCivil = (val: any): string => {
+                    if (!val) return '';
+                    const u = String(val).toUpperCase().trim();
+                    if (u.startsWith('SOLTER')) return 'SOLTERO(A)';
+                    if (u.startsWith('CASAD')) return 'CASADO(A)';
+                    if (u.startsWith('CONVIV')) return 'CONVIVIENTE';
+                    if (u.startsWith('DIVORCIAD')) return 'DIVORCIADO(A)';
+                    if (u.startsWith('VIUD')) return 'VIUDO(A)';
+                    return u;
+                };
+                const normGradoInstr = (val: any): string => {
+                    if (!val) return '';
+                    const u = String(val).toUpperCase().trim();
+                    const opciones = ['SIN_INSTRUCCION','PRIMARIA_INCOMPLETA','PRIMARIA_COMPLETA','SECUNDARIA_INCOMPLETA','SECUNDARIA_COMPLETA','SUPERIOR_INCOMPLETA','SUPERIOR_COMPLETA'];
+                    if (opciones.includes(u)) return u;
+                    if (u.includes('SIN')) return 'SIN_INSTRUCCION';
+                    if (u.includes('PRIMARIA')) return u.includes('INCOMPLETA') ? 'PRIMARIA_INCOMPLETA' : 'PRIMARIA_COMPLETA';
+                    if (u.includes('SECUNDARIA')) return u.includes('INCOMPLETA') ? 'SECUNDARIA_INCOMPLETA' : 'SECUNDARIA_COMPLETA';
+                    if (u.includes('SUPERIOR') || u.includes('TECNIC') || u.includes('TÉCNIC') || u.includes('UNIVERSIT')) return u.includes('INCOMPLETA') ? 'SUPERIOR_INCOMPLETA' : 'SUPERIOR_COMPLETA';
+                    return u;
+                };
+                const normTipoDiscapNna = (val: any): string => {
+                    if (!val) return '';
+                    const s = String(val).trim();
+                    // Códigos del F03 → textos CONADIS que usa el combo del F04
+                    const mapa: Record<string, string> = {
+                        '1': 'Motriz /física', '2': 'Sensorial', '3': 'cognitivo / Intelectual',
+                        '4': 'Psicosocial /Psíquica', '5': 'Más de una discapacidad', '6': ''
+                    };
+                    if (mapa[s] !== undefined) return mapa[s];
+                    return s;
+                };
+
                 const combinedName = mergedData.tutorNombre || prev.tutorNombre || '';
                 const parts = combinedName.trim().split(/\s+/);
                 
@@ -602,11 +767,11 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                     primerApellido:    f.priApeTutApo || f.primerApellido || f.nombres?.split(' ')[0] || '',
                     segundoApellido:   f.segApeTutApo || f.segundoApellido || f.nombres?.split(' ')[1] || '',
                     nombres:           f.nomApeTutApo || f.nombres?.split(' ').slice(2).join(' ') || f.nombres || '',
-                    parentesco:        f.vinTutUsu || f.parentesco || '',
+                    parentesco:        normParentesco(f.vinTutUsu || f.parentesco || ''),
                     edad:              f.edad || '',
-                    sexo:              f.sexoApo || f.sexo || '',
-                    estadoCivil:       f.estadoCivil || '',
-                    gradoInstruccion:  f.gradoInstruccion || '',
+                    sexo:              normCode(f.sexoApo || f.sexo || ''),
+                    estadoCivil:       normEstadoCivil(f.estadoCivil || ''),
+                    gradoInstruccion:  normGradoInstr(f.gradoInstruccion || ''),
                     ocupacion:         f.ocupacion || '',
                     priApeTutApo:      f.priApeTutApo || f.primerApellido || f.nombres?.split(' ')[0] || '',
                     segApeTutApo:      f.segApeTutApo || f.segundoApellido || f.nombres?.split(' ')[1] || '',
@@ -616,14 +781,14 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                     nacionalidadApo:   f.nacionalidadApo || 'PERUANA',
                     tipDocTutApo:      f.tipDocTutApo || '',
                     nroDocTutApo:      f.nroDocTutApo || f.dni || '',
-                    vinTutUsu:         f.vinTutUsu || f.parentesco || '',
-                    lenMatApo:         f.lenMatApo || '10',
+                    vinTutUsu:         normParentesco(f.vinTutUsu || f.parentesco || ''),
+                    lenMatApo:         normCode(f.lenMatApo || '10'),
                     lenMatEspApo:      f.lenMatEspApo || '',
-                    autIdeEtApo:       f.autIdeEtApo || '7',
+                    autIdeEtApo:       normCode(f.autIdeEtApo || '7'),
                     autIdeEtEspApo:    f.autIdeEtEspApo || '',
-                    tipoDiscapApo:     f.tipoDiscapApo || '6',
-                    certDiscapApo:     f.certDiscapApo || '99',
-                    viveCon:           f.viveCon || 'SI',
+                    tipoDiscapApo:     normCode(f.tipoDiscapApo || '6'),
+                    certDiscapApo:     normCode(f.certDiscapApo || '99'),
+                    viveCon:           normYesNo(f.viveCon || 'SI'),
                     telefono:          f.telefono || '',
                     esTutorPrincipal:  f.esTutorPrincipal === 'true' || f.esTutorPrincipal === true ? 'true' : 'false'
                 })) : [];
@@ -637,16 +802,49 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                     tutorSegundoApellido: segApe,
                     tutorNombre: nom,
 
+                    // Sexo del NNA (viene de la ficha de inscripción, editable si faltara)
+                    sexo: normCode(mergedData.sexo || nna?.sexo || prev.sexo),
+
+                    // Fecha de inicio/fin de aplicación de la ficha (propias del F04, no vienen de la inscripción)
+                    fechaInicioAplicacion: normDate(mergedData.fechaInicioAplicacion || prev.fechaInicioAplicacion),
+                    fechaFinAplicacion:    normDate(mergedData.fechaFinAplicacion || prev.fechaFinAplicacion),
+
+                    // Merge seguro de situacionCalleDetalle: si el registro guardado es de antes de agregar
+                    // "usoDinero" (u otro sub-campo nuevo), evita que quede undefined y rompa el render.
+                    situacionCalleDetalle: {
+                        ...prev.situacionCalleDetalle,
+                        ...(mergedData.situacionCalleDetalle || {}),
+                        usoDinero: {
+                            ...prev.situacionCalleDetalle.usoDinero,
+                            ...(mergedData.situacionCalleDetalle?.usoDinero || {})
+                        }
+                    },
+
+                    // higieneAdecuada pasó de booleano a SI/NO/A_VECES. Si el registro guardado
+                    // es de antes de este cambio, convierte el booleano legado al nuevo formato.
+                    higieneAdecuada: (() => {
+                        const v = mergedData.higieneAdecuada;
+                        if (v === true) return 'SI';
+                        if (v === false) return 'NO';
+                        return v || prev.higieneAdecuada;
+                    })(),
+
                     // Sexo, Documento, Parentesco y Fecha Nacimiento
                     tutorSexo: normCode(mergedData.tutorSexo || mergedData.sexoApo || prev.tutorSexo),
                     tutorFechaNacimiento: normDate(mergedData.tutorFechaNacimiento || mergedData.fechaNacApo || prev.tutorFechaNacimiento),
                     tutorDNI: mergedData.tutorDNI || mergedData.nroDocTutApo || mergedData.dni || prev.tutorDNI || '',
                     tutorTipoDocumento: normCode(mergedData.tutorTipoDocumento || mergedData.tipDocTutApo || prev.tutorTipoDocumento || '1'),
-                    tutorParentesco: normCode(mergedData.tutorParentesco || mergedData.vinTutUsu || prev.tutorParentesco),
+                    tutorParentesco: normParentesco(mergedData.tutorParentesco || mergedData.vinTutUsu || prev.tutorParentesco),
+
+                    // Combos con formato heredado de F03/NNA: normalizar para que
+                    // coincidan con los values de sus opciones (si no, se ven vacíos)
+                    tipoDoc: normCode(mergedData.tipoDoc || prev.tipoDoc),
+                    tutorEstadoCivil: normEstadoCivil(mergedData.tutorEstadoCivil || prev.tutorEstadoCivil),
+                    tipoDiscapacidad: normTipoDiscapNna(mergedData.tipoDiscapacidad || prev.tipoDiscapacidad),
                     
                     // Ocupación y Grado Instrucción
                     tutorOcupacion: mergedData.tutorOcupacion || mergedData.ocupacion || prev.tutorOcupacion || '',
-                    tutorGradoInstruccion: mergedData.tutorGradoInstruccion || mergedData.gradoInstruccion || prev.tutorGradoInstruccion || '',
+                    tutorGradoInstruccion: normGradoInstr(mergedData.tutorGradoInstruccion || mergedData.gradoInstruccion || prev.tutorGradoInstruccion || ''),
 
                     // Discapacidad y CONADIS
                     tutorTipoDiscapacidad: normCode(mergedData.tutorTipoDiscapacidad || mergedData.tipoDiscapApo || prev.tutorTipoDiscapacidad),
@@ -770,7 +968,10 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                 ...formData,
                 actividadesCalle: actividadesCalle,
                 nnaId: nna.id,
-                casoId: caso?.id
+                casoId: caso?.id,
+                // Forzar false: al finalizar un borrador, formData puede traer
+                // es_borrador=true heredado del datos_extra guardado.
+                es_borrador: false
             };
 
             const response = await fetch(url, {
@@ -801,7 +1002,7 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
         setCurrentFamily({
             primerApellido: '', segundoApellido: '', nombres: '', parentesco: '', edad: '', sexo: '', estadoCivil: '', gradoInstruccion: '', ocupacion: '',
             priApeTutApo: '', segApeTutApo: '', nomApeTutApo: '', sexoApo: '', fechaNacApo: '', nacionalidadApo: 'PERUANA', tipDocTutApo: '1', nroDocTutApo: '',
-            vinTutUsu: '1', lenMatApo: '10', lenMatEspApo: '', autIdeEtApo: '7', autIdeEtEspApo: '', tipoDiscapApo: '6', certDiscapApo: '99', viveCon: 'SI', telefono: ''
+            vinTutUsu: '1', lenMatApo: '10', lenMatEspApo: '', autIdeEtApo: '7', autIdeEtEspApo: '', tipoDiscapApo: '6', certDiscapApo: '99', viveCon: '', telefono: ''
         });
         setShowFamilyModal(true);
     };
@@ -990,47 +1191,151 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                             </h2>
                         </div>
                         <div className="p-4 grid grid-cols-12 gap-x-6 gap-y-4">
-                            {/* Fila 1: Nombres y Apellidos (75% | col-span-9) and DNI / Documento (25% | col-span-3) */}
-                            <div className="col-span-12 md:col-span-9">
-                                <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Nombres y Apellidos</label>
+                            {/* Fila 1: Nombres y Apellidos separados */}
+                            <div className="col-span-12 md:col-span-4">
+                                <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Primer Apellido</label>
                                 <input
                                     type="text"
-                                    readOnly
-                                    disabled
-                                    className="w-full px-3 py-2 border border-border rounded-[6px] text-xs bg-surface-muted text-fg font-medium disabled:opacity-100 disabled:bg-surface-muted select-none"
-                                    value={`${nna?.nombres || ''} ${nna?.apellidoPaterno || ''} ${nna?.apellidoMaterno || ''}`}
+                                    className="w-full px-3 py-2 border border-border rounded-[6px] text-xs bg-surface text-fg font-medium focus:ring-2 focus:ring-primary/40 focus:border-primary outline-none"
+                                    value={formData.apellidoPaterno}
+                                    onChange={(e) => setFormData({ ...formData, apellidoPaterno: e.target.value.toUpperCase() })}
+                                />
+                            </div>
+                            <div className="col-span-12 md:col-span-4">
+                                <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Segundo Apellido</label>
+                                <input
+                                    type="text"
+                                    className="w-full px-3 py-2 border border-border rounded-[6px] text-xs bg-surface text-fg font-medium focus:ring-2 focus:ring-primary/40 focus:border-primary outline-none"
+                                    value={formData.apellidoMaterno}
+                                    onChange={(e) => setFormData({ ...formData, apellidoMaterno: e.target.value.toUpperCase() })}
+                                />
+                            </div>
+                            <div className="col-span-12 md:col-span-4">
+                                <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Nombres</label>
+                                <input
+                                    type="text"
+                                    className="w-full px-3 py-2 border border-border rounded-[6px] text-xs bg-surface text-fg font-medium focus:ring-2 focus:ring-primary/40 focus:border-primary outline-none"
+                                    value={formData.nombres}
+                                    onChange={(e) => setFormData({ ...formData, nombres: e.target.value.toUpperCase() })}
+                                />
+                            </div>
+
+                            {/* Fila 1b: Documento de Identidad (igual que la ficha de inscripción) */}
+                            <div className="col-span-12 border-t border-border pt-4 mt-1">
+                                <p className="text-[10px] font-bold text-fg-muted uppercase mb-3">Documento de Identidad</p>
+                                <div className="grid grid-cols-12 gap-x-6 gap-y-4">
+                                    <div className="col-span-12 md:col-span-4">
+                                        <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Tipo Documento</label>
+                                        <select
+                                            className="w-full px-3 py-2 border border-border rounded-[6px] text-xs bg-surface text-fg font-medium focus:ring-2 focus:ring-primary/40 focus:border-primary outline-none"
+                                            value={formData.tipoDoc}
+                                            onChange={(e) => setFormData({ ...formData, tipoDoc: e.target.value })}
+                                        >
+                                            <option value="">Seleccionar...</option>
+                                            {(parametros?.OPCIONES_TIP_DOC_APO_2026 || [
+                                                { value: '1', label: '1: DNI' },
+                                                { value: '2', label: '2: Carné de extranjería' },
+                                                { value: '3', label: '3: Pasaporte' },
+                                                { value: '4', label: '4: Documento de Identidad Extranjero' },
+                                                { value: '5', label: '5: CUI o Acta de Nacimiento' },
+                                                { value: '6', label: '6: Certificado de Nacido Vivo - CNV' },
+                                                { value: '7', label: '7: No tiene' },
+                                            ]).map((opt: { value: string; label: string }) => (
+                                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div className="col-span-12 md:col-span-4">
+                                        <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Nº de Documento / DNI</label>
+                                        <input
+                                            type="text"
+                                            className="w-full px-3 py-2 border border-border rounded-[6px] text-xs bg-surface text-fg font-medium focus:ring-2 focus:ring-primary/40 focus:border-primary outline-none"
+                                            placeholder="Ingrese número"
+                                            value={formData.numeroDoc}
+                                            onChange={(e) => setFormData({ ...formData, numeroDoc: e.target.value })}
+                                        />
+                                    </div>
+
+                                    <div className="col-span-12 md:col-span-4">
+                                        <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">¿Tiene Partida Nac.?</label>
+                                        <div className="flex gap-2">
+                                            {[{ value: true, label: 'Sí' }, { value: false, label: 'No' }].map(opt => (
+                                                <button
+                                                    type="button"
+                                                    key={String(opt.value)}
+                                                    onClick={() => setFormData({ ...formData, tienePartidaNacimiento: opt.value })}
+                                                    className={`flex-1 px-3 py-2 rounded-[6px] border text-xs font-bold uppercase transition-colors ${formData.tienePartidaNacimiento === opt.value ? 'bg-primary text-white border-primary' : 'border-border text-fg-muted hover:bg-surface-muted'}`}
+                                                >
+                                                    {opt.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="col-span-12">
+                                        <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">¿Por qué? (En caso no tenga documento de identidad)</label>
+                                        <input
+                                            type="text"
+                                            className="w-full px-3 py-2 border border-border rounded-[6px] text-xs bg-surface text-fg font-medium focus:ring-2 focus:ring-primary/40 focus:border-primary outline-none"
+                                            placeholder="Especifique motivo..."
+                                            value={formData.detalleSinDoc}
+                                            onChange={(e) => setFormData({ ...formData, detalleSinDoc: e.target.value })}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Fila 2: Sexo, Fecha de Nacimiento, Edad / Tiempo y Teléfono (25% | col-span-3 c/u) */}
+                            <div className="col-span-12 md:col-span-3">
+                                <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Sexo</label>
+                                <select
+                                    className="w-full px-3 py-2 border border-border rounded-[6px] text-xs bg-surface text-fg font-medium focus:ring-2 focus:ring-primary/40 focus:border-primary outline-none"
+                                    value={formData.sexo}
+                                    onChange={(e) => setFormData({ ...formData, sexo: e.target.value })}
+                                >
+                                    <option value="">Seleccionar...</option>
+                                    {opcionesSexo.map(opt => (
+                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="col-span-12 md:col-span-3">
+                                <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Fecha Nacimiento</label>
+                                <input
+                                    type="date"
+                                    className="w-full px-3 py-2 border border-border rounded-[6px] text-xs bg-surface text-fg font-medium focus:ring-2 focus:ring-primary/40 focus:border-primary outline-none"
+                                    value={formData.fechaNacimiento}
+                                    onChange={(e) => {
+                                        const fecha = e.target.value;
+                                        // Calcular edad automáticamente desde la fecha de nacimiento
+                                        let edad = formData.edad;
+                                        let unidadEdad = formData.unidadEdad;
+                                        if (fecha) {
+                                            const nac = new Date(fecha + 'T00:00:00');
+                                            const hoy = new Date();
+                                            if (!isNaN(nac.getTime()) && nac <= hoy) {
+                                                let anios = hoy.getFullYear() - nac.getFullYear();
+                                                let meses = hoy.getMonth() - nac.getMonth();
+                                                if (hoy.getDate() < nac.getDate()) meses--;
+                                                if (meses < 0) { anios--; meses += 12; }
+                                                if (anios >= 1) {
+                                                    edad = String(anios); unidadEdad = 'ANIOS';
+                                                } else if (meses >= 1) {
+                                                    edad = String(meses); unidadEdad = 'MESES';
+                                                } else {
+                                                    const dias = Math.max(0, Math.floor((hoy.getTime() - nac.getTime()) / 86400000));
+                                                    edad = String(dias); unidadEdad = 'DIAS';
+                                                }
+                                            }
+                                        }
+                                        setFormData({ ...formData, fechaNacimiento: fecha, edad, unidadEdad });
+                                    }}
                                 />
                             </div>
 
                             <div className="col-span-12 md:col-span-3">
-                                <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">DNI / Documento</label>
-                                <div className="relative">
-                                    <input
-                                        type="text"
-                                        readOnly
-                                        disabled
-                                        className="w-full px-3 py-2 border border-border rounded-[6px] text-xs bg-surface-muted text-fg font-medium disabled:opacity-100 disabled:bg-surface-muted select-none pr-14"
-                                        value={nna?.numeroDoc || '---'}
-                                    />
-                                    {formData.noTieneDNI && (
-                                        <span className="absolute right-2 top-1.5 text-[8px] bg-warning/10 text-warning border border-warning/20 px-1 py-0.5 rounded font-bold uppercase select-none">Sin DNI</span>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Fila 2: Fecha de Nacimiento (33.3% | col-span-4), Edad / Tiempo (33.3% | col-span-4), and Teléfono (33.3% | col-span-4) */}
-                            <div className="col-span-12 md:col-span-4">
-                                <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Fecha Nacimiento</label>
-                                <input
-                                    type="text"
-                                    readOnly
-                                    disabled
-                                    className="w-full px-3 py-2 border border-border rounded-[6px] text-xs bg-surface-muted text-fg font-medium disabled:opacity-100 disabled:bg-surface-muted select-none"
-                                    value={nna?.fechaNacimiento ? new Date(nna.fechaNacimiento).toLocaleDateString('es-PE') : '---'}
-                                />
-                            </div>
-
-                            <div className="col-span-12 md:col-span-4">
                                 <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Edad / Tiempo</label>
                                 <div className="flex -space-x-px">
                                     <input
@@ -1054,7 +1359,7 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                                 </div>
                             </div>
 
-                            <div className="col-span-12 md:col-span-4">
+                            <div className="col-span-12 md:col-span-3">
                                 <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Teléfono de Contacto</label>
                                 <input
                                     type="text"
@@ -1106,6 +1411,111 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                                         }))
                                     }
                                 />
+                            </div>
+
+                            {/* Fila 5: Aseguramiento de Salud (100% | col-span-12) */}
+                            <div className="col-span-12 border-t border-border pt-4 mt-1">
+                                <p className="text-[10px] font-bold text-fg-muted uppercase mb-3">Aseguramiento de Salud</p>
+                                <div className="grid grid-cols-12 gap-x-6 gap-y-4">
+                                    <div className="col-span-12 md:col-span-6">
+                                        <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">¿Afiliado al Seguro Universal de Salud (SIS)?</label>
+                                        <div className="flex gap-2">
+                                            {['SI', 'NO', 'NO_SABE'].map(opt => (
+                                                <button
+                                                    type="button"
+                                                    key={opt}
+                                                    onClick={() => setFormData(prev => ({
+                                                        ...prev,
+                                                        afiliadoSIS: opt,
+                                                        ...(opt === 'SI' ? { afiliadoOtroSeguro: 'NO', detalleOtroSeguro: '' } : {})
+                                                    }))}
+                                                    className={`flex-1 px-3 py-2 rounded-[6px] border text-xs font-bold uppercase transition-colors ${formData.afiliadoSIS === opt ? 'bg-primary text-white border-primary' : 'border-border text-fg-muted hover:bg-surface-muted'}`}
+                                                >
+                                                    {opt.replace('_', ' ')}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="col-span-12 md:col-span-6">
+                                        <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">¿Afiliado a algún otro tipo de seguro de salud?</label>
+                                        <div className="flex gap-2">
+                                            {['SI', 'NO', 'NO_SABE'].map(opt => (
+                                                <button
+                                                    type="button"
+                                                    key={opt}
+                                                    onClick={() => setFormData(prev => ({
+                                                        ...prev,
+                                                        afiliadoOtroSeguro: opt,
+                                                        ...(opt === 'SI' ? { afiliadoSIS: 'NO' } : { detalleOtroSeguro: '' })
+                                                    }))}
+                                                    className={`flex-1 px-3 py-2 rounded-[6px] border text-xs font-bold uppercase transition-colors ${formData.afiliadoOtroSeguro === opt ? 'bg-primary text-white border-primary' : 'border-border text-fg-muted hover:bg-surface-muted'}`}
+                                                >
+                                                    {opt.replace('_', ' ')}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {formData.afiliadoOtroSeguro === 'SI' && (
+                                        <>
+                                            <div className="col-span-12 md:col-span-6">
+                                                <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Seleccione el seguro de salud</label>
+                                                <select
+                                                    className="w-full px-3 py-2 border border-border rounded-[6px] text-xs bg-surface text-fg font-medium focus:ring-2 focus:ring-primary/40 focus:border-primary outline-none"
+                                                    value={SEGUROS_PREDEFINIDOS.includes(formData.detalleOtroSeguro) ? formData.detalleOtroSeguro : (formData.detalleOtroSeguro ? 'OTRO' : '')}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value;
+                                                        setFormData({ ...formData, detalleOtroSeguro: val === 'OTRO' ? '' : val });
+                                                    }}
+                                                >
+                                                    <option value="">Seleccionar...</option>
+                                                    {SEGUROS_PREDEFINIDOS.map(s => (
+                                                        <option key={s} value={s}>{s}</option>
+                                                    ))}
+                                                    <option value="OTRO">Otro (Especificar)</option>
+                                                </select>
+                                            </div>
+                                            {!SEGUROS_PREDEFINIDOS.includes(formData.detalleOtroSeguro) && (
+                                                <div className="col-span-12 md:col-span-6">
+                                                    <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Especifique el seguro de salud alternativo</label>
+                                                    <input
+                                                        type="text"
+                                                        className="w-full px-3 py-2 border border-border rounded-[6px] text-xs bg-surface text-fg font-medium focus:ring-2 focus:ring-primary/40 focus:border-primary outline-none"
+                                                        placeholder="Ej: Mapfre, Seguro universitario particular..."
+                                                        value={formData.detalleOtroSeguro}
+                                                        onChange={(e) => setFormData({ ...formData, detalleOtroSeguro: e.target.value })}
+                                                    />
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Fila 6: Fecha de Aplicación de la Ficha (100% | col-span-12) */}
+                            <div className="col-span-12 border-t border-border pt-4 mt-1">
+                                <p className="text-[10px] font-bold text-fg-muted uppercase mb-3">Fecha de Aplicación de la Ficha</p>
+                                <div className="grid grid-cols-12 gap-x-6 gap-y-4">
+                                    <div className="col-span-12 md:col-span-6">
+                                        <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Fecha de Inicio de Aplicación</label>
+                                        <input
+                                            type="date"
+                                            className="w-full px-3 py-2 border border-border rounded-[6px] text-xs bg-surface text-fg font-medium focus:ring-2 focus:ring-primary/40 focus:border-primary outline-none"
+                                            value={formData.fechaInicioAplicacion}
+                                            onChange={(e) => setFormData({ ...formData, fechaInicioAplicacion: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="col-span-12 md:col-span-6">
+                                        <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Fecha de Fin de Aplicación</label>
+                                        <input
+                                            type="date"
+                                            className="w-full px-3 py-2 border border-border rounded-[6px] text-xs bg-surface text-fg font-medium focus:ring-2 focus:ring-primary/40 focus:border-primary outline-none"
+                                            value={formData.fechaFinAplicacion}
+                                            onChange={(e) => setFormData({ ...formData, fechaFinAplicacion: e.target.value })}
+                                        />
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1240,7 +1650,7 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
 
                             {/* Tiempo y Explotación */}
                             <div className="col-span-12 md:col-span-4">
-                                <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Tiempo en Calle</label>
+                                <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Tiempo en Situación de Calle</label>
                                 <div className="flex gap-2">
                                     <input
                                         type="text"
@@ -1301,11 +1711,29 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                                 </div>
                             </div>
 
+                            <div className="col-span-12 md:col-span-4">
+                                <label className="block text-[10px] font-bold text-fg-muted uppercase mb-2">¿En qué utiliza el dinero producto de la actividad de calle?</label>
+                                <div className="space-y-2">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input type="checkbox" checked={formData.situacionCalleDetalle.usoDinero.gastosFamiliares} onChange={e => setFormData({ ...formData, situacionCalleDetalle: { ...formData.situacionCalleDetalle, usoDinero: { ...formData.situacionCalleDetalle.usoDinero, gastosFamiliares: e.target.checked } } })} className="rounded text-success" />
+                                        <span className="text-xs text-fg-2">Gastos familiares</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input type="checkbox" checked={formData.situacionCalleDetalle.usoDinero.gastosPropios} onChange={e => setFormData({ ...formData, situacionCalleDetalle: { ...formData.situacionCalleDetalle, usoDinero: { ...formData.situacionCalleDetalle.usoDinero, gastosPropios: e.target.checked } } })} className="rounded text-success" />
+                                        <span className="text-xs text-fg-2">Gastos propios</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input type="checkbox" checked={formData.situacionCalleDetalle.usoDinero.entregaOtraPersona} onChange={e => setFormData({ ...formData, situacionCalleDetalle: { ...formData.situacionCalleDetalle, usoDinero: { ...formData.situacionCalleDetalle.usoDinero, entregaOtraPersona: e.target.checked } } })} className="rounded text-success" />
+                                        <span className="text-xs text-fg-2">Entrega a otra persona (padres o tutor, otro)</span>
+                                    </label>
+                                </div>
+                            </div>
+
                             <hr className="col-span-12 border-border" />
 
                             {/* Motivo, Modalidad y Lugar */}
                             <div className="col-span-12 md:col-span-4">
-                                <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Motivo Situación de Calle</label>
+                                <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Motivo de su Situación de Calle</label>
                                 <textarea
                                     className="w-full px-3 py-2 border border-border rounded-[6px] text-xs focus:ring-2 focus:ring-primary/40 focus:border-primary min-h-[80px]"
                                     placeholder="Describa el motivo..."
@@ -1459,7 +1887,7 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                             {/* Obligado y Escapó */}
                             <div className="col-span-12 md:col-span-6 bg-danger-soft p-3 rounded-[6px] border border-danger/20 transition-all duration-300">
                                 <div className="flex justify-between items-center mb-2">
-                                    <label className="text-[10px] font-bold text-danger uppercase">¿Es obligado a trabajar?</label>
+                                    <label className="text-[10px] font-bold text-danger uppercase">¿Es obligado a realizar la actividad de calle?</label>
                                     <div className="flex gap-3">
                                         <label className="flex items-center gap-1 cursor-pointer"><input type="radio" name="obligado" checked={formData.situacionCalleDetalle.obligado.si} onChange={() => setFormData({ ...formData, situacionCalleDetalle: { ...formData.situacionCalleDetalle, obligado: { si: true, no: false, quien: '' } } })} className="text-danger" /> <span className="text-xs font-bold">SI</span></label>
                                         <label className="flex items-center gap-1 cursor-pointer"><input type="radio" name="obligado" checked={formData.situacionCalleDetalle.obligado.no} onChange={() => setFormData({ ...formData, situacionCalleDetalle: { ...formData.situacionCalleDetalle, obligado: { si: false, no: true, quien: '' } } })} className="text-fg-muted" /> <span className="text-xs font-bold">NO</span></label>
@@ -1480,7 +1908,7 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
 
                             <div className="col-span-12 md:col-span-6 bg-warning-soft p-3 rounded-[6px] border border-warning/20 transition-all duration-300">
                                 <div className="flex justify-between items-center mb-2">
-                                    <label className="text-[10px] font-bold text-warning uppercase">¿Escapó de casa?</label>
+                                    <label className="text-[10px] font-bold text-warning uppercase">¿Alguna vez te escapaste de casa más de 1 día?</label>
                                     <div className="flex gap-3">
                                         <label className="flex items-center gap-1 cursor-pointer"><input type="radio" name="escapo" checked={formData.situacionCalleDetalle.escapoCasa.si} onChange={() => setFormData({ ...formData, situacionCalleDetalle: { ...formData.situacionCalleDetalle, escapoCasa: { si: true, no: false, veces: '' } } })} className="text-warning" /> <span className="text-xs font-bold">SI</span></label>
                                         <label className="flex items-center gap-1 cursor-pointer"><input type="radio" name="escapo" checked={formData.situacionCalleDetalle.escapoCasa.no} onChange={() => setFormData({ ...formData, situacionCalleDetalle: { ...formData.situacionCalleDetalle, escapoCasa: { si: false, no: true, veces: '' } } })} className="text-fg-muted" /> <span className="text-xs font-bold">NO</span></label>
@@ -1649,7 +2077,7 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                                 />
                             </div>
                             <div className="col-span-12 md:col-span-4">
-                                <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Vínculo con el NNA</label>
+                                <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Parentesco con el Usuario</label>
                                 <select
                                     className="w-full px-3 py-2 border border-border rounded-[6px] text-xs focus:ring-2 focus:ring-primary/40 focus:border-primary bg-surface"
                                     value={formData.tutorParentesco}
@@ -1696,8 +2124,8 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                                 </select>
                             </div>
 
-                            {/* Fila 5: Lengua, Autoidentificación, Estado Civil */}
-                            <div className="col-span-12 md:col-span-4">
+                            {/* Fila 5: Lengua, Estado Civil */}
+                            <div className="col-span-12 md:col-span-6">
                                 <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Lengua Materna</label>
                                 <select
                                     className="w-full px-3 py-2 border border-border rounded-[6px] text-xs focus:ring-2 focus:ring-primary/40 focus:border-primary bg-surface"
@@ -1710,20 +2138,7 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                                     ))}
                                 </select>
                             </div>
-                            <div className="col-span-12 md:col-span-4">
-                                <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Autoidentificación Étnica</label>
-                                <select
-                                    className="w-full px-3 py-2 border border-border rounded-[6px] text-xs focus:ring-2 focus:ring-primary/40 focus:border-primary bg-surface"
-                                    value={formData.tutorEtnia}
-                                    onChange={(e) => setFormData({ ...formData, tutorEtnia: e.target.value })}
-                                >
-                                    <option value="">-- SELECCIONAR --</option>
-                                    {opcionesEtnia.map(opt => (
-                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className="col-span-12 md:col-span-4">
+                            <div className="col-span-12 md:col-span-6">
                                 <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Estado Civil</label>
                                 <select
                                     className="w-full px-3 py-2 border border-border rounded-[6px] text-xs focus:ring-2 focus:ring-primary/40 focus:border-primary bg-surface"
@@ -1758,7 +2173,7 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                                 </select>
                             </div>
                             <div className="col-span-12 md:col-span-4">
-                                <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Tipo de Discapacidad</label>
+                                <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Presenta Alguna Discapacidad</label>
                                 <select
                                     className="w-full px-3 py-2 border border-border rounded-[6px] text-xs focus:ring-2 focus:ring-primary/40 focus:border-primary bg-surface"
                                     value={formData.tutorTipoDiscapacidad}
@@ -1828,10 +2243,17 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
 
                     {/* IV. DATOS DE LA FAMILIA */}
                     <div className={activeTab === 'FAMILIA' ? '' : 'hidden'}>
+                        <div className="bg-surface rounded-[8px] border border-border overflow-hidden">
+                            <div className="bg-surface-muted border-b border-border px-4 py-2">
+                                <h2 className="text-sm font-black text-fg uppercase">
+                                    IV. DATOS DE LA FAMILIA
+                                </h2>
+                            </div>
+                        </div>
                         <div className="border border-purple-100 rounded-xl bg-purple-50/30 p-5 mt-2 group hover:border-purple-200 transition-all">
                             <div className="flex justify-between items-center mb-4 pb-2 border-b border-purple-100/50">
                                 <h4 className="text-sm font-black text-purple-900 uppercase flex items-center gap-2">
-                                    <Users size={16} className="text-purple-700" /> Familiar / Adulto Responsable (SEC 2026)
+                                    <Users size={16} className="text-purple-700" /> Familiar o Tutor Responsable del NNA
                                 </h4>
                                 <button
                                     type="button"
@@ -1864,16 +2286,26 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                                                     </div>
                                                     <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-gray-50 text-xs">
                                                         <div>
-                                                            <span className="text-gray-400 font-bold text-[9px] uppercase block">DNI / Documento</span>
-                                                            <span className="font-bold text-gray-700">{familiar.nroDocTutApo || familiar.dni || 'Sin Documento'}</span>
+                                                            <span className="text-gray-400 font-bold text-[9px] uppercase block">Edad</span>
+                                                            <span className="font-bold text-gray-700">{familiar.edad || 'No registra'}</span>
                                                         </div>
                                                         <div>
-                                                            <span className="text-gray-400 font-bold text-[9px] uppercase block">Teléfono</span>
-                                                            <span className="font-bold text-gray-700">{familiar.telefono || 'No registra'}</span>
+                                                            <span className="text-gray-400 font-bold text-[9px] uppercase block">Sexo</span>
+                                                            <span className="font-bold text-gray-700">
+                                                                {['1', 'MASCULINO', 'M'].includes(String(familiar.sexo || familiar.sexoApo || '').toUpperCase())
+                                                                    ? 'Masculino'
+                                                                    : ['2', 'FEMENINO', 'F'].includes(String(familiar.sexo || familiar.sexoApo || '').toUpperCase())
+                                                                        ? 'Femenino'
+                                                                        : 'No registra'}
+                                                            </span>
                                                         </div>
                                                         <div>
-                                                            <span className="text-gray-400 font-bold text-[9px] uppercase block">Vive con NNA</span>
-                                                            <span className="font-bold text-gray-700">{familiar.viveCon || 'NO'}</span>
+                                                            <span className="text-gray-400 font-bold text-[9px] uppercase block">Estado Civil</span>
+                                                            <span className="font-bold text-gray-700">{familiar.estadoCivil || 'No registra'}</span>
+                                                        </div>
+                                                        <div>
+                                                            <span className="text-gray-400 font-bold text-[9px] uppercase block">Grado de Instrucción</span>
+                                                            <span className="font-bold text-gray-700">{(familiar.gradoInstruccion || 'No registra').replace(/_/g, ' ')}</span>
                                                         </div>
                                                         <div>
                                                             <span className="text-gray-400 font-bold text-[9px] uppercase block">Ocupación</span>
@@ -2000,8 +2432,8 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                                 <div className="flex gap-2 bg-surface-muted p-2 rounded-[6px] border border-border text-center">
                                     {['1', '2', '3'].map(opt => (
                                         <label key={opt} className="flex-1 cursor-pointer hover:bg-surface p-2 rounded transition-all shadow-sm border border-transparent hover:border-border">
-                                            <input type="radio" name="ambientes" value={opt} checked={formData.numeroAmbientes === opt} onChange={(e) => setFormData({ ...formData, numeroAmbientes: e.target.value })} className="sr-only peer" />
-                                            <span className="block font-bold text-fg-muted peer-checked:text-primary peer-checked:scale-110 transition-transform">{opt}</span>
+                                            <input type="radio" name="ambientes" value={opt} checked={formData.numeroAmbientes === opt} onChange={(e) => setFormData({ ...formData, numeroAmbientes: e.target.value })} className="hidden peer" />
+                                            <span className="block font-bold text-fg-muted rounded peer-checked:text-primary peer-checked:bg-primary-soft transition-colors">{opt}</span>
                                         </label>
                                     ))}
                                 </div>
@@ -2014,7 +2446,7 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                                     {['OTROS', 'PROPIA', 'ALQUILADA', 'ALOJADO'].map(opt => (
                                         <label key={opt} className="flex items-center gap-2 cursor-pointer hover:bg-surface p-1 px-2 rounded transition-all border border-transparent hover:border-border">
                                             <input type="radio" name="propiedad" value={opt} checked={formData.propiedadVivienda === opt} onChange={(e) => setFormData({ ...formData, propiedadVivienda: e.target.value })} className="text-primary focus:ring-primary/40" />
-                                            <span className="text-[10px] font-semibold text-fg-2 truncate" title={opt}>{opt === 'ALOJADO' ? 'ALOJADO/INV.' : opt}</span>
+                                            <span className="text-[10px] font-semibold text-fg-2 truncate" title={opt}>{opt === 'ALOJADO' ? 'ALOJADO/INVASIÓN' : opt}</span>
                                         </label>
                                     ))}
                                 </div>
@@ -2275,33 +2707,83 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                                 </div>
                             )}
 
-                            {/* Atraso y Problemas */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
-                                {[
-                                    { label: 'Atraso Escolar', key: 'presentaAtraso' },
-                                    { label: 'Prob. Aprendizaje', key: 'problemasAprendizaje' },
-                                    { label: 'Prob. Conducta', key: 'problemasConducta' }
-                                ].map(item => (
-                                    <div key={item.key} className="p-4 border border-purple-100 rounded-xl bg-purple-50/10 flex flex-col justify-between">
-                                        <span className="font-bold text-[10px] text-purple-900 uppercase mb-3">{item.label}</span>
-                                        <div className="flex gap-2 h-8">
-                                            <button
-                                                type="button"
-                                                onClick={() => setFormData({ ...formData, [item.key]: true })}
-                                                className={`flex-1 flex items-center justify-center font-bold text-[10px] border rounded-lg cursor-pointer transition-colors ${formData[item.key as keyof typeof formData] === true ? 'bg-purple-700 text-white border-purple-700' : 'bg-white text-purple-700 border-purple-200 hover:bg-purple-50'}`}
-                                            >
-                                                SÍ
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => setFormData({ ...formData, [item.key]: false })}
-                                                className={`flex-1 flex items-center justify-center font-bold text-[10px] border rounded-lg cursor-pointer transition-colors ${formData[item.key as keyof typeof formData] === false ? 'bg-gray-700 text-white border-gray-700' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}`}
-                                            >
-                                                NO
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
+                            {/* Atraso y Problemas — cada campo con su propia variable y su propio componente */}
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-4 items-start">
+                                <ToggleSiNo
+                                    label="Atraso Escolar"
+                                    value={formData.presentaAtraso}
+                                    onChange={(v) => setFormData({ ...formData, presentaAtraso: v })}
+                                >
+                                    <InputField
+                                        label="¿Cuánto? (años)"
+                                        value={formData.tiempoAtraso}
+                                        onChange={(e) => setFormData({ ...formData, tiempoAtraso: e.target.value })}
+                                        placeholder="Ej: 1"
+                                    />
+                                    <SelectField
+                                        label="Motivo del Atraso"
+                                        value={formData.motivoAtraso}
+                                        onChange={(e) => setFormData({ ...formData, motivoAtraso: e.target.value })}
+                                        options={[
+                                            { value: 'REPITIO', label: 'Repitió' },
+                                            { value: 'DESERTO', label: 'Deserto' },
+                                            { value: 'NO_ESTUDIO', label: 'No Estudió' }
+                                        ]}
+                                    />
+                                </ToggleSiNo>
+                                <ToggleSiNo
+                                    label="Prob. Aprendizaje"
+                                    value={formData.problemasAprendizaje}
+                                    onChange={(v) => setFormData({ ...formData, problemasAprendizaje: v })}
+                                />
+                                <ToggleSiNo
+                                    label="Prob. Conducta"
+                                    value={formData.problemasConducta}
+                                    onChange={(v) => setFormData({ ...formData, problemasConducta: v })}
+                                >
+                                    <SelectField
+                                        label="Intensidad del Problema Conductual"
+                                        value={formData.intensidadConducta}
+                                        onChange={(e) => setFormData({ ...formData, intensidadConducta: e.target.value })}
+                                        options={[
+                                            { value: 'LEVE', label: 'Leve' },
+                                            { value: 'MODERADO', label: 'Moderado' },
+                                            { value: 'SEVERO', label: 'Severo' }
+                                        ]}
+                                    />
+                                </ToggleSiNo>
+                                <ToggleSiNo
+                                    label="Ha sido Expulsado"
+                                    value={formData.expulsado}
+                                    onChange={(v) => setFormData({ ...formData, expulsado: v })}
+                                >
+                                    <InputField
+                                        label="N° de Veces"
+                                        value={formData.vecesExpulsado}
+                                        onChange={(e) => setFormData({ ...formData, vecesExpulsado: e.target.value })}
+                                        placeholder="Ej: 1"
+                                    />
+                                </ToggleSiNo>
+                                <ToggleSiNo
+                                    label="Faltas/Tardanzas en el Mes"
+                                    value={formData.faltasTardanzas}
+                                    onChange={(v) => setFormData({ ...formData, faltasTardanzas: v })}
+                                />
+                                <ToggleSiNo
+                                    label="Se Duerme en Clase"
+                                    value={formData.seDuermeClase}
+                                    onChange={(v) => setFormData({ ...formData, seDuermeClase: v })}
+                                />
+                                <ToggleSiNo
+                                    label="Sufre Bullying/Discriminación"
+                                    value={formData.sufreBullying}
+                                    onChange={(v) => setFormData({ ...formData, sufreBullying: v })}
+                                />
+                                <ToggleSiNo
+                                    label="Tutor/Padre Conversa con Docente"
+                                    value={formData.tutorConversaDocente}
+                                    onChange={(v) => setFormData({ ...formData, tutorConversaDocente: v })}
+                                />
                             </div>
                         </div>
                     </div>
@@ -2313,34 +2795,279 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                                 VII. SALUD – ALIMENTACIÓN – HIGIENE
                             </h2>
                         </div>
-                        <div className="p-4 grid grid-cols-12 gap-x-6 gap-y-4 text-xs">
-                            {[
-                                { label: '¿Enfermedad Crónica?', key: 'enfermedadCronica', detailKey: 'detalleEnfermedadCronica' },
-                                { label: '¿Problema Psicológico?', key: 'problemaPsicologico', detailKey: 'detalleProblemaPsicologico' },
-                                { label: '¿Consume Sustancias?', key: 'consumeSustancias', detailKey: 'tipoSustancias' }
-                            ].map(item => (
-                                <div key={item.key} className="col-span-12 p-3 border-b border-border/50 flex flex-col md:flex-row gap-4 items-start md:items-center">
-                                    <div className="w-48">
-                                        <span className="font-bold text-[10px] text-fg-muted uppercase">{item.label}</span>
-                                        <div className="flex gap-2 mt-2">
-                                            <div onClick={() => setFormData({ ...formData, [item.key]: true })} className={`px-4 py-1 rounded cursor-pointer font-bold transition-colors ${formData[item.key as keyof typeof formData] === true ? 'bg-danger text-white' : 'bg-surface-muted text-fg-muted hover:text-danger'}`}>SI</div>
-                                            <div onClick={() => setFormData({ ...formData, [item.key]: false })} className={`px-4 py-1 rounded cursor-pointer font-bold transition-colors ${formData[item.key as keyof typeof formData] === false ? 'bg-success text-white' : 'bg-surface-muted text-fg-muted hover:text-success'}`}>NO</div>
-                                        </div>
-                                    </div>
-                                    {formData[item.key as keyof typeof formData] && (
-                                        <div className="flex-1 w-full animate-in slide-in-from-left-2 duration-300">
-                                            <label className="block text-[9px] font-bold text-fg-muted uppercase mb-1">Especifique / Detalles:</label>
-                                            <input
-                                                type="text"
-                                                className="w-full px-3 py-2 border border-danger/20 rounded-[6px] text-xs bg-danger-soft/10 focus:bg-surface focus:ring-2 focus:ring-danger/20 outline-none"
-                                                placeholder="Describa la situación..."
-                                                value={formData[item.detailKey as keyof typeof formData] as string}
-                                                onChange={e => setFormData({ ...formData, [item.detailKey]: e.target.value })}
-                                            />
-                                        </div>
-                                    )}
+                        <div className="p-6 space-y-6 text-xs">
+
+                            {/* Presenta problemas de salud en (checkboxes múltiples) */}
+                            <div>
+                                <label className="block text-[10px] font-bold text-fg-muted uppercase mb-2">Presenta Problemas de Salud en</label>
+                                <div className="flex flex-wrap gap-4 p-3 bg-purple-50/10 border border-purple-100 rounded-xl">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input type="checkbox" checked={formData.problemasSaludTipo.piel} onChange={e => setFormData({ ...formData, problemasSaludTipo: { ...formData.problemasSaludTipo, piel: e.target.checked } })} className="rounded text-purple-700" />
+                                        <span className="font-bold text-fg-2">Piel</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input type="checkbox" checked={formData.problemasSaludTipo.desnutricion} onChange={e => setFormData({ ...formData, problemasSaludTipo: { ...formData.problemasSaludTipo, desnutricion: e.target.checked } })} className="rounded text-purple-700" />
+                                        <span className="font-bold text-fg-2">Desnutrición</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input type="checkbox" checked={formData.problemasSaludTipo.respiratorios} onChange={e => setFormData({ ...formData, problemasSaludTipo: { ...formData.problemasSaludTipo, respiratorios: e.target.checked } })} className="rounded text-purple-700" />
+                                        <span className="font-bold text-fg-2">Respiratorios</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input type="checkbox" checked={formData.problemasSaludTipo.its} onChange={e => setFormData({ ...formData, problemasSaludTipo: { ...formData.problemasSaludTipo, its: e.target.checked } })} className="rounded text-purple-700" />
+                                        <span className="font-bold text-fg-2">ITS</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input type="checkbox" checked={formData.problemasSaludTipo.otros} onChange={e => setFormData({ ...formData, problemasSaludTipo: { ...formData.problemasSaludTipo, otros: e.target.checked } })} className="rounded text-purple-700" />
+                                        <span className="font-bold text-fg-2">Otros</span>
+                                    </label>
                                 </div>
-                            ))}
+                                {formData.problemasSaludTipo.otros && (
+                                    <div className="mt-2 animate-scaleUp">
+                                        <InputField
+                                            label="Especifique otro problema de salud"
+                                            value={formData.problemasSaludOtroDetalle}
+                                            onChange={(e) => setFormData({ ...formData, problemasSaludOtroDetalle: e.target.value })}
+                                            placeholder="Describa el problema..."
+                                        />
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Enfermedad Crónica / Discapacidad / Problema Psicológico / Consumo — cada uno con su tarjeta y sus propios detalles */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+                                <ToggleSiNo
+                                    label="¿Enfermedad Crónica?"
+                                    value={formData.enfermedadCronica}
+                                    onChange={(v) => setFormData({ ...formData, enfermedadCronica: v })}
+                                >
+                                    <InputField
+                                        label="Especifique / Detalles"
+                                        value={formData.detalleEnfermedadCronica}
+                                        onChange={(e) => setFormData({ ...formData, detalleEnfermedadCronica: e.target.value })}
+                                        placeholder="Describa la situación..."
+                                    />
+                                    <ToggleSiNo
+                                        label="Recibe Tratamiento"
+                                        value={formData.recibeTratamientoEnfermedad}
+                                        onChange={(v) => setFormData({ ...formData, recibeTratamientoEnfermedad: v })}
+                                    />
+                                </ToggleSiNo>
+
+                                <ToggleSiNo
+                                    label="Sufre Alguna Discapacidad"
+                                    value={formData.tieneDiscapacidad}
+                                    onChange={(v) => setFormData({ ...formData, tieneDiscapacidad: v })}
+                                >
+                                    <SelectField
+                                        label="Tipo de Discapacidad"
+                                        value={formData.tipoDiscapacidad}
+                                        onChange={(e) => setFormData({ ...formData, tipoDiscapacidad: e.target.value })}
+                                        options={DISCAPACIDADES_CONADIS.map(d => ({ value: d, label: d }))}
+                                    />
+                                    <InputField
+                                        label="Detalle de Discapacidad"
+                                        value={formData.detalleDiscapacidad}
+                                        onChange={(e) => setFormData({ ...formData, detalleDiscapacidad: e.target.value })}
+                                        placeholder="Especifique detalles adicionales..."
+                                    />
+                                    <ToggleSiNo
+                                        label="Cuenta con Carnet de Discapacidad"
+                                        value={formData.certificadoDiscapacidad}
+                                        onChange={(v) => setFormData({ ...formData, certificadoDiscapacidad: v })}
+                                    />
+                                    <SelectField
+                                        label="Dónde Recibe Tratamiento"
+                                        value={formData.dondeTratamientoDiscapacidad}
+                                        onChange={(e) => setFormData({ ...formData, dondeTratamientoDiscapacidad: e.target.value })}
+                                        options={[
+                                            { value: 'HOSPITAL', label: 'Hospital' },
+                                            { value: 'CENTRO_SALUD', label: 'Centro de Salud' },
+                                            { value: 'OTRO', label: 'Otro' }
+                                        ]}
+                                    />
+                                </ToggleSiNo>
+
+                                <ToggleSiNo
+                                    label="Presenta Indicadores de Problemas Psicológicos"
+                                    value={formData.problemaPsicologico}
+                                    onChange={(v) => setFormData({ ...formData, problemaPsicologico: v })}
+                                >
+                                    <label className="block text-[9px] font-bold text-fg-muted uppercase mb-1">Tipo de Indicador</label>
+                                    <div className="flex flex-wrap gap-3 mb-2">
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input type="checkbox" checked={formData.tipoIndicadorPsicologico.autoestimaBaja} onChange={e => setFormData({ ...formData, tipoIndicadorPsicologico: { ...formData.tipoIndicadorPsicologico, autoestimaBaja: e.target.checked } })} className="rounded text-purple-700" />
+                                            <span className="font-bold text-fg-2">Autoestima Baja</span>
+                                        </label>
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input type="checkbox" checked={formData.tipoIndicadorPsicologico.depresion} onChange={e => setFormData({ ...formData, tipoIndicadorPsicologico: { ...formData.tipoIndicadorPsicologico, depresion: e.target.checked } })} className="rounded text-purple-700" />
+                                            <span className="font-bold text-fg-2">Depresión</span>
+                                        </label>
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input type="checkbox" checked={formData.tipoIndicadorPsicologico.ansiedad} onChange={e => setFormData({ ...formData, tipoIndicadorPsicologico: { ...formData.tipoIndicadorPsicologico, ansiedad: e.target.checked } })} className="rounded text-purple-700" />
+                                            <span className="font-bold text-fg-2">Ansiedad</span>
+                                        </label>
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input type="checkbox" checked={formData.tipoIndicadorPsicologico.impulsividad} onChange={e => setFormData({ ...formData, tipoIndicadorPsicologico: { ...formData.tipoIndicadorPsicologico, impulsividad: e.target.checked } })} className="rounded text-purple-700" />
+                                            <span className="font-bold text-fg-2">Impulsividad</span>
+                                        </label>
+                                    </div>
+                                    <InputField
+                                        label="Detalles Importantes"
+                                        value={formData.detalleProblemaPsicologico}
+                                        onChange={(e) => setFormData({ ...formData, detalleProblemaPsicologico: e.target.value })}
+                                        placeholder="Describa la situación..."
+                                    />
+                                </ToggleSiNo>
+
+                                <ToggleSiNo
+                                    label="¿Consume Sustancias?"
+                                    value={formData.consumeSustancias}
+                                    onChange={(v) => setFormData({ ...formData, consumeSustancias: v })}
+                                >
+                                    <InputField
+                                        label="¿Cuál(es)?"
+                                        value={formData.tipoSustancias}
+                                        onChange={(e) => setFormData({ ...formData, tipoSustancias: e.target.value })}
+                                        placeholder="Especifique..."
+                                    />
+                                    <ToggleSiNo
+                                        label="Si Presenta Adicción, Recibe Tratamiento"
+                                        value={formData.adiccionRecibeTratamiento}
+                                        onChange={(v) => setFormData({ ...formData, adiccionRecibeTratamiento: v })}
+                                    />
+                                </ToggleSiNo>
+                            </div>
+
+                            {/* Salud Sexual y Reproductiva */}
+                            <div>
+                                <label className="block text-[10px] font-bold text-fg-muted uppercase mb-2">Salud Sexual y Reproductiva</label>
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
+                                    <ToggleSiNo
+                                        label="Se Encuentra Gestando"
+                                        value={formData.seEncuentraGestando}
+                                        onChange={(v) => setFormData({ ...formData, seEncuentraGestando: v })}
+                                    />
+                                    <ToggleSiNo
+                                        label="Es Madre/Padre Adolescente"
+                                        value={formData.esMadrePadreAdolescente}
+                                        onChange={(v) => setFormData({ ...formData, esMadrePadreAdolescente: v })}
+                                    />
+                                    <ToggleSiNo
+                                        label="Ha Sufrido Algún Aborto"
+                                        value={formData.haSufridoAborto}
+                                        onChange={(v) => setFormData({ ...formData, haSufridoAborto: v })}
+                                    />
+                                    <ToggleSiNo
+                                        label="Ha Sido Víctima de Abuso Sexual"
+                                        value={formData.victimaAbusoSexual}
+                                        onChange={(v) => setFormData({ ...formData, victimaAbusoSexual: v })}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Alimentación */}
+                            <div>
+                                <label className="block text-[10px] font-bold text-fg-muted uppercase mb-2">Alimentación</label>
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
+                                    <ToggleSiNo
+                                        label="Recibe sus Alimentos 3 Veces al Día"
+                                        value={formData.recibeTresAlimentos}
+                                        onChange={(v) => setFormData({ ...formData, recibeTresAlimentos: v })}
+                                    />
+                                    <ToggleSiNo
+                                        label="Aparenta Estar Bien Alimentado"
+                                        value={formData.aparentaBienAlimentado}
+                                        onChange={(v) => setFormData({ ...formData, aparentaBienAlimentado: v })}
+                                    />
+                                    <SelectField
+                                        label="Dónde Recibe sus Alimentos"
+                                        value={formData.dondeAlimenta}
+                                        onChange={(e) => setFormData({ ...formData, dondeAlimenta: e.target.value })}
+                                        options={[
+                                            { value: 'CALLE', label: 'Calle' },
+                                            { value: 'HOGAR', label: 'Hogar' },
+                                            { value: 'OTRO', label: 'Otro' }
+                                        ]}
+                                    />
+                                    <SelectField
+                                        label="Quién Asume su Alimentación"
+                                        value={formData.quienAlimenta}
+                                        onChange={(e) => setFormData({ ...formData, quienAlimenta: e.target.value })}
+                                        options={[
+                                            { value: 'USUARIO', label: 'Usuario' },
+                                            { value: 'PADRE_TUTOR', label: 'Padre/Tutor' },
+                                            { value: 'INSTITUCION', label: 'Institución' },
+                                            { value: 'OTROS', label: 'Otros' }
+                                        ]}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Higiene (SI / NO / A VECES) */}
+                            <div>
+                                <label className="block text-[10px] font-bold text-fg-muted uppercase mb-2">Higiene</label>
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
+                                    <Toggle3
+                                        label="Se Asea Diariamente"
+                                        value={formData.higieneAdecuada}
+                                        onChange={(v) => setFormData({ ...formData, higieneAdecuada: v })}
+                                    />
+                                    <Toggle3
+                                        label="Utiliza Ropas Limpias"
+                                        value={formData.ropasLimpias}
+                                        onChange={(v) => setFormData({ ...formData, ropasLimpias: v })}
+                                    />
+                                    <Toggle3
+                                        label="Cumple Normas de Higiene antes/después de Comer"
+                                        value={formData.normasHigieneComer}
+                                        onChange={(v) => setFormData({ ...formData, normasHigieneComer: v })}
+                                    />
+                                    <Toggle3
+                                        label="Cabello/Uñas Recortadas y Limpias"
+                                        value={formData.cabelloUnasLimpias}
+                                        onChange={(v) => setFormData({ ...formData, cabelloUnasLimpias: v })}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Disciplina / Violencia correctiva */}
+                            <div>
+                                <ToggleSiNo
+                                    label="Los Padres/Tutor Ejercen Violencia para Corregir Conductas Inadecuadas"
+                                    value={formData.violenciaCorrectiva}
+                                    onChange={(v) => setFormData({ ...formData, violenciaCorrectiva: v })}
+                                >
+                                    <InputField
+                                        label="¿Quién?"
+                                        value={formData.quienEjerceViolencia}
+                                        onChange={(e) => setFormData({ ...formData, quienEjerceViolencia: e.target.value })}
+                                        placeholder="Especifique..."
+                                    />
+                                    <label className="block text-[9px] font-bold text-fg-muted uppercase mb-1">Tipo de Violencia</label>
+                                    <div className="flex flex-wrap gap-3">
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input type="checkbox" checked={formData.tipoViolencia.fisica} onChange={e => setFormData({ ...formData, tipoViolencia: { ...formData.tipoViolencia, fisica: e.target.checked } })} className="rounded text-purple-700" />
+                                            <span className="font-bold text-fg-2">Física</span>
+                                        </label>
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input type="checkbox" checked={formData.tipoViolencia.psicologica} onChange={e => setFormData({ ...formData, tipoViolencia: { ...formData.tipoViolencia, psicologica: e.target.checked } })} className="rounded text-purple-700" />
+                                            <span className="font-bold text-fg-2">Psicológica</span>
+                                        </label>
+                                    </div>
+                                </ToggleSiNo>
+                            </div>
+
+                            {/* Observaciones */}
+                            <div>
+                                <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Observaciones de Salud</label>
+                                <textarea
+                                    className="w-full px-3 py-2 border border-border rounded-[6px] text-xs focus:ring-2 focus:ring-primary/40 focus:border-primary min-h-[80px]"
+                                    placeholder="Observaciones adicionales..."
+                                    value={formData.observacionesSalud}
+                                    onChange={(e) => setFormData({ ...formData, observacionesSalud: e.target.value })}
+                                />
+                            </div>
                         </div>
                     </div>
 
@@ -2370,10 +3097,36 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                                             <input type="text" className="w-full text-xs p-2 border border-primary/10 rounded-[6px] bg-surface" placeholder="Ej: 3 veces" value={formData.vecesJuegaSemana} onChange={e => setFormData({ ...formData, vecesJuegaSemana: e.target.value })} />
                                         </div>
                                         <div>
-                                            <label className="block text-[9px] font-bold text-fg-muted uppercase mb-1">¿Dónde juega?</label>
-                                            <input type="text" className="w-full text-xs p-2 border border-primary/10 rounded-[6px] bg-surface" placeholder="Ej: Parque, Casa..." value={formData.lugarJuego} onChange={e => setFormData({ ...formData, lugarJuego: e.target.value })} />
+                                            <label className="block text-[9px] font-bold text-fg-muted uppercase mb-1">Lugar Donde Juega</label>
+                                            <div className="flex gap-1">
+                                                {[
+                                                    { value: 'CALLE_PARQUE', label: 'Calle/Parque' },
+                                                    { value: 'CASA', label: 'Casa' },
+                                                    { value: 'OTRO', label: 'Otro' }
+                                                ].map(opt => (
+                                                    <div
+                                                        key={opt.value}
+                                                        onClick={() => setFormData({ ...formData, lugarJuego: opt.value })}
+                                                        className={`flex-1 text-center py-1.5 rounded cursor-pointer text-[8px] font-bold border transition-all ${formData.lugarJuego === opt.value ? 'bg-primary-soft border-primary/30 text-primary shadow-sm' : 'bg-surface border-primary/10 text-fg-muted hover:bg-primary-soft/20'}`}
+                                                    >
+                                                        {opt.label}
+                                                    </div>
+                                                ))}
+                                            </div>
                                         </div>
                                     </div>
+                                    {formData.lugarJuego === 'OTRO' && (
+                                        <div className="mt-3">
+                                            <label className="block text-[9px] font-bold text-fg-muted uppercase mb-1">Especifique el Lugar</label>
+                                            <input
+                                                type="text"
+                                                className="w-full text-xs p-2 border border-primary/10 rounded-[6px] bg-surface"
+                                                placeholder="Especifique..."
+                                                value={formData.lugarJuegoOtroDetalle}
+                                                onChange={(e) => setFormData({ ...formData, lugarJuegoOtroDetalle: e.target.value })}
+                                            />
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="p-4 bg-surface-muted/30 rounded-[8px] border border-border">
@@ -2401,26 +3154,30 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                                     </h3>
 
                                     <div className="space-y-3">
-                                        <div>
-                                            <label className="block text-[9px] font-bold text-fg-muted uppercase mb-1">Intereses Deportivos</label>
-                                            <input
-                                                type="text"
-                                                className="w-full text-xs p-2 border border-primary/20 rounded-[6px] focus:ring-primary/40 bg-surface"
-                                                placeholder="Ej: Fútbol, Voley..."
+                                        <ToggleSiNo
+                                            label="Refiere Intereses Deportivos"
+                                            value={formData.interesesDeportivos}
+                                            onChange={(v) => setFormData({ ...formData, interesesDeportivos: v })}
+                                        >
+                                            <InputField
+                                                label="¿Cuál(es)?"
                                                 value={formData.recreacionInteresDeporte}
                                                 onChange={(e) => setFormData({ ...formData, recreacionInteresDeporte: e.target.value })}
+                                                placeholder="Ej: Fútbol, Voley..."
                                             />
-                                        </div>
-                                        <div>
-                                            <label className="block text-[9px] font-bold text-fg-muted uppercase mb-1">Intereses Artísticos</label>
-                                            <input
-                                                type="text"
-                                                className="w-full text-xs p-2 border border-primary/20 rounded-[6px] focus:ring-primary/40 bg-surface"
-                                                placeholder="Ej: Dibujo, Baile, Música..."
+                                        </ToggleSiNo>
+                                        <ToggleSiNo
+                                            label="Refiere Intereses Artísticos"
+                                            value={formData.interesesArtisticos}
+                                            onChange={(v) => setFormData({ ...formData, interesesArtisticos: v })}
+                                        >
+                                            <InputField
+                                                label="¿Cuál(es)?"
                                                 value={formData.recreacionInteresArte}
                                                 onChange={(e) => setFormData({ ...formData, recreacionInteresArte: e.target.value })}
+                                                placeholder="Ej: Dibujo, Baile, Música..."
                                             />
-                                        </div>
+                                        </ToggleSiNo>
                                     </div>
                                 </div>
 
@@ -2548,6 +3305,34 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
 
             </div>
 
+            {/* BOTONES INFERIORES - Duplicado del header para facilitar guardado al final del formulario */}
+            <div className="max-w-7xl mx-auto print:hidden px-4 pb-6 pt-2">
+                <div className="flex justify-end">
+                    <div className="flex flex-wrap gap-2">
+                        <button
+                            onClick={() => setShowDraftConfirm(true)}
+                            disabled={loading}
+                            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-warning-soft text-warning border border-warning/30 px-3.5 py-2 rounded-[6px] text-[13px] font-bold hover:bg-warning/10 transition-colors disabled:opacity-60"
+                        >
+                            <Clock size={16} /> Borrador
+                        </button>
+                        <button
+                            onClick={() => setShowSaveConfirm(true)}
+                            disabled={loading}
+                            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-primary text-primary-fg px-3.5 py-2 rounded-[6px] text-[13px] font-bold hover:bg-primary/90 transition-colors disabled:opacity-60"
+                        >
+                            <Save size={16} /> Guardar
+                        </button>
+                        <button
+                            onClick={() => window.print()}
+                            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-surface border border-border-strong text-fg px-3.5 py-2 rounded-[6px] text-[13px] font-bold hover:bg-surface-muted transition-colors"
+                        >
+                            <Printer size={16} /> Imprimir
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             {/* MODAL PARA AGREGAR/EDITAR FAMILIAR */}
             {
                 showFamilyModal && (
@@ -2557,7 +3342,7 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                             <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-purple-50 rounded-t-2xl">
                                 <div>
                                     <h3 className="text-lg font-black text-purple-900 flex items-center gap-2">
-                                        <Users size={22} className="text-purple-700" /> {editingFamilyIndex !== null ? 'Editar Familiar' : 'Registrar Familiar Responsable'} (SEC 2026)
+                                        <Users size={22} className="text-purple-700" /> {editingFamilyIndex !== null ? 'Editar Familiar o Tutor Responsable' : 'Registrar Familiar o Tutor Responsable'}
                                     </h3>
                                     <p className="text-xs text-purple-700 font-medium">Complete todos los datos oficiales del familiar responsable del NNA.</p>
                                 </div>
@@ -2701,20 +3486,7 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                                             placeholder="Escriba la lengua..."
                                         />
                                     )}
-                                    <SelectField
-                                        label="Autoidentificación Étnica"
-                                        value={currentFamily.autIdeEtApo || ''}
-                                        onChange={(e) => setCurrentFamily({ ...currentFamily, autIdeEtApo: e.target.value })}
-                                        options={opcionesEtnia}
-                                    />
-                                    {['8', 'OTRO'].includes(currentFamily.autIdeEtApo || '') && (
-                                        <InputField
-                                            label="Especificar Etnia"
-                                            value={currentFamily.autIdeEtEspApo || ''}
-                                            onChange={(e) => setCurrentFamily({ ...currentFamily, autIdeEtEspApo: e.target.value })}
-                                            placeholder="Escriba la etnia..."
-                                        />
-                                    )}
+
                                     <SelectField
                                         label="Tipo de Discapacidad"
                                         value={currentFamily.tipoDiscapApo || ''}
@@ -2749,7 +3521,7 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                                                 type="checkbox"
                                                 checked={currentFamily.esTutorPrincipal === 'true' || currentFamily.esTutorPrincipal === true}
                                                 onChange={(e) => setCurrentFamily({ ...currentFamily, esTutorPrincipal: e.target.checked ? 'true' : 'false' })}
-                                                className="sr-only peer"
+                                                className="hidden peer"
                                             />
                                             <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-700"></div>
                                         </label>
@@ -2818,7 +3590,7 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                                             <option value="EDUCACIÓN">Educación</option>
                                             <option value="LEGAL">Legal</option>
                                             <option value="PAUTAS DE CRIANZA">Pautas de Crianza</option>
-                                            <option value="VIOLENCIA">Violencia</option>
+                                            <option value="VIOLENCIA">Violencia - Física y Psicológica</option>
                                             <option value="RECREATIVAS">Recreativas</option>
                                             <option value="OTRA">Otra</option>
                                         </select>
@@ -2954,7 +3726,7 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                         <tr>
                             <td style={tdStyle}>
                                 <span style={labelStyle as any}>Sexo</span>
-                                M [{nna?.sexo === 'M' ? 'X' : ' '}]  F [{nna?.sexo === 'F' ? 'X' : ' '}]
+                                M [{formData.sexo === '1' ? 'X' : ' '}]  F [{formData.sexo === '2' ? 'X' : ' '}]
                             </td>
                             <td style={tdStyle}>
                                 <span style={labelStyle as any}>Lugar Nacimiento</span>
@@ -2962,7 +3734,7 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                             </td>
                             <td style={tdStyle} colSpan={2}>
                                 <span style={labelStyle as any}>Seguro de Salud</span>
-                                {nna?.afiliadoSIS === 'SI' ? 'SIS' : (nna?.afiliadoOtroSeguro === 'SI' ? nna?.detalleOtroSeguro : 'NINGUNO')}
+                                {formData.afiliadoSIS === 'SI' ? 'SIS' : (formData.afiliadoOtroSeguro === 'SI' ? (formData.detalleOtroSeguro || 'OTRO') : 'NINGUNO')}
                             </td>
                         </tr>
                         <tr>
@@ -2986,7 +3758,7 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                         </tr>
                         <tr>
                             <td style={tdStyle}>
-                                <span style={labelStyle as any}>Tiempo en Calle</span>
+                                <span style={labelStyle as any}>Tiempo en Situación de Calle</span>
                                 <b>{formData.tiempoEnCalle || caso?.tiempoEnCalle}</b>
                             </td>
                             <td style={tdStyle} colSpan={3}>
@@ -3170,10 +3942,29 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                             <td style={tdStyle}>
                                 <span style={labelStyle as any}>Problemas Conducta</span>
                                 SI [{formData.problemasConducta ? 'X' : ' '}] NO [{!formData.problemasConducta ? 'X' : ' '}]
+                                {formData.problemasConducta && <b> ({formData.intensidadConducta || '---'})</b>}
                             </td>
                             <td style={tdStyle}>
                                 <span style={labelStyle as any}>Ha sido expulsado</span>
                                 SI [{formData.expulsado ? 'X' : ' '}] NO [{!formData.expulsado ? 'X' : ' '}] N° veces: {formData.vecesExpulsado || '---'}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style={tdStyle}>
+                                <span style={labelStyle as any}>Faltas/Tardanzas en el Mes</span>
+                                SI [{formData.faltasTardanzas ? 'X' : ' '}] NO [{!formData.faltasTardanzas ? 'X' : ' '}]
+                            </td>
+                            <td style={tdStyle}>
+                                <span style={labelStyle as any}>Se Duerme en Clase</span>
+                                SI [{formData.seDuermeClase ? 'X' : ' '}] NO [{!formData.seDuermeClase ? 'X' : ' '}]
+                            </td>
+                            <td style={tdStyle}>
+                                <span style={labelStyle as any}>Sufre Bullying/Discriminación</span>
+                                SI [{formData.sufreBullying ? 'X' : ' '}] NO [{!formData.sufreBullying ? 'X' : ' '}]
+                            </td>
+                            <td style={tdStyle}>
+                                <span style={labelStyle as any}>Tutor Conversa con Docente</span>
+                                SI [{formData.tutorConversaDocente ? 'X' : ' '}] NO [{!formData.tutorConversaDocente ? 'X' : ' '}]
                             </td>
                         </tr>
                     </tbody>
@@ -3184,34 +3975,84 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                 <table style={tableStyle as any}>
                     <tbody>
                         <tr>
-                            <td style={{ ...tdStyle, backgroundColor: '#f9fafb' }} width="30%"><b>Enfermedad Crónica:</b></td>
-                            <td style={tdStyle}>SI [{formData.enfermedadCronica ? 'X' : ' '}] NO [{!formData.enfermedadCronica ? 'X' : ' '}]</td>
+                            <td style={{ ...tdStyle, backgroundColor: '#f9fafb' }} width="30%"><b>Presenta Problemas en:</b></td>
+                            <td style={tdStyle} colSpan={2}>
+                                Piel [{formData.problemasSaludTipo.piel ? 'X' : ' '}]
+                                {' '}Desnutrición [{formData.problemasSaludTipo.desnutricion ? 'X' : ' '}]
+                                {' '}Respiratorios [{formData.problemasSaludTipo.respiratorios ? 'X' : ' '}]
+                                {' '}ITS [{formData.problemasSaludTipo.its ? 'X' : ' '}]
+                                {' '}Otros [{formData.problemasSaludTipo.otros ? 'X' : ' '}] {formData.problemasSaludTipo.otros && `(${formData.problemasSaludOtroDetalle || '---'})`}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style={{ ...tdStyle, backgroundColor: '#f9fafb' }}><b>Enfermedad Crónica:</b></td>
+                            <td style={tdStyle}>SI [{formData.enfermedadCronica ? 'X' : ' '}] NO [{!formData.enfermedadCronica ? 'X' : ' '}] Recibe Tratamiento: SI [{formData.recibeTratamientoEnfermedad ? 'X' : ' '}] NO [{!formData.recibeTratamientoEnfermedad ? 'X' : ' '}]</td>
                             <td style={tdStyle}>{formData.detalleEnfermedadCronica || '---'}</td>
                         </tr>
                         <tr>
                             <td style={{ ...tdStyle, backgroundColor: '#f9fafb' }}><b>Discapacidad:</b></td>
-                            <td style={tdStyle}>SI [{nna?.tieneDiscapacidad ? 'X' : ' '}] NO [{!nna?.tieneDiscapacidad ? 'X' : ' '}]</td>
-                            <td style={tdStyle}>{nna?.tipoDiscapacidad || '---'}</td>
+                            <td style={tdStyle}>
+                                SI [{formData.tieneDiscapacidad ? 'X' : ' '}] NO [{!formData.tieneDiscapacidad ? 'X' : ' '}]
+                                {' '}Carnet: SI [{formData.certificadoDiscapacidad ? 'X' : ' '}] NO [{!formData.certificadoDiscapacidad ? 'X' : ' '}]
+                            </td>
+                            <td style={tdStyle}>{formData.tipoDiscapacidad || '---'} — Tratamiento: {formData.dondeTratamientoDiscapacidad || '---'}</td>
                         </tr>
                         <tr>
                             <td style={{ ...tdStyle, backgroundColor: '#f9fafb' }}><b>Problemas Psicológicos:</b></td>
                             <td style={tdStyle}>SI [{formData.problemaPsicologico ? 'X' : ' '}] NO [{!formData.problemaPsicologico ? 'X' : ' '}]</td>
-                            <td style={tdStyle}>{formData.detalleProblemaPsicologico || '---'}</td>
+                            <td style={tdStyle}>
+                                {[
+                                    formData.tipoIndicadorPsicologico.autoestimaBaja && 'Autoestima Baja',
+                                    formData.tipoIndicadorPsicologico.depresion && 'Depresión',
+                                    formData.tipoIndicadorPsicologico.ansiedad && 'Ansiedad',
+                                    formData.tipoIndicadorPsicologico.impulsividad && 'Impulsividad'
+                                ].filter(Boolean).join(', ') || '---'} — {formData.detalleProblemaPsicologico || '---'}
+                            </td>
                         </tr>
                         <tr>
                             <td style={{ ...tdStyle, backgroundColor: '#f9fafb' }}><b>Consume Sustancias:</b></td>
-                            <td style={tdStyle}>SI [{formData.consumeSustancias ? 'X' : ' '}] NO [{!formData.consumeSustancias ? 'X' : ' '}]</td>
+                            <td style={tdStyle}>SI [{formData.consumeSustancias ? 'X' : ' '}] NO [{!formData.consumeSustancias ? 'X' : ' '}] Recibe Tratamiento: SI [{formData.adiccionRecibeTratamiento ? 'X' : ' '}] NO [{!formData.adiccionRecibeTratamiento ? 'X' : ' '}]</td>
                             <td style={tdStyle}>{formData.tipoSustancias || '---'}</td>
                         </tr>
                         <tr>
-                            <td style={{ ...tdStyle, backgroundColor: '#f9fafb' }}><b>Recibe 3 Alimentos al Día:</b></td>
-                            <td style={tdStyle}>SI [{formData.recibeTresAlimentos ? 'X' : ' '}] NO [{!formData.recibeTresAlimentos ? 'X' : ' '}]</td>
-                            <td style={tdStyle}></td>
+                            <td style={{ ...tdStyle, backgroundColor: '#f9fafb' }}><b>Salud Sexual y Reproductiva:</b></td>
+                            <td style={tdStyle} colSpan={2}>
+                                Gestando [{formData.seEncuentraGestando ? 'X' : ' '}]
+                                {' '}Madre/Padre Adolescente [{formData.esMadrePadreAdolescente ? 'X' : ' '}]
+                                {' '}Aborto [{formData.haSufridoAborto ? 'X' : ' '}]
+                                {' '}Abuso Sexual [{formData.victimaAbusoSexual ? 'X' : ' '}]
+                            </td>
                         </tr>
                         <tr>
-                            <td style={{ ...tdStyle, backgroundColor: '#f9fafb' }}><b>Higiene Personal Adecuada:</b></td>
-                            <td style={tdStyle}>SI [{formData.higieneAdecuada ? 'X' : ' '}] NO [{!formData.higieneAdecuada ? 'X' : ' '}]</td>
-                            <td style={tdStyle}><span style={{ fontSize: '8px' }}>Cabello/uñas limpias y recortadas</span></td>
+                            <td style={{ ...tdStyle, backgroundColor: '#f9fafb' }}><b>Alimentación:</b></td>
+                            <td style={tdStyle}>
+                                3 Veces al Día: SI [{formData.recibeTresAlimentos ? 'X' : ' '}] NO [{!formData.recibeTresAlimentos ? 'X' : ' '}]
+                                {' '}Bien Alimentado: SI [{formData.aparentaBienAlimentado ? 'X' : ' '}] NO [{!formData.aparentaBienAlimentado ? 'X' : ' '}]
+                            </td>
+                            <td style={tdStyle}>Dónde: {formData.dondeAlimenta || '---'} — Quién: {formData.quienAlimenta || '---'}</td>
+                        </tr>
+                        <tr>
+                            <td style={{ ...tdStyle, backgroundColor: '#f9fafb' }}><b>Higiene:</b></td>
+                            <td style={tdStyle} colSpan={2}>
+                                Se Asea: {formData.higieneAdecuada || '---'}
+                                {' '}| Ropas Limpias: {formData.ropasLimpias || '---'}
+                                {' '}| Normas al Comer: {formData.normasHigieneComer || '---'}
+                                {' '}| Cabello/Uñas: {formData.cabelloUnasLimpias || '---'}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style={{ ...tdStyle, backgroundColor: '#f9fafb' }}><b>Violencia Correctiva:</b></td>
+                            <td style={tdStyle}>SI [{formData.violenciaCorrectiva ? 'X' : ' '}] NO [{!formData.violenciaCorrectiva ? 'X' : ' '}]</td>
+                            <td style={tdStyle}>
+                                ¿Quién? {formData.quienEjerceViolencia || '---'} — Tipo: {[
+                                    formData.tipoViolencia.fisica && 'Física',
+                                    formData.tipoViolencia.psicologica && 'Psicológica'
+                                ].filter(Boolean).join(', ') || '---'}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style={{ ...tdStyle, backgroundColor: '#f9fafb' }}><b>Observaciones de Salud:</b></td>
+                            <td style={tdStyle} colSpan={2}>{formData.observacionesSalud || '---'}</td>
                         </tr>
                     </tbody>
                 </table>
@@ -3229,7 +4070,11 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                             </td>
                             <td style={tdStyle} width="25%">
                                 <span style={labelStyle as any}>Lugar</span>
-                                <b>{formData.lugarJuego || '---'}</b>
+                                <b>
+                                    {formData.lugarJuego === 'CALLE_PARQUE' ? 'Calle/Parque' :
+                                     formData.lugarJuego === 'CASA' ? 'Casa' :
+                                     formData.lugarJuego === 'OTRO' ? `Otro (${formData.lugarJuegoOtroDetalle || '---'})` : '---'}
+                                </b>
                             </td>
                         </tr>
                         <tr>
@@ -3241,8 +4086,8 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                             </td>
                         </tr>
                         <tr>
-                            <td style={tdStyle}><span style={labelStyle as any}>Intereses Deportivos</span> SI [{formData.interesesDeportivos ? 'X' : ' '}] NO [{!formData.interesesDeportivos ? 'X' : ' '}]</td>
-                            <td style={tdStyle}><span style={labelStyle as any}>Intereses Artísticos</span> SI [{formData.interesesArtisticos ? 'X' : ' '}] NO [{!formData.interesesArtisticos ? 'X' : ' '}]</td>
+                            <td style={tdStyle}><span style={labelStyle as any}>Intereses Deportivos</span> SI [{formData.interesesDeportivos ? 'X' : ' '}] NO [{!formData.interesesDeportivos ? 'X' : ' '}] {formData.interesesDeportivos && `(${formData.recreacionInteresDeporte || '---'})`}</td>
+                            <td style={tdStyle}><span style={labelStyle as any}>Intereses Artísticos</span> SI [{formData.interesesArtisticos ? 'X' : ' '}] NO [{!formData.interesesArtisticos ? 'X' : ' '}] {formData.interesesArtisticos && `(${formData.recreacionInteresArte || '---'})`}</td>
                             <td style={tdStyle} colSpan={2}><span style={labelStyle as any}>Actividades con Familia</span> SI [{formData.actividadesFamilia ? 'X' : ' '}] NO [{!formData.actividadesFamilia ? 'X' : ' '}]</td>
                         </tr>
                     </tbody>

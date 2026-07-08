@@ -78,11 +78,16 @@ export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({ isOpen, onClose,
                                 </p>
                             </div>
                         </div>
+                    ) : !dlToken ? (
+                        <div className="flex flex-col items-center justify-center space-y-4 text-gray-500">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-500"></div>
+                            <p className="text-sm font-semibold">Preparando documento seguro...</p>
+                        </div>
                     ) : (
                         <iframe
                             src={pdfUrl}
                             className="w-full h-full border-none"
-                            title={`Ficha F03 - ${nnaName}`}
+                            title={`Documento - ${nnaName}`}
                         />
                     )}
                 </div>

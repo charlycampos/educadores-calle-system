@@ -368,6 +368,9 @@ const mapExactOption = (value: unknown, options: readonly string[]): string => {
 };
 
 const normalizeViveCon = (value: unknown): string => {
+    // Pass through numeric codes used by the form's radio buttons (1-7)
+    const str = String(value ?? '').trim();
+    if (['1', '2', '3', '4', '5', '6', '7'].includes(str)) return str;
     const exact = mapExactOption(value, VIVE_CON_OPTIONS);
     if (exact) return exact;
     const normalized = normalizeCatalogText(value);
@@ -689,6 +692,10 @@ export const NnaCreatePage = () => {
                  usoTiempo: {} as Record<string, UsoTiempoDia>,
                  actividadesTiempoLibreLista: []
              }],
+             zonaIntervencion: '',
+             departamentoIntervencion: '',
+             provinciaIntervencion: '',
+             distritoIntervencion: '',
              situacionCalle: '',
              perfil: '',
              victimaExplotacion: 'NO',
@@ -1084,6 +1091,10 @@ export const NnaCreatePage = () => {
                 'Reciclaje',
                 'Mendicidad',
                 'Malabares / Arte callejero',
+                'Estibadores',
+                'Venta de fruta picada',
+                'Venta de artículos varios',
+                'Deambular',
                 'Otro (especificar)'
             ] as const;
 
@@ -1112,6 +1123,10 @@ export const NnaCreatePage = () => {
                 if (/recicl/.test(normalized)) return { actividad: 'Reciclaje' };
                 if (/mendig/.test(normalized)) return { actividad: 'Mendicidad' };
                 if (/(malabar|arte callejer)/.test(normalized)) return { actividad: 'Malabares / Arte callejero' };
+                if (/estibad/.test(normalized)) return { actividad: 'Estibadores' };
+                if (/fruta/.test(normalized)) return { actividad: 'Venta de fruta picada' };
+                if (/(articulo|varios)/.test(normalized)) return { actividad: 'Venta de artículos varios' };
+                if (/deambul/.test(normalized)) return { actividad: 'Deambular' };
 
                 return { actividad: 'Otro (especificar)', actividadEspecifique: cleanActividad };
             };
@@ -1165,7 +1180,7 @@ export const NnaCreatePage = () => {
                 lenMatEspNna: nna.lenMatEspNna || '',
                 autIdeEtNna: nna.autIdeEtNna || '7',
                 autIdeEtEspNna: nna.autIdeEtEspNna || '',
-                certDiscapNna: nna.certDiscapNna || '99',
+                certDiscapNna: ['1', '2', '3', '4', '99'].includes(nna.certDiscapNna || '') ? nna.certDiscapNna : '',
                 detalleDiscapacidad: nna.detalleDiscapacidad || '',
                 tienePartidaNacimiento: toBoolean(nna.tienePartidaNacimiento) ? "true" : "false",
                 detalleSinDoc: nna.detalleSinDoc || '',
@@ -1190,7 +1205,11 @@ export const NnaCreatePage = () => {
                 tieneDiscapacidad: toBoolean(nna.tieneDiscapacidad),
                 tipoDiscapacidad: nna.tipoDiscapacidad || '',
 
-                actividadesTiempoLibre: nna.actividadesTiempoLibre || '',
+                actividadesTiempoLibre: (() => {
+                    const v = nna.actividadesTiempoLibre || '';
+                    // Ignore legacy diagnostic strings (format: "[Riesgo...] Semanal→ ...")
+                    return v.includes('Semanal→') ? '' : v;
+                })(),
                 caracteristicas: nna.caracteristicas || '',
                 tieneAntecedenteAlbergue: toBoolean(nna.tieneAntecedenteAlbergue),
                 detalleAntecedenteAlbergue: nna.detalleAntecedenteAlbergue || '',
@@ -1243,6 +1262,9 @@ export const NnaCreatePage = () => {
 
             reset({
                 zonaIntervencion: activeCase?.zonaIntervencion || '',
+                departamentoIntervencion: activeCase?.departamentoIntervencion || '',
+                provinciaIntervencion: activeCase?.provinciaIntervencion || '',
+                distritoIntervencion: activeCase?.distritoIntervencion || '',
                 perfil: activeCase?.perfil || '',
                 situacionCalle: activeCase?.situacionCalle || '',
                 victimaExplotacion: activeCase?.victimaExplotacion || activeCase?.victima_explotacion || 'NO',
@@ -1416,12 +1438,12 @@ export const NnaCreatePage = () => {
                     setSubmitting(false);
                     return;
                 }
-                if (nna.tipoDoc !== "SIN_DOC" && !nna.numeroDoc?.trim()) {
+                if (nna.tipoDoc !== "7" && !nna.numeroDoc?.trim()) {
                     showAlert("Campo Requerido", `El número de documento${label} es obligatorio para tipos de documento distintos a SIN DOCUMENTO.`, "warning");
                     setSubmitting(false);
                     return;
                 }
-                if (nna.tipoDoc === "DNI" && nna.numeroDoc?.trim()) {
+                if (nna.tipoDoc === "1" && nna.numeroDoc?.trim()) {
                     const cleanDoc = nna.numeroDoc.trim();
                     if (!/^\d{8}$/.test(cleanDoc)) {
                         showAlert("Documento Inválido", `El número de DNI${label} debe contener exactamente 8 dígitos numéricos.`, "warning");
@@ -1429,7 +1451,7 @@ export const NnaCreatePage = () => {
                         return;
                     }
                 }
-                if (nna.tipoDoc === "CEX" && nna.numeroDoc?.trim()) {
+                if (nna.tipoDoc === "2" && nna.numeroDoc?.trim()) {
                     const cleanDoc = nna.numeroDoc.trim();
                     if (!/^[a-zA-Z0-9]{9,12}$/.test(cleanDoc)) {
                         showAlert("Documento Inválido", `El Carnet de Extranjería (CEX)${label} debe ser alfanumérico y tener entre 9 y 12 caracteres.`, "warning");
@@ -1437,7 +1459,7 @@ export const NnaCreatePage = () => {
                         return;
                     }
                 }
-                if (nna.tipoDoc === "SIN_DOC" && !nna.detalleSinDoc?.trim()) {
+                if (nna.tipoDoc === "7" && !nna.detalleSinDoc?.trim()) {
                     showAlert("Campo Requerido", `Debe especificar el detalle o motivo de la falta de documento${label}.`, "warning");
                     setSubmitting(false);
                     return;
@@ -1449,14 +1471,14 @@ export const NnaCreatePage = () => {
             if (tieneTutor) {
                 const tipoDocTutor = data.tipDocTutApo?.trim();
                 const nroDocTutor = data.nroDocTutApo?.trim();
-                if (tipoDocTutor === "DNI" && nroDocTutor) {
+                if (tipoDocTutor === "1" && nroDocTutor) {
                     if (!/^\d{8}$/.test(nroDocTutor)) {
                         showAlert("Documento Inválido (Tutor)", "El número de DNI del tutor/apoderado debe contener exactamente 8 dígitos numéricos.", "warning");
                         setSubmitting(false);
                         return;
                     }
                 }
-                if (tipoDocTutor === "CEX" && nroDocTutor) {
+                if (tipoDocTutor === "2" && nroDocTutor) {
                     if (!/^[a-zA-Z0-9]{9,12}$/.test(nroDocTutor)) {
                         showAlert("Documento Inválido (Tutor)", "El Carnet de Extranjería (CEX) del tutor/apoderado debe ser alfanumérico y tener entre 9 y 12 caracteres.", "warning");
                         setSubmitting(false);
@@ -1482,7 +1504,6 @@ export const NnaCreatePage = () => {
             else if (totales.trabajar > 14 || promSueño < 8 || totales.trabajar > totales.estudiar) riesgo = 'Riesgo Moderado';
             else if (totales.trabajar > 0) riesgo = 'Riesgo Leve';
 
-            const diag = `[${riesgo}] Semanal→ Est:${totales.estudiar}h Tra:${totales.trabajar}h Dor:${totales.dormir}h Jug:${totales.jugar}h | Prom.sueño:${promSueño}h/día`;
             const datosF03 = {
                 usoTiempo: nna.usoTiempo || {},
                 actividadesTiempoLibreLista: actList,
@@ -1492,7 +1513,6 @@ export const NnaCreatePage = () => {
 
             return {
                 ...nna,
-                actividadesTiempoLibre: diag,
                 datosF03Backup: JSON.stringify(datosF03)
             };
         });
@@ -1622,7 +1642,9 @@ export const NnaCreatePage = () => {
             nnas: mappedNnas,
             perfil: data.perfil,
             zona_intervencion: data.zonaIntervencion || null,
-            distrito_intervencion: data.distritoDom || null,
+            distrito_intervencion: data.distritoIntervencion || null,
+            departamento_intervencion: data.departamentoIntervencion || null,
+            provincia_intervencion: data.provinciaIntervencion || null,
             situacion_calle: data.situacionCalle || null,
             actividad_realizada: actividadRealizada,
             tiempo_en_calle: data.tiempoEnCalle || null,
@@ -1824,9 +1846,6 @@ export const NnaCreatePage = () => {
                         <div className="mt-1 space-y-1">
                             <p className="text-xs text-gray-600">
                                 <span className="font-bold text-gray-800">Nº Ficha:</span> {(selectedExpediente[0] as any).codigoFicha03 || 'Sin Código'}
-                            </p>
-                            <p className="text-xs text-gray-600">
-                                <span className="font-bold text-gray-800">Expediente:</span> {((selectedExpediente[0] as any).casos?.find((c: any) => c.estado !== 'CERRADO') || (selectedExpediente[0] as any).casos?.[0])?.codigoCaso || `ID: ${id}`}
                             </p>
                         </div>
                     </div>

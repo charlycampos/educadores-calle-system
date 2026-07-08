@@ -95,6 +95,7 @@ export const SaludSection: React.FC = () => {
                                                 setValue(`nnas.${index}.afiliadoOtroSeguro`, val);
                                                 if (val === 'SI') {
                                                     setValue(`nnas.${index}.afiliadoSIS`, 'NO');
+                                                    setValue(`nnas.${index}.detalleOtroSeguro`, '');
                                                 } else {
                                                     setValue(`nnas.${index}.detalleOtroSeguro`, '');
                                                 }
@@ -123,7 +124,6 @@ export const SaludSection: React.FC = () => {
                                             }
                                         }}
                                         options={[
-                                            { value: '', label: 'Seleccione un seguro...' },
                                             ...SEGUROS_PREDEFINIDOS.map(s => ({ value: s, label: s })),
                                             { value: 'OTRO', label: 'Otro (Especificar)' }
                                         ]}
@@ -228,7 +228,7 @@ export const SaludSection: React.FC = () => {
                         </div>
 
                         <div className="pt-2">
-                            <InputField label="Observaciones Salud / Lugar de Atención" register={register(`nnas.${index}.observacionesSalud` as const)} />
+                            <InputField label="Observaciones" register={register(`nnas.${index}.observacionesSalud` as const)} />
                         </div>
 
                     </div>

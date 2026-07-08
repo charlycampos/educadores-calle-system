@@ -71,6 +71,8 @@ const MonitorTrasladosPage        = lazy(() => import('./features/dashboard/Moni
 const CoordinadorDerivacionesPage = lazy(() => import('./features/dashboard/CoordinadorDerivacionesPage').then(m => ({ default: m.CoordinadorDerivacionesPage })));
 const CoordinadorCasosPage        = lazy(() => import('./features/dashboard/CoordinadorCasosPage').then(m => ({ default: m.CoordinadorCasosPage })));
 const CoordinadorDiariosPage      = lazy(() => import('./features/dashboard/CoordinadorDiariosPage').then(m => ({ default: m.CoordinadorDiariosPage })));
+const EducadorDiariosPage         = lazy(() => import('./features/dashboard/EducadorDiariosPage').then(m => ({ default: m.EducadorDiariosPage })));
+const EducadorCalendarioPage      = lazy(() => import('./features/dashboard/EducadorCalendarioPage').then(m => ({ default: m.EducadorCalendarioPage })));
 
 // Indicador de carga mientras se descarga el código de la página
 const PageLoader = () => (
@@ -126,6 +128,18 @@ function App() {
         <Route path="/coordinador/diarios" element={
           <ProtectedRoute>
             <CoordinadorDiariosPage />
+          </ProtectedRoute>
+        } />
+
+        <Route path="/educador/diarios" element={
+          <ProtectedRoute>
+            <EducadorDiariosPage />
+          </ProtectedRoute>
+        } />
+
+        <Route path="/educador/calendario" element={
+          <ProtectedRoute>
+            <EducadorCalendarioPage />
           </ProtectedRoute>
         } />
 

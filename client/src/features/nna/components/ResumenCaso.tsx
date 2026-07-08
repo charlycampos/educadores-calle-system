@@ -681,6 +681,8 @@ const TabIntervencion = ({ nna, caso }: { nna: any; caso: any }) => {
                     <InfoRow label="Días de Trabajo" value={caso?.diasTrabajo} />
                     <InfoRow label="Antecedente Institucional" value={caso?.antecedenteInstitucional} />
                     
+                    <InfoRow label="Región de Abordaje" value={caso?.departamentoIntervencion} />
+                    <InfoRow label="Provincia de Abordaje" value={caso?.provinciaIntervencion} />
                     <InfoRow label="Distrito de Abordaje" value={caso?.distritoIntervencion} />
                     <InfoRow label="Zona Específica" value={caso?.zonaIntervencion} />
                     <InfoRow label="Horarios" value={

@@ -17,6 +17,8 @@ class Caso:
     fase: str = "I"  # I, II o III
     # Intervención
     zona_intervencion: Optional[str] = None
+    departamento_intervencion: Optional[str] = None
+    provincia_intervencion: Optional[str] = None
     distrito_intervencion: Optional[str] = None
     actividad_realizada: Optional[str] = None
     tiempo_en_calle: Optional[str] = None

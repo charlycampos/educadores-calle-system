@@ -26,6 +26,11 @@ def _extract_token(request: Request, token: Optional[str]) -> Optional[str]:
     return token
 
 
+def _es_borrador(data: DiagnosticoSocialCreate) -> bool:
+    """Un F04 guardado como borrador no debe generar PDF ni abrir expediente."""
+    return bool(data.datos_extra and data.datos_extra.get("es_borrador"))
+
+
 def _get_pdf_path(diag: dict) -> str:
     codigo = diag.get("codigo_ficha_04") or f"ID_{diag.get('id')}"
     codigo = "".join(c for c in codigo if c.isalnum() or c in ("-", "_", ".")).strip()
@@ -97,20 +102,20 @@ async def guardar_diagnostico(
     use_case = DiagnosticoUseCase(repo)
     result = await use_case.guardar_diagnostico(nna_id, data)
     diag_id = result.get("id")
-    if diag_id:
+    if diag_id and not _es_borrador(data):
         background_tasks.add_task(trigger_f04_pdf_generation, diag_id)
         await trigger_apertura_expediente(nna_id)
     return result
 
 
 @router.get("/nna/{nna_id}")
-async def obtener_diagnosticos_de_nna(nna_id: int, repo: OracleDiagnosticoRepository = Depends(get_repository)):
+async def obtener_diagnosticos_de_nna(nna_id: int, repo: OracleDiagnosticoRepository = Depends(get_repository), current_user: dict = Depends(get_current_user)):
     use_case = DiagnosticoUseCase(repo)
     return await use_case.obtener_diagnostico_por_nna(nna_id)
 
 
 @router.get("/prefilled/nna/{nna_id}")
-async def obtener_diagnostico_prellenado(nna_id: int, repo: OracleDiagnosticoRepository = Depends(get_repository)):
+async def obtener_diagnostico_prellenado(nna_id: int, repo: OracleDiagnosticoRepository = Depends(get_repository), current_user: dict = Depends(get_current_user)):
     use_case = DiagnosticoUseCase(repo)
     return await use_case.obtener_diagnostico_prellenado(nna_id)
 
@@ -188,7 +193,7 @@ async def get_diagnostico_pdf(id: int, request: Request, token: Optional[str] = 
 
 
 @router.get("/{id}")
-async def obtener_diagnostico_por_id(id: int, repo: OracleDiagnosticoRepository = Depends(get_repository)):
+async def obtener_diagnostico_por_id(id: int, repo: OracleDiagnosticoRepository = Depends(get_repository), current_user: dict = Depends(get_current_user)):
     use_case = DiagnosticoUseCase(repo)
     diag = await use_case.obtener_diagnostico_por_id(id)
     if not diag:
@@ -202,18 +207,24 @@ async def actualizar_diagnostico(
     data: DiagnosticoSocialCreate,
     background_tasks: BackgroundTasks,
     repo: OracleDiagnosticoRepository = Depends(get_repository),
+    current_user: dict = Depends(get_current_user),
 ):
+    from src.infrastructure.services.expediente_service import trigger_apertura_expediente
     use_case = DiagnosticoUseCase(repo)
     diag = await use_case.obtener_diagnostico_por_id(id)
     if not diag:
         raise HTTPException(status_code=404, detail="Diagnóstico no encontrado")
     result = await use_case.actualizar_diagnostico(id, data)
-    background_tasks.add_task(trigger_f04_pdf_generation, id)
+    if not _es_borrador(data):
+        background_tasks.add_task(trigger_f04_pdf_generation, id)
+        # Si el registro nació como borrador, la apertura de expediente quedó
+        # pendiente en el POST; se dispara aquí al finalizarlo.
+        await trigger_apertura_expediente(data.nna_id)
     return result
 
 
 @router.delete("/{id}")
-async def eliminar_diagnostico(id: int, repo: OracleDiagnosticoRepository = Depends(get_repository)):
+async def eliminar_diagnostico(id: int, repo: OracleDiagnosticoRepository = Depends(get_repository), current_user: dict = Depends(get_current_user)):
     use_case = DiagnosticoUseCase(repo)
     diag = await use_case.obtener_diagnostico_por_id(id)
     if not diag:

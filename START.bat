@@ -6,8 +6,6 @@ echo ========================================
 echo.
 
 echo [0] Limpiando procesos antiguos (puertos 3001-3006, 5173)...
-taskkill /F /IM python.exe >nul 2>&1
-taskkill /F /IM node.exe >nul 2>&1
 for %%p in (3001 3002 3003 3004 3005 3006 5173) do (
     for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":%%p" ^| findstr /i "LISTENING ESCUCHANDO"') do (
         taskkill /F /PID %%a >nul 2>&1
@@ -16,7 +14,7 @@ for %%p in (3001 3002 3003 3004 3005 3006 5173) do (
 echo Limpieza completada.
 
 echo [1] Iniciando cliente web (Frontend)...
-start "Cliente Web - Puerto 5173" cmd /k "cd client && npm run dev"
+start "Cliente Web - Puerto 5173" cmd /k "cd client && npm run dev -- --host"
 
 echo.
 echo [2] Iniciando microservicios Python...

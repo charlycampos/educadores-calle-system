@@ -66,7 +66,8 @@ export const UbigeoSelectorSimple = ({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
                 <label className="block text-xs font-bold text-fg-2 uppercase mb-1">{labels.dep}</label>
-                <select value={departamento || ''} onChange={handleDepChange} disabled={readOnly} className={selectCls}>
+                {/* value normalizado: si la BD trae 'Junín' y la opción es 'JUNIN', sin esto el combo se ve vacío */}
+                <select value={normDep || ''} onChange={handleDepChange} disabled={readOnly} className={selectCls}>
                     <option value="">-- SELECCIONAR --</option>
                     {departamentos.map(dep => (
                         <option key={dep.id} value={normalizeUbigeo(dep.name)}>
@@ -78,7 +79,7 @@ export const UbigeoSelectorSimple = ({
 
             <div>
                 <label className="block text-xs font-bold text-fg-2 uppercase mb-1">{labels.prov}</label>
-                <select value={provincia || ''} onChange={handleProvChange} disabled={readOnly || !departamento} className={selectCls}>
+                <select value={normProv || ''} onChange={handleProvChange} disabled={readOnly || !departamento} className={selectCls}>
                     <option value="">-- SELECCIONAR --</option>
                     {provincesList.map(prov => (
                         <option key={prov.id} value={normalizeUbigeo(prov.name)}>
@@ -90,7 +91,7 @@ export const UbigeoSelectorSimple = ({
 
             <div>
                 <label className="block text-xs font-bold text-fg-2 uppercase mb-1">{labels.dist}</label>
-                <select value={distrito || ''} onChange={handleDistChange} disabled={readOnly || !provincia} className={selectCls}>
+                <select value={normalizeUbigeo(distrito) || ''} onChange={handleDistChange} disabled={readOnly || !provincia} className={selectCls}>
                     <option value="">-- SELECCIONAR --</option>
                     {districtsList.map(dist => (
                         <option key={dist.id} value={normalizeUbigeo(dist.name)}>

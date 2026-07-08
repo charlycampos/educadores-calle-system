@@ -8,9 +8,82 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from reportlab.lib.units import inch
 
 
+# ── Catálogos (mismos values/labels que usa el formulario F04 en el frontend) ──
+
+MAP_SEXO = {"1": "Masculino", "2": "Femenino"}
+
+MAP_TIPO_DOC = {"1": "DNI", "2": "Carné de extranjería", "3": "Pasaporte", "7": "No tiene"}
+
+MAP_VINCULO = {
+    "1": "Padre o madre", "2": "Tío/a", "3": "Abuelo/a", "4": "Hermano/a",
+    "5": "Otro familiar", "6": "Otro no familiar",
+}
+
+MAP_LENGUA = {
+    "1": "Quechua", "2": "Aimara", "3": "Asháninka", "4": "Awajún/Aguaruna",
+    "5": "Shipibo-Conibo", "6": "Shawi/Chayahuita", "7": "Matsigenka/Machiguenga",
+    "8": "Achuar", "9": "Otra lengua indígena u originaria", "10": "Castellano",
+    "11": "Portugués", "12": "Otra lengua extranjera", "13": "Lengua de señas peruana",
+    "14": "No escucha ni habla", "16": "No responde / No sabe", "99": "No aplica",
+}
+
+MAP_ETNIA = {
+    "1": "Quechua", "2": "Aimara", "3": "Indígena u originario de la Amazonía",
+    "4": "Parte de otro pueblo indígena", "5": "Afrodescendiente", "6": "Blanco",
+    "7": "Mestizo", "8": "Otro",
+}
+
+MAP_DISCAP = {
+    "1": "Motriz o física", "2": "Sensorial", "3": "Cognitivo-intelectual",
+    "4": "Psicosocial o psíquica", "5": "Más de una discapacidad", "6": "Ninguna",
+}
+
+MAP_CERT_CONADIS = {
+    "1": "Sí, tiene Certificado", "2": "Sí tiene, pero no lo porta",
+    "3": "No cuenta con Certificado", "4": "En trámite", "99": "No aplica",
+}
+
+MAP_EDU_ESTUDIA = {
+    "SI": "Sí (con ficha de matrícula)", "NO": "No (no matriculado)",
+    "PROCESO": "En proceso de matrícula", "NO_APLICA": "No aplica",
+}
+
+MAP_EDU_NIVEL = {
+    "1": "Sin nivel", "2": "Inicial", "3": "Primaria Incompleta", "4": "Primaria Completa",
+    "5": "Secundaria Incompleta", "6": "Secundaria Completa",
+    "7": "Superior No Universitaria Incompleta", "8": "Superior No Universitaria Completa",
+    "9": "Superior Universitario Incompleto", "10": "Superior Universitario Completo",
+    "11": "Básica Especial",
+}
+
+MAP_EDU_GRADO = {
+    "1": "Inicial", "2": "1ro primaria", "3": "2do primaria", "4": "3ro primaria",
+    "5": "4to primaria", "6": "5to primaria", "7": "6to primaria",
+    "8": "1ro secundaria", "9": "2do secundaria", "10": "3ro secundaria",
+    "11": "4to secundaria", "12": "5to secundaria",
+    "13": "Ciclo I (EBA)", "14": "Ciclo II (EBA)", "15": "Ciclo III (EBA)",
+    "16": "Ciclo IV (EBA)", "17": "Ciclo V (EBA)", "18": "Ciclo VI (EBA)",
+    "19": "Ciclo VII (EBA)", "20": "Ciclo VIII (EBA)", "21": "Ciclo IX (EBA)",
+    "22": "Ciclo X (EBA)", "99": "No aplica",
+}
+
+MAP_EDU_MODALIDAD = {
+    "1": "Básica / regular (EBR)", "2": "Alternativa (EBA)", "3": "Especial (EBE)",
+    "4": "Superior Técnica", "5": "Superior Universitaria", "6": "CETPRO",
+}
+
+MAP_SI_NO_AVECES = {"SI": "Sí", "NO": "No", "A_VECES": "A veces", "A VECES": "A veces"}
+
+DIAS_LABEL = {
+    "lunes": "Lun", "martes": "Mar", "miercoles": "Mié", "jueves": "Jue",
+    "viernes": "Vie", "sabado": "Sáb", "domingo": "Dom",
+}
+
+
 def generate_f04_pdf(diag_data: dict, nna_data: dict, output_path: str) -> str:
     """
-    Genera el PDF de la Ficha de Diagnóstico Social F04.
+    Genera el PDF de la Ficha de Diagnóstico Social F04 con TODAS las secciones
+    del formulario (I-IX), traduciendo los códigos a sus etiquetas de catálogo.
 
     :param diag_data: dict con columnas de DIAGNOSTICO_SOCIAL + datos_extra ya parseado como dict
     :param nna_data:  dict con nombre, apellidos, DNI, fecha nacimiento del NNA
@@ -71,15 +144,63 @@ def generate_f04_pdf(diag_data: dict, nna_data: dict, output_path: str) -> str:
         t.setStyle(TableStyle(style_cmds))
         return t
 
+    def grid_table(hdr_texts, data_rows, col_widths):
+        hdr = [[Paragraph(h, label_style) for h in hdr_texts]]
+        t = Table(hdr + data_rows, colWidths=col_widths)
+        t.setStyle(TableStyle([
+            ("GRID",           (0, 0), (-1, -1), 0.4, BORDER),
+            ("BACKGROUND",     (0, 0), (-1,  0), PRIMARY),
+            ("TEXTCOLOR",      (0, 0), (-1,  0), colors.white),
+            ("FONTNAME",       (0, 0), (-1,  0), "Helvetica-Bold"),
+            ("FONTSIZE",       (0, 0), (-1, -1), 8),
+            ("PADDING",        (0, 0), (-1, -1), 4),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, BG_LIGHT]),
+        ]))
+        return t
+
     def c(val, default="-"):
         if val is None or str(val).strip() in ("", "None", "null", "undefined"):
             return default
         return str(val).strip()
 
+    def tr(val, mapa, default="-"):
+        """Traduce un código de catálogo a su etiqueta. Si no está en el mapa, muestra el valor tal cual."""
+        s = c(val, "")
+        if not s:
+            return default
+        # tolerar valores tipo '1: DNI' guardados por versiones antiguas
+        code = s.split(":")[0].strip()
+        return mapa.get(code, s)
+
     def yesno(val):
-        if val is True or str(val).upper() in ("SI", "TRUE", "1", "YES"):
+        if val is True or str(val).upper() in ("SI", "TRUE", "1", "YES", "SÍ"):
             return "SÍ"
         return "NO"
+
+    def sina(val):
+        """SI / NO / A VECES."""
+        s = c(val, "")
+        if s == "":
+            return "-"
+        if isinstance(val, bool):
+            return "SÍ" if val else "NO"
+        return MAP_SI_NO_AVECES.get(s.upper(), s)
+
+    def fecha(val):
+        s = c(val, "")
+        if not s:
+            return "-"
+        s = s[:10]
+        try:
+            return datetime.strptime(s, "%Y-%m-%d").strftime("%d/%m/%Y")
+        except Exception:
+            return s
+
+    def marcas(dic, etiquetas):
+        """Convierte un dict de checkboxes {clave: bool} en 'Etiqueta1, Etiqueta2'."""
+        dic = dic or {}
+        res = [etiquetas.get(k, k.capitalize()) for k, v in dic.items() if v]
+        return ", ".join(res) or "-"
 
     def L(text):
         return Paragraph(c(text), label_style)
@@ -110,17 +231,26 @@ def generate_f04_pdf(diag_data: dict, nna_data: dict, output_path: str) -> str:
         c(extra.get("ubigeoDepto")), c(extra.get("ubigeoProvinc")), c(extra.get("ubigeoDistrito"))
     ])) or "-"
 
-    fn = nna_data.get("fechaNacimiento") or ""
-    fn_str = str(fn)[:10] if fn else "-"
+    fn = extra.get("fechaNacimiento") or nna_data.get("fechaNacimiento") or ""
+
+    partida = extra.get("tienePartidaNacimiento")
+    partida_str = "SÍ" if partida in (True, "true", "SI", 1) else ("NO" if partida in (False, "false", "NO", 0) else "-")
+    if partida_str == "NO" and c(extra.get("detalleSinDoc"), ""):
+        partida_str += f" — {c(extra.get('detalleSinDoc'))}"
+
+    w4 = doc.width / 4
 
     sec1 = [
-        [L("NNA:"),           V(nna_nombre),                     L("DNI / Doc:"),      V(nna_data.get("numeroDoc"))],
-        [L("Edad:"),          V(f"{c(extra.get('edad'))} {c(extra.get('unidadEdad','años')).lower()}"),
-                                                                  L("Fecha Nacimiento:"), V(fn_str)],
-        [L("Dirección:"),     V(extra.get("direccionActual")),    L("Referencia:"),     V(extra.get("referenciaDireccion"))],
-        [L("Ubigeo:"),        V(ubigeo),                         L("Teléfono:"),        V(extra.get("telefonoContacto"))],
+        [L("Apellidos y Nombres:"), V(nna_nombre),                          L("Sexo:"),               V(tr(extra.get("sexo"), MAP_SEXO))],
+        [L("Tipo Doc / Nº:"),       V(f"{tr(extra.get('tipoDoc') or nna_data.get('tipoDoc'), MAP_TIPO_DOC)} — {c(extra.get('numeroDoc') or nna_data.get('numeroDoc'))}"),
+                                                                             L("Partida Nacimiento:"), V(partida_str)],
+        [L("Fecha Nacimiento:"),    V(fecha(fn)),                           L("Edad:"),               V(f"{c(extra.get('edad'))} {c(extra.get('unidadEdad', 'años')).lower()}")],
+        [L("Dirección:"),           V(extra.get("direccionActual")),        L("Referencia:"),         V(extra.get("referenciaDireccion"))],
+        [L("Ubigeo:"),              V(ubigeo),                              L("Teléfono:"),           V(extra.get("telefonoContacto"))],
+        [L("Inicio Aplicación:"),   V(fecha(extra.get("fechaInicioAplicacion"))),
+                                                                             L("Fin Aplicación:"),     V(fecha(extra.get("fechaFinAplicacion")))],
     ]
-    story.append(make_table(sec1))
+    story.append(make_table(sec1, [w4, w4, w4, w4]))
     story.append(Spacer(1, 8))
 
     # ── II. Situación de Calle ────────────────────────────────────────────
@@ -133,6 +263,7 @@ def generate_f04_pdf(diag_data: dict, nna_data: dict, output_path: str) -> str:
     consumo= det.get("consumo") or {}
     oblig  = det.get("obligado") or {}
     escap  = det.get("escapoCasa") or {}
+    acomp  = det.get("acompanamiento") or {}
 
     perfil_str = (
         "Trabajo Infantil" if perfil.get("trabajoInfantil") else
@@ -147,21 +278,59 @@ def generate_f04_pdf(diag_data: dict, nna_data: dict, output_path: str) -> str:
     if not tiempo_calle or tiempo_calle == "- -":
         tiempo_calle = c(diag_data.get("tiempo_en_calle"))
 
-    modalidad = det.get("modalidadTrabajo") or {}
-    modal_str = ", ".join(k.capitalize() for k, v in modalidad.items() if v) or "-"
+    modal_str = marcas(det.get("modalidadTrabajo"), {"puestoFijo": "Puesto Fijo", "ambulante": "Ambulante", "recorre": "Recorre"})
+    horarios_str   = marcas(det.get("horarios"),   {"manana": "Mañana", "tarde": "Tarde", "noche": "Noche"})
+    frecuencia_str = marcas(det.get("frecuencia"), {"diario": "Diario", "interdiario": "Interdiario", "finesSemana": "Fines de semana", "temporadas": "Temporadas"})
+    uso_dinero_str = marcas(det.get("usoDinero"),  {"gastosFamiliares": "Gastos familiares", "gastosPropios": "Gastos propios", "entregaOtraPersona": "Entrega a otra persona"})
+
+    acomp_str = marcas(acomp, {"solo": "Solo", "acompanado": "Acompañado", "acompanadoFamiliar": "Acompañado por familiar", "quien": ""})
+    if c(acomp.get("quien"), ""):
+        acomp_str = (acomp_str + f" — {c(acomp.get('quien'))}").strip("- ")
+
+    consumo_tiempo = f"{c(consumo.get('tiempo'))} {c(consumo.get('unidadTiempo'))}".strip("- ")
 
     sec2 = [
         [L("Perfil:"),            V(perfil_str),                          L("Tiempo en Calle:"),     V(tiempo_calle)],
         [L("Motivo:"),            V(det.get("motivo") or diag_data.get("motivo_ingreso")),
                                                                             L("Lugar / Zona:"),         V(det.get("lugar") or diag_data.get("lugar_pernota"))],
-        [L("Ingreso Semanal:"),   V(f"S/ {c(det.get('ingresoSemanal'))}"), L("Víctima Explotación:"), V(yesno(det.get("explotacionSexual")))],
-        [L("Modalidad Trabajo:"), V(modal_str),                            L("¿Obligado?:"),           V(f"{yesno(oblig.get('si'))} — {c(oblig.get('quien'))}")],
-        [L("¿Escapó de casa?:"),  V(f"{yesno(escap.get('si'))} — {c(escap.get('veces'))} veces"),
+        [L("Actividad:"),         V(det.get("actividad") or extra.get("actividadEconomica") or diag_data.get("actividad_calle")),
+                                                                            L("Punto Concentración:"),  V(extra.get("puntoConcentracion"))],
+        [L("Horarios:"),          V(horarios_str),                         L("Frecuencia:"),           V(frecuencia_str)],
+        [L("Ingreso Semanal:"),   V(f"S/ {c(det.get('ingresoSemanal'))}"), L("Uso del Dinero:"),       V(uso_dinero_str)],
+        [L("Modalidad Trabajo:"), V(modal_str),                            L("Acompañamiento:"),       V(acomp_str)],
+        [L("Víctima Explotación:"), V(yesno(det.get("explotacionSexual"))), L("¿Obligado?:"),          V(f"{yesno(oblig.get('si'))} — {c(oblig.get('quien'))}".strip("- "))],
+        [L("¿Escapó de casa?:"),  V(f"{yesno(escap.get('si'))} — {c(escap.get('veces'))} veces" if escap.get("si") else yesno(escap.get("si"))),
                                                                             L("Consumo Sustancias:"),   V(yesno(consumo.get("si")))],
-        [L("Tipo Sustancia:"),    V(consumo.get("tipo")),                  L("Frec. Consumo:"),        V(consumo.get("frecuencia"))],
+        [L("Tipo Sustancia:"),    V(consumo.get("tipo")),                  L("Frec. / Tiempo:"),       V(f"{c(consumo.get('frecuencia'))} — {consumo_tiempo}".strip("- "))],
     ]
-    w4 = doc.width / 4
     story.append(make_table(sec2, [w4, w4, w4, w4]))
+    story.append(Spacer(1, 4))
+
+    # Grilla de actividades en calle (desglosadas)
+    actividades = extra.get("actividadesCalle") or []
+    if actividades:
+        act_rows = []
+        for a in actividades:
+            agenda = a.get("agenda") or {}
+            dias = []
+            for dia, rangos in agenda.items():
+                if rangos:
+                    if isinstance(rangos, list):
+                        dias.append(f"{DIAS_LABEL.get(dia, dia)}: {', '.join(map(str, rangos))}")
+                    else:
+                        dias.append(f"{DIAS_LABEL.get(dia, dia)}: {rangos}")
+            act_rows.append([
+                Paragraph(c(a.get("actividad")), value_style),
+                Paragraph(c(a.get("acompanamiento") or a.get("acompanado")), value_style),
+                Paragraph(c(a.get("permanencia") or a.get("tiempo")), value_style),
+                Paragraph(c("; ".join(dias)), value_style),
+            ])
+        c4 = doc.width / 4
+        story.append(grid_table(
+            ["Actividad / Trabajo", "Acompañamiento", "Permanencia", "Agenda Semanal"],
+            act_rows,
+            [c4 * 1.1, c4 * 0.7, c4 * 0.7, c4 * 1.5],
+        ))
     story.append(Spacer(1, 8))
 
     # ── III. Tutor / Apoderado ────────────────────────────────────────────
@@ -174,17 +343,22 @@ def generate_f04_pdf(diag_data: dict, nna_data: dict, output_path: str) -> str:
         c(extra.get("tutorNombre")),
     ])).strip() or c(diag_data.get("nombre_tutor"))
 
+    discap_tutor = tr(extra.get("tutorTipoDiscapacidad"), MAP_DISCAP, "Ninguna")
+    conadis_str  = tr(extra.get("tutorCertificadoConadis"), MAP_CERT_CONADIS)
+
     sec3 = [
-        [L("Apellidos y Nombres:"), V(tutor_nombre),                                    L("Vínculo con NNA:"),   V(extra.get("tutorParentesco"))],
-        [L("Tipo Doc / Nº:"),       V(f"{c(extra.get('tutorTipoDocumento'))} — {c(extra.get('tutorDNI') or diag_data.get('dni_tutor'))}"),
+        [L("Apellidos y Nombres:"), V(tutor_nombre),                                    L("Vínculo con NNA:"),   V(tr(extra.get("tutorParentesco"), MAP_VINCULO))],
+        [L("Tipo Doc / Nº:"),       V(f"{tr(extra.get('tutorTipoDocumento'), MAP_TIPO_DOC)} — {c(extra.get('tutorDNI') or diag_data.get('dni_tutor'))}"),
                                                                                           L("Teléfono:"),          V(extra.get("tutorTelefono") or diag_data.get("telefono_tutor"))],
-        [L("Sexo / F. Nac.:"),      V(f"{c(extra.get('tutorSexo'))} — {c(extra.get('tutorFechaNacimiento'))}"),
-                                                                                          L("Ocupación:"),         V(extra.get("tutorOcupacion"))],
-        [L("Lengua / Etnia:"),      V(f"{c(extra.get('tutorLenguaMaterna'))} / {c(extra.get('tutorEtnia'))}"),
-                                                                                          L("¿Vive con NNA?:"),    V(extra.get("tutorViveConNna", "SI"))],
-        [L("Grado Instrucción:"),   V(extra.get("tutorGradoInstruccion")),               L("Estado Civil:"),      V(extra.get("tutorEstadoCivil"))],
-        [L("Discapacidad:"),        V(extra.get("tutorTipoDiscapacidad", "Ninguna")),    L("Consumo Drogas:"),    V(extra.get("tutorConsumoDrogas", "NO"))],
-        [L("Ingreso Semanal:"),     V(f"S/ {c(extra.get('tutorIngreso'))}"),             L("Demanda Alimentos:"), V(extra.get("tutorDeseaDemanda", "NO"))],
+        [L("Sexo:"),                V(tr(extra.get("tutorSexo"), MAP_SEXO)),             L("Fecha Nacimiento:"),  V(fecha(extra.get("tutorFechaNacimiento")))],
+        [L("Nacionalidad:"),        V(extra.get("tutorNacionalidad")),                   L("Ocupación:"),         V(extra.get("tutorOcupacion"))],
+        [L("Lengua Materna:"),      V(tr(extra.get("tutorLenguaMaterna"), MAP_LENGUA)),  L("Autoident. Étnica:"), V(tr(extra.get("tutorEtnia"), MAP_ETNIA))],
+        [L("Grado Instrucción:"),   V(c(extra.get("tutorGradoInstruccion")).replace("_", " ").capitalize()),
+                                                                                          L("Estado Civil:"),      V(extra.get("tutorEstadoCivil"))],
+        [L("¿Vive con NNA?:"),      V(sina(extra.get("tutorViveConNna"))),               L("Ingreso Semanal:"),   V(f"S/ {c(extra.get('tutorIngreso'))}")],
+        [L("Discapacidad:"),        V(discap_tutor),                                      L("Cert. CONADIS:"),     V(conadis_str)],
+        [L("Consumo Drogas:"),      V(sina(extra.get("tutorConsumoDrogas"))),            L("Recibe Apoyo Alim.:"),V(sina(extra.get("tutorRecibeApoyo")))],
+        [L("Demanda Alimentos:"),   V(sina(extra.get("tutorDeseaDemanda"))),             L(""),                   V("", "")],
     ]
     story.append(make_table(sec3, [w4, w4, w4, w4]))
     story.append(Spacer(1, 8))
@@ -195,14 +369,6 @@ def generate_f04_pdf(diag_data: dict, nna_data: dict, output_path: str) -> str:
         story.append(sec_header("IV. Composición Familiar"))
         story.append(Spacer(1, 4))
 
-        hdr = [[
-            Paragraph("Apellidos y Nombres", label_style),
-            Paragraph("Parentesco",         label_style),
-            Paragraph("Edad",               label_style),
-            Paragraph("DNI",                label_style),
-            Paragraph("Ocupación",          label_style),
-            Paragraph("Vive c/ NNA",        label_style),
-        ]]
         rows = []
         for f in familiares:
             full = " ".join(filter(lambda x: x not in ("-", ""), [
@@ -210,32 +376,27 @@ def generate_f04_pdf(diag_data: dict, nna_data: dict, output_path: str) -> str:
             ])).strip()
             rows.append([
                 Paragraph(full, value_style),
-                Paragraph(c(f.get("parentesco") or f.get("vinTutUsu")), value_style),
+                Paragraph(tr(f.get("parentesco") or f.get("vinTutUsu"), MAP_VINCULO), value_style),
                 Paragraph(c(f.get("edad")),                              value_style),
+                Paragraph(tr(f.get("sexo") or f.get("sexoApo"), MAP_SEXO), value_style),
                 Paragraph(c(f.get("nroDocTutApo") or f.get("dni")),     value_style),
                 Paragraph(c(f.get("ocupacion")),                         value_style),
-                Paragraph(c(f.get("viveCon")),                           value_style),
+                Paragraph(sina(f.get("viveCon")),                        value_style),
             ])
 
-        c6 = doc.width / 6
-        ft = Table(hdr + rows, colWidths=[c6 * 1.8, c6 * 0.9, c6 * 0.6, c6 * 0.8, c6 * 0.9, c6 * 0.5])  # type: ignore
-        ft.setStyle(TableStyle([
-            ("GRID",           (0, 0), (-1, -1), 0.4, BORDER),
-            ("BACKGROUND",     (0, 0), (-1,  0), PRIMARY),
-            ("TEXTCOLOR",      (0, 0), (-1,  0), colors.white),
-            ("FONTNAME",       (0, 0), (-1,  0), "Helvetica-Bold"),
-            ("FONTSIZE",       (0, 0), (-1, -1), 8),
-            ("PADDING",        (0, 0), (-1, -1), 4),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, BG_LIGHT]),
-        ]))
-        story.append(ft)
+        c7 = doc.width / 7
+        story.append(grid_table(
+            ["Apellidos y Nombres", "Parentesco", "Edad", "Sexo", "DNI", "Ocupación", "Vive c/ NNA"],
+            rows,
+            [c7 * 1.9, c7 * 1.0, c7 * 0.5, c7 * 0.7, c7 * 0.8, c7 * 1.3, c7 * 0.8],
+        ))
         story.append(Spacer(1, 4))
 
     din = extra.get("dinamicaFamiliar") or {}
     if din:
         din_rows = [
-            [L("Contacto Familiar:"), V(din.get("contacto")), L("Frecuencia:"),    V(din.get("frecuencia"))],
-            [L("Rol Protector:"),     V(din.get("rolProtector")), L("Rol Proveedor:"), V(din.get("rolProveedor"))],
+            [L("Contacto Familiar:"), V(sina(din.get("contacto"))), L("Frecuencia:"),    V(c(din.get("frecuencia")).replace("_", " ").capitalize())],
+            [L("Rol Protector:"),     V(sina(din.get("rolProtector"))), L("Rol Proveedor:"), V(sina(din.get("rolProveedor")))],
         ]
         story.append(make_table(din_rows, [w4, w4, w4, w4]))
     story.append(Spacer(1, 8))
@@ -244,16 +405,22 @@ def generate_f04_pdf(diag_data: dict, nna_data: dict, output_path: str) -> str:
     story.append(sec_header("V. Vivienda"))
     story.append(Spacer(1, 4))
 
-    srv      = extra.get("serviciosBasicos") or {}
-    servicios = ", ".join(k.capitalize() for k, v in srv.items() if v) or "-"
+    servicios = marcas(extra.get("serviciosBasicos"), {"agua": "Agua", "luz": "Luz", "desague": "Desagüe", "otros": "Otros"})
+
+    duerme_det = sina(extra.get("duermeCama"))
+    if c(extra.get("duermeSoloAcompanado"), "") and duerme_det == "SÍ":
+        duerme_det += f" — {c(extra.get('duermeSoloAcompanado')).capitalize()}"
+
+    albergue = yesno(extra.get("tieneAntecedenteAlbergue"))
+    albergue_det = f"{c(extra.get('tiempoAlbergue'))} — {c(extra.get('detalleAntecedenteAlbergue'))}".strip("- ") or "-"
 
     sec5 = [
-        [L("Material:"),        V(extra.get("materialVivienda")),      L("Ambientes:"),       V(extra.get("numeroAmbientes"))],
-        [L("Propiedad:"),       V(extra.get("propiedadVivienda")),      L("SISFOH:"),          V(extra.get("viviendaSisfoh"))],
-        [L("Servicios Básicos:"),V(servicios),                          L("Higiene domicilio:"),V(extra.get("higieneDomicilio"))],
-        [L("Duerme en cama:"),  V(extra.get("duermeCama")),             L("Duerme con quién:"),V(extra.get("duermeConQuien"))],
-        [L("Antec. Albergue:"), V(yesno(extra.get("tieneAntecedenteAlbergue"))),
-                                                                         L("Motivo/Tiempo:"),   V(f"{c(extra.get('tiempoAlbergue'))} — {c(extra.get('detalleAntecedenteAlbergue'))}")],
+        [L("Material:"),          V(c(extra.get("materialVivienda")).capitalize()), L("Nº Ambientes:"),      V(extra.get("numeroAmbientes"))],
+        [L("Propiedad:"),         V(c(extra.get("propiedadVivienda")).capitalize()),L("Inscrita en SISFOH:"),V(sina(extra.get("viviendaSisfoh")))],
+        [L("Servicios Básicos:"), V(servicios),                                     L("Higiene domicilio:"), V(c(extra.get("higieneDomicilio")).capitalize())],
+        [L("Duerme en cama:"),    V(duerme_det),                                    L("Duerme con quién:"),  V(extra.get("duermeConQuien"))],
+        [L("Lugar de Pernocte:"), V(f"{c(extra.get('lugarPernocte'))} {c(extra.get('detalleLugarPernocte'), '')}".strip("- ")),
+                                                                                     L("Antec. Albergue:"),   V(f"{albergue} — {albergue_det}".strip("- ") if albergue == "SÍ" else albergue)],
     ]
     story.append(make_table(sec5, [w4, w4, w4, w4]))
     story.append(Spacer(1, 8))
@@ -262,39 +429,116 @@ def generate_f04_pdf(diag_data: dict, nna_data: dict, output_path: str) -> str:
     story.append(sec_header("VI. Educación"))
     story.append(Spacer(1, 4))
 
+    atraso = yesno(extra.get("presentaAtraso"))
+    if atraso == "SÍ":
+        atraso += f" — {c(extra.get('tiempoAtraso'))} / {c(extra.get('motivoAtraso')).replace('_', ' ').capitalize()}".strip("- /")
+
+    conducta = yesno(extra.get("problemasConducta"))
+    if conducta == "SÍ" and c(extra.get("intensidadConducta"), ""):
+        conducta += f" ({c(extra.get('intensidadConducta')).capitalize()})"
+
+    expulsado = yesno(extra.get("expulsado"))
+    if expulsado == "SÍ" and c(extra.get("vecesExpulsado"), ""):
+        expulsado += f" — {c(extra.get('vecesExpulsado'))} veces"
+
     sec6 = [
-        [L("¿Estudia?:"),         V(extra.get("eduEstudia")),       L("Nivel Educativo:"), V(extra.get("eduNivel"))],
-        [L("Grado / Año:"),       V(extra.get("eduGrado")),         L("Modalidad:"),       V(extra.get("eduModalidad"))],
-        [L("Institución Ed.:"),   V(extra.get("eduInstitucion")),   L("Turno:"),           V(extra.get("eduTurno"))],
-        [L("Motivo no estudia:"), V(extra.get("eduMotivoNoEstudia")), L("Atraso escolar:"), V(yesno(extra.get("presentaAtraso")))],
-        [L("Prob. Aprendizaje:"), V(yesno(extra.get("problemasAprendizaje"))), L("Prob. Conducta:"), V(yesno(extra.get("problemasConducta")))],
+        [L("¿Estudia? / Matrícula:"), V(tr(extra.get("eduEstudia"), MAP_EDU_ESTUDIA)), L("Nivel Educativo:"),  V(tr(extra.get("eduNivel"), MAP_EDU_NIVEL))],
+        [L("Grado / Año:"),           V(tr(extra.get("eduGrado"), MAP_EDU_GRADO)),     L("Modalidad:"),        V(tr(extra.get("eduModalidad"), MAP_EDU_MODALIDAD))],
+        [L("Institución Ed.:"),       V(extra.get("eduInstitucion")),                  L("Turno:"),            V(c(extra.get("eduTurno")).capitalize())],
+        [L("Tipo de I.E.:"),          V(c(extra.get("eduTipoIE")).capitalize()),       L("Motivo no estudia:"),V(extra.get("eduMotivoNoEstudia"))],
+        [L("Atraso escolar:"),        V(atraso),                                        L("Prob. Aprendizaje:"),V(yesno(extra.get("problemasAprendizaje")))],
+        [L("Prob. Conducta:"),        V(conducta),                                      L("Ha sido expulsado:"),V(expulsado)],
+        [L("Faltas/Tardanzas:"),      V(yesno(extra.get("faltasTardanzas"))),           L("Se duerme en clase:"),V(yesno(extra.get("seDuermeClase")))],
+        [L("Sufre Bullying:"),        V(yesno(extra.get("sufreBullying"))),             L("Tutor conversa c/ docente:"), V(yesno(extra.get("tutorConversaDocente")))],
     ]
     story.append(make_table(sec6, [w4, w4, w4, w4]))
     story.append(Spacer(1, 8))
 
-    # ── VII. Salud ────────────────────────────────────────────────────────
-    story.append(sec_header("VII. Salud"))
+    # ── VII. Salud – Alimentación – Higiene ───────────────────────────────
+    story.append(sec_header("VII. Salud – Alimentación – Higiene"))
     story.append(Spacer(1, 4))
 
+    prob_salud = marcas(extra.get("problemasSaludTipo"), {
+        "piel": "Piel", "desnutricion": "Desnutrición", "respiratorios": "Respiratorios",
+        "its": "ITS", "otros": "Otros",
+    })
+    if c(extra.get("problemasSaludOtroDetalle"), ""):
+        prob_salud += f" — {c(extra.get('problemasSaludOtroDetalle'))}"
+
+    otro_seguro = sina(extra.get("afiliadoOtroSeguro"))
+    if c(extra.get("detalleOtroSeguro"), ""):
+        otro_seguro += f" — {c(extra.get('detalleOtroSeguro'))}"
+
+    discap_nna = yesno(extra.get("tieneDiscapacidad"))
+    enf = yesno(extra.get("enfermedadCronica"))
+    if enf == "SÍ":
+        enf += f" — {c(extra.get('detalleEnfermedadCronica'))}".strip("- ")
+        enf += f" (Tratamiento: {yesno(extra.get('recibeTratamientoEnfermedad'))})"
+
+    psico = yesno(extra.get("problemaPsicologico"))
+    indicadores = marcas(extra.get("tipoIndicadorPsicologico"), {
+        "autoestimaBaja": "Autoestima baja", "depresion": "Depresión",
+        "ansiedad": "Ansiedad", "impulsividad": "Impulsividad",
+    })
+    if psico == "SÍ" and indicadores != "-":
+        psico += f" — {indicadores}"
+
+    sustancias = yesno(extra.get("consumeSustancias"))
+    if sustancias == "SÍ":
+        sustancias += f" — {c(extra.get('tipoSustancias'))} (Tratamiento: {yesno(extra.get('adiccionRecibeTratamiento'))})"
+
+    violencia = yesno(extra.get("violenciaCorrectiva"))
+    if violencia == "SÍ":
+        tipo_v = marcas(extra.get("tipoViolencia"), {"fisica": "Física", "psicologica": "Psicológica"})
+        violencia += f" — {tipo_v} — Quién: {c(extra.get('quienEjerceViolencia'))}"
+
     sec7 = [
-        [L("Afiliado SIS:"),     V(extra.get("afiliadoSIS")),            L("Otro Seguro:"),       V(extra.get("afiliadoOtroSeguro"))],
-        [L("Discapacidad NNA:"), V(yesno(extra.get("tieneDiscapacidad"))), L("Tipo Discapacidad:"), V(extra.get("tipoDiscapacidad"))],
-        [L("Enf. Crónica:"),     V(yesno(extra.get("enfermedadCronica"))), L("Detalle:"),           V(extra.get("detalleEnfermedadCronica"))],
-        [L("Prob. Psicológico:"),V(yesno(extra.get("problemaPsicologico"))), L("Tipo/Detalle:"),    V(extra.get("detalleProblemaPsicologico"))],
-        [L("3 alimentos/día:"),  V(yesno(extra.get("recibeTresAlimentos"))), L("Higiene adecuada:"), V(yesno(extra.get("higieneAdecuada")))],
-        [L("Obs. Salud:"),       Paragraph(c(extra.get("observacionesSalud")), value_style), L(""), Paragraph("", value_style)],
+        [L("Afiliado SIS:"),        V(sina(extra.get("afiliadoSIS"))),           L("Otro Seguro:"),         V(otro_seguro)],
+        [L("Prob. de Salud en:"),   V(prob_salud),                               L("Enf. Crónica:"),        V(enf)],
+        [L("Discapacidad NNA:"),    V(discap_nna),                               L("Tipo Discapacidad:"),   V(extra.get("tipoDiscapacidad"))],
+        [L("Detalle Discapacidad:"),V(extra.get("detalleDiscapacidad")),         L("Carnet Discapacidad:"), V(yesno(extra.get("certificadoDiscapacidad")))],
+        [L("Dónde trata Discap.:"), V(c(extra.get("dondeTratamientoDiscapacidad")).replace("_", " ").capitalize()),
+                                                                                  L("Prob. Psicológico:"),   V(psico)],
+        [L("Detalle Psicológico:"), V(extra.get("detalleProblemaPsicologico")),  L("Consume Sustancias:"),  V(sustancias)],
+        [L("¿Gestando?:"),          V(yesno(extra.get("seEncuentraGestando"))),  L("Madre/Padre Adolesc.:"),V(yesno(extra.get("esMadrePadreAdolescente")))],
+        [L("Ha sufrido aborto:"),   V(yesno(extra.get("haSufridoAborto"))),      L("Víctima Abuso Sexual:"),V(yesno(extra.get("victimaAbusoSexual")))],
+        [L("3 alimentos/día:"),     V(yesno(extra.get("recibeTresAlimentos"))),  L("Aparenta bien alim.:"), V(yesno(extra.get("aparentaBienAlimentado")))],
+        [L("Dónde se alimenta:"),   V(c(extra.get("dondeAlimenta")).replace("_", " ").capitalize()),
+                                                                                  L("Quién lo alimenta:"),   V(c(extra.get("quienAlimenta")).replace("_", " ").capitalize())],
+        [L("Higiene adecuada:"),    V(sina(extra.get("higieneAdecuada"))),       L("Ropas limpias:"),       V(sina(extra.get("ropasLimpias")))],
+        [L("Normas higiene comer:"),V(sina(extra.get("normasHigieneComer"))),    L("Cabello/uñas limpias:"),V(sina(extra.get("cabelloUnasLimpias")))],
+        [L("Violencia correctiva:"),V(violencia),                                L("Obs. Salud:"),          V(extra.get("observacionesSalud"))],
     ]
     story.append(make_table(sec7, [w4, w4, w4, w4]))
     story.append(Spacer(1, 8))
 
     # ── VIII. Recreación ──────────────────────────────────────────────────
-    story.append(sec_header("VIII. Recreación y Tiempo Libre"))
+    story.append(sec_header("VIII. Recreación e Intereses"))
     story.append(Spacer(1, 4))
 
+    juega = yesno(extra.get("tiempoParaJugar"))
+    if juega == "SÍ" and c(extra.get("vecesJuegaSemana"), ""):
+        juega += f" — {c(extra.get('vecesJuegaSemana'))} veces/semana"
+
+    lugar_juego = c(extra.get("lugarJuego")).replace("_", " ").capitalize()
+    if c(extra.get("lugarJuegoOtroDetalle"), ""):
+        lugar_juego += f" — {c(extra.get('lugarJuegoOtroDetalle'))}"
+
+    participa = sina(extra.get("recreacionParticipaInstitucion"))
+    tipo_inst = f"{c(extra.get('recreacionTipoInstitucion'), '')} {c(extra.get('recreacionInstitucionDetalle'), '')}".strip() or "-"
+
+    deporte = yesno(extra.get("interesesDeportivos"))
+    if c(extra.get("recreacionInteresDeporte"), ""):
+        deporte += f" — {c(extra.get('recreacionInteresDeporte'))}"
+    arte = yesno(extra.get("interesesArtisticos"))
+    if c(extra.get("recreacionInteresArte"), ""):
+        arte += f" — {c(extra.get('recreacionInteresArte'))}"
+
     sec8 = [
-        [L("Tiempo para jugar:"),    V(yesno(extra.get("tiempoParaJugar"))),  L("Interés Deporte:"), V(extra.get("recreacionInteresDeporte"))],
-        [L("Interés Arte:"),         V(extra.get("recreacionInteresArte")),   L("Activ. Familia:"),  V(extra.get("recreacionActividadFamilia"))],
-        [L("Participa Institución:"),V(extra.get("recreacionParticipaInstitucion")), L("Tipo Institución:"), V(extra.get("recreacionTipoInstitucion"))],
+        [L("Tiempo para jugar:"),     V(juega),        L("Lugar donde juega:"),   V(lugar_juego)],
+        [L("Interés Deportivo:"),     V(deporte),      L("Interés Artístico:"),   V(arte)],
+        [L("Activ. con Familia:"),    V(sina(extra.get("recreacionActividadFamilia"))),
+                                                        L("Participa Institución:"), V(f"{participa} — {tipo_inst}".strip("- ") if participa == "Sí" else participa)],
     ]
     story.append(make_table(sec8, [w4, w4, w4, w4]))
     story.append(Spacer(1, 8))
@@ -302,16 +546,9 @@ def generate_f04_pdf(diag_data: dict, nna_data: dict, output_path: str) -> str:
     # ── IX. Necesidades ───────────────────────────────────────────────────
     necesidades = extra.get("necesidades") or []
     if necesidades:
-        story.append(sec_header("IX. Necesidades Identificadas"))
+        story.append(sec_header("IX. Necesidades Identificadas y Plan de Acción"))
         story.append(Spacer(1, 4))
 
-        nec_hdr = [[
-            Paragraph("Categoría",   label_style),
-            Paragraph("Descripción", label_style),
-            Paragraph("Fase I",      label_style),
-            Paragraph("Fase II",     label_style),
-            Paragraph("Fase III",    label_style),
-        ]]
         nec_rows = []
         for n in necesidades:
             nec_rows.append([
@@ -322,17 +559,11 @@ def generate_f04_pdf(diag_data: dict, nna_data: dict, output_path: str) -> str:
                 Paragraph(c(n.get("faseIII")),     value_style),
             ])
         c5 = doc.width / 5
-        nt = Table(nec_hdr + nec_rows, colWidths=[c5, c5, c5, c5, c5])
-        nt.setStyle(TableStyle([
-            ("GRID",           (0, 0), (-1, -1), 0.4, BORDER),
-            ("BACKGROUND",     (0, 0), (-1,  0), PRIMARY),
-            ("TEXTCOLOR",      (0, 0), (-1,  0), colors.white),
-            ("FONTNAME",       (0, 0), (-1,  0), "Helvetica-Bold"),
-            ("FONTSIZE",       (0, 0), (-1, -1), 8),
-            ("PADDING",        (0, 0), (-1, -1), 4),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, BG_LIGHT]),
-        ]))
-        story.append(nt)
+        story.append(grid_table(
+            ["Categoría", "Descripción", "Fase I", "Fase II", "Fase III"],
+            nec_rows,
+            [c5 * 0.8, c5 * 1.4, c5, c5 * 0.9, c5 * 0.9],
+        ))
         story.append(Spacer(1, 8))
 
     # ── Firmas ────────────────────────────────────────────────────────────

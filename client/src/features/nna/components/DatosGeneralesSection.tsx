@@ -1,21 +1,36 @@
 import React from 'react';
 import { useFormContext } from 'react-hook-form';
 import { InputField, SectionHeader } from '../../../components/ui/FormFields';
+import { UbigeoFields } from '../../../components/forms/UbigeoFields';
 import { clsx } from 'clsx';
 import type { NnaFormData } from '../types/nna-form.types';
 
 export const DatosGeneralesSection: React.FC = () => {
-    const { register, watch, formState: { errors } } = useFormContext<NnaFormData>();
+    const { register, watch, setValue, formState: { errors } } = useFormContext<NnaFormData>();
     const perfilValue = watch('perfil');
 
     return (
         <div className="space-y-6 animate-fadeIn">
-            <SectionHeader title="I. Datos Generales" subtitle="Ubicación de la intervención and marco temporal." />
+            <SectionHeader title="I. Datos Generales" />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="md:col-span-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+                <div className="md:col-span-2 space-y-2">
+                    <label className="text-xs font-bold text-gray-500 uppercase">Lugar de Intervención (Ubigeo)</label>
+                    <UbigeoFields
+                        departamento={watch('departamentoIntervencion')}
+                        provincia={watch('provinciaIntervencion')}
+                        distrito={watch('distritoIntervencion')}
+                        onChange={({ departamento, provincia, distrito }) => {
+                            setValue('departamentoIntervencion', departamento);
+                            setValue('provinciaIntervencion', provincia);
+                            setValue('distritoIntervencion', distrito);
+                        }}
+                    />
+                </div>
+
+                <div className="md:col-span-2 pt-2">
                     <InputField
-                        label="Zona de Intervención (Lugar específico)"
+                        label="Zona de intervención (lugar donde los/las NNA se encuentran en situación de calle)"
                         register={register('zonaIntervencion', { required: 'La zona es obligatoria' })}
                         placeholder="Ej: Plaza de Armas, Jr. Comercio..."
                         error={errors.zonaIntervencion}
@@ -57,20 +72,6 @@ export const DatosGeneralesSection: React.FC = () => {
                     {errors.situacionCalle && <span className="text-red-500 text-xs font-bold mt-1">Este campo es requerido.</span>}
                 </div>
             )}
-
-            <div className="border-t border-gray-100 pt-6 mt-2">
-                <label className="block text-sm font-bold text-gray-700 mb-3">¿Víctima de Explotación Sexual?</label>
-                <div className="flex flex-wrap gap-3">
-                    <label className="flex items-center gap-2 cursor-pointer bg-white px-4 py-2 rounded-lg border border-gray-200 shadow-sm transition-all hover:bg-gray-50">
-                        <input type="radio" value="SI" {...register('victimaExplotacion')} className="text-blue-600 focus:ring-blue-500" />
-                        <span className="font-bold text-sm text-gray-800">SÍ</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer bg-white px-4 py-2 rounded-lg border border-gray-200 shadow-sm transition-all hover:bg-gray-50">
-                        <input type="radio" value="NO" {...register('victimaExplotacion')} className="text-blue-600 focus:ring-blue-500" />
-                        <span className="font-bold text-sm text-gray-800">NO</span>
-                    </label>
-                </div>
-            </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 border-t border-gray-100 pt-6">
                 <InputField type="date" label="Fecha de Abordaje" register={register('fechaAbordaje')} />

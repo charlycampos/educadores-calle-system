@@ -47,6 +47,8 @@ export const ActividadesCalleSection: React.FC<ActividadesCalleSectionProps> = (
     // pero siempre usar fields como fuente de datos para el renderizado
     // para evitar desincronización con el estado interno del useFieldArray
     const watchedFields = useWatch({ control, name: 'actividadesCalle' });
+    // Perfil del NNA (Sección II) — determina qué lista de actividades ve el educador aquí.
+    const perfil = useWatch({ control, name: 'perfil' });
     // Merge: fields tiene los IDs internos de RHF, watchedFields tiene los datos actuales
     const actividades = fields.map((field, index) => ({
         ...field,
@@ -102,7 +104,7 @@ export const ActividadesCalleSection: React.FC<ActividadesCalleSectionProps> = (
                     <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                         <div className="flex items-center gap-2">
                             <Briefcase className="w-5 h-5 text-blue-600" />
-                            <h3 className="font-black text-slate-700 uppercase tracking-wide text-sm">Actividades en Calle</h3>
+                            <h3 className="font-black text-slate-700 uppercase tracking-wide text-sm">Actividades Según Perfil</h3>
                         </div>
                         <span className="text-xs font-bold text-slate-500 bg-white px-3 py-1 rounded-full shadow-sm border border-slate-200">
                             {fields.length} actividades
@@ -252,11 +254,12 @@ export const ActividadesCalleSection: React.FC<ActividadesCalleSectionProps> = (
                 </div>
             </div>
 
-            <ActividadModal 
+            <ActividadModal
                 isOpen={modalState.isOpen}
                 onClose={closeModal}
                 onSave={handleSaveActivity}
                 initialData={modalState.editIndex !== null ? actividades[modalState.editIndex] : undefined}
+                perfil={perfil}
             />
         </div>
     );

@@ -3,9 +3,9 @@ from datetime import datetime
 from pydantic import BaseModel
 
 class DiarioCampoBase(BaseModel):
-    caso_id: int
+    caso_id: Optional[int] = None
     ubicacion: Optional[str] = None
-    actividad: str
+    actividad: Optional[str] = None
     estado_fisico: Optional[str] = None
     estado_animo: Optional[str] = None
     observaciones: Optional[str] = None

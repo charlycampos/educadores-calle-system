@@ -3,12 +3,12 @@
 const isProduction = import.meta.env.PROD; // Usa variables de entorno en producción
 
 // Microservicios Python con arquitectura hexagonal + Oracle
-export const AUTH_API_URL         = isProduction ? '/api/auth-service'         : 'http://localhost:3001/api';
-export const NNA_API_URL          = isProduction ? '/api/nna-service'          : 'http://localhost:3002/api';
-export const INTERVENCION_API_URL = isProduction ? '/api/intervencion-service' : 'http://localhost:3003/api';
-export const DERIVACION_API_URL   = isProduction ? '/api/derivacion-service'   : 'http://localhost:3004/api';
-export const TALLERES_API_URL     = isProduction ? '/api/talleres-service'     : 'http://localhost:3005/api';
-export const EXPEDIENTE_API_URL   = isProduction ? '/api/expediente-service'   : 'http://localhost:3006/api';
+export const AUTH_API_URL         = '/api/auth-service';
+export const NNA_API_URL          = '/api/nna-service';
+export const INTERVENCION_API_URL = '/api/intervencion-service';
+export const DERIVACION_API_URL   = '/api/derivacion-service';
+export const TALLERES_API_URL     = '/api/talleres-service';
+export const EXPEDIENTE_API_URL   = '/api/expediente-service';
 
 // Configuración de roles y accesos
 export const ROLES = {

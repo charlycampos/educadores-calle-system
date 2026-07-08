@@ -6,6 +6,17 @@ import { clsx } from 'clsx';
 import { Home, Users, Plus, Trash2, Edit2, Calendar, AlertCircle } from 'lucide-react';
 import type { NnaFormData, NnaPersonalData, ActividadTiempoLibre } from '../types/nna-form.types';
 
+const OPCIONES_ACTIVIDADES_LIBRE = [
+    "Deportes",
+    "Música y Canto",
+    "Dibujo y Pintura",
+    "Danza o Baile",
+    "Teatro o Actuación",
+    "Lectura y Estudios",
+    "Computación o Videojuegos",
+    "Talleres Productivos / Técnicos"
+];
+
 interface FamiliaSectionProps {
     setEditingFamiliarIndex: (index: number | null) => void;
     setShowTutorModal: (show: boolean) => void;
@@ -147,51 +158,73 @@ export const FamiliaSection: React.FC<FamiliaSectionProps> = ({
                     <div className="space-y-3">
                         <div className="text-sm font-bold text-gray-800">¿Con quiénes vives?</div>
                         <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-                            {(parametros?.OPCIONES_CONVIVENCIA_2026 || [
-                                { value: '1', label: '1. Solo Padre' },
-                                { value: '2', label: '2. Solo Madre' },
-                                { value: '3', label: '3. Padre y madre' },
-                                { value: '4', label: '4. Adulto responsable (familia extensa)' },
-                                { value: '5', label: '5. Solo' },
-                                { value: '6', label: '6. Otro' }
-                            ]).map((opt: any) => (
-                                <label key={opt.value} className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-all ${String(watch('viveCon')) === String(opt.value) ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
-                                    <input type="radio" value={opt.value} {...register('viveCon')} className="text-blue-600" />
-                                    <span className="text-xs font-bold text-gray-700">{opt.label}</span>
-                                </label>
-                            ))}
+                            {[
+                                { value: '3', label: 'Ambos padres' },
+                                { value: '2', label: 'Solo Madre' },
+                                { value: '1', label: 'Solo Padre' },
+                                { value: '4', label: 'Otros familiares' },
+                                { value: '5', label: 'Amigos' },
+                                { value: '6', label: 'Solo' },
+                                { value: '7', label: 'Otro' }
+                            ].map((opt: any) => {
+                                const currentValue = String(watch('viveCon') || '');
+                                const isSelected = currentValue === opt.value || 
+                                                   currentValue.startsWith(opt.value + ':') || 
+                                                   currentValue.startsWith(opt.value + '.');
+                                return (
+                                    <label key={opt.value} className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-all ${isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
+                                        <input type="radio" value={opt.value} {...register('viveCon')} className="text-blue-600" checked={isSelected} />
+                                        <span className="text-xs font-bold text-gray-700">{opt.label}</span>
+                                    </label>
+                                );
+                            })}
                         </div>
                     </div>
 
-                    {(watch('viveCon') === '6' || watch('viveCon') === 'Otro') && (
+                    {(watch('viveCon') === '7' || 
+                      watch('viveCon') === 'Otro' || 
+                      String(watch('viveCon') || '').startsWith('7') || 
+                      String(watch('viveCon') || '').startsWith('6') ||
+                      String(watch('viveCon') || '').toLowerCase().includes('otro')) && (
                         <div className="animate-slideDown">
                             <InputField label="Especifique" register={register('detalleViveCon')} placeholder="Detalle..." />
                         </div>
                     )}
 
-                    <div className="space-y-3">
-                        <div className="text-sm font-bold text-gray-800">¿Dónde pernocta generalmente?</div>
-                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                            {['Casa Propia', 'Casa Familiar', 'Calle', 'Albergue', 'Refugio Temporal', 'Obra'].map((opt) => (
-                                <label key={opt} className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-all ${watch('lugarPernocte') === opt ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
-                                    <input type="radio" value={opt} {...register('lugarPernocte')} className="text-blue-600" />
-                                    <span className="text-xs font-bold text-gray-700">{opt}</span>
-                                </label>
-                            ))}
-                        </div>
-                    </div>
+                    {(() => {
+                        const viveConValue = String(watch('viveCon') || '');
+                        const noViveConFamilia = ['5', '6', '7'].includes(viveConValue) || 
+                                                 viveConValue.toLowerCase().includes('amigo') || 
+                                                 viveConValue.toLowerCase().includes('solo') || 
+                                                 viveConValue.toLowerCase().includes('otro');
+                        
+                        if (!noViveConFamilia) return null;
 
-                    {watch('lugarPernocte') === 'Otro' && (
-                        <div className="animate-slideDown">
-                            <InputField label="Especifique" register={register('detalleLugarPernocte')} placeholder="Detalle..." />
-                        </div>
-                    )}
+                        return (
+                            <div className="space-y-3 p-4 bg-gray-50 border border-gray-100 rounded-xl animate-fadeIn">
+                                <div className="text-sm font-bold text-gray-800">En caso que no viva con sus padres u otros familiares preguntar ¿Dónde duermes habitualmente?</div>
+                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                                    {['Su casa', 'Calles, Parques', 'Cuarto alquilado', 'Otro'].map((opt) => (
+                                        <label key={opt} className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-all ${watch('lugarPernocte') === opt ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
+                                            <input type="radio" value={opt} {...register('lugarPernocte')} className="text-blue-600" />
+                                            <span className="text-xs font-bold text-gray-700">{opt}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                                {watch('lugarPernocte') === 'Otro' && (
+                                    <div className="animate-slideDown mt-3">
+                                        <InputField label="Especifique" register={register('detalleLugarPernocte')} placeholder="Detalle..." />
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })()}
 
                     {/* Familiar / Adulto Responsable (SEC 2026) */}
                     <div className="border border-purple-100 rounded-xl bg-purple-50/30 p-5 mt-6 group hover:border-purple-200 transition-all">
                         <div className="flex justify-between items-center mb-4 pb-2 border-b border-purple-100/50">
                             <h4 className="text-sm font-black text-purple-900 uppercase flex items-center gap-2">
-                                <Users size={16} className="text-purple-700" /> Familiar / Adulto Responsable (SEC 2026)
+                                <Users size={16} className="text-purple-700" /> Familiar o Tutor Responsable del NNA
                             </h4>
                             <button
                                 type="button"
@@ -303,7 +336,7 @@ export const FamiliaSection: React.FC<FamiliaSectionProps> = ({
                     </div>
 
                     <div className="space-y-3">
-                        <div className="text-sm font-bold text-gray-800">¿Tiene antecedente de albergue?</div>
+                        <div className="text-sm font-bold text-gray-800">¿Ha estado en una casa de estancia, hogar o albergue?</div>
                         <div className="flex gap-3">
                             {[true, false].map((val) => (
                                 <label key={String(val)} className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-all ${watch('nnas.0.tieneAntecedenteAlbergue') === val ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
@@ -322,7 +355,7 @@ export const FamiliaSection: React.FC<FamiliaSectionProps> = ({
 
                     {watch('nnas.0.tieneAntecedenteAlbergue') && (
                         <div className="animate-slideDown">
-                            <InputField label="Detalle" register={register('nnas.0.detalleAntecedenteAlbergue' as const)} placeholder="Mencione dónde y cuándo..." />
+                            <InputField label="¿Cuál?" register={register('nnas.0.detalleAntecedenteAlbergue' as const)} placeholder="Mencione dónde y cuándo..." />
                         </div>
                     )}
                 </div>
@@ -332,41 +365,114 @@ export const FamiliaSection: React.FC<FamiliaSectionProps> = ({
             {fields.map((field, nnaIndex) => (
                 <div key={field.id} className="border border-gray-200 rounded-xl overflow-hidden shadow-sm bg-white">
                     <h3 className="bg-blue-50 text-blue-900 font-bold px-4 py-3 border-b border-blue-100 flex items-center gap-2">
-                        <Calendar size={18} /> VII. Actividades de Tiempo Libre - {watch(`nnas.${nnaIndex}.nombres`)} {watch(`nnas.${nnaIndex}.apellidoPaterno`)}
+                        <Calendar size={18} /> VII. Actividades de Tiempo Libre
                     </h3>
                     <div className="p-5 space-y-4">
+                        <div className="w-full">
+                            <label className="text-sm font-bold text-gray-800 block mb-3">
+                                ¿Qué actividades de tiempo libre te gustaría realizar?
+                            </label>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
+                                {OPCIONES_ACTIVIDADES_LIBRE.map((act) => {
+                                    const currentValue = watch(`nnas.${nnaIndex}.actividadesTiempoLibre`) || '';
+                                    const activitiesArray = currentValue.split(',').map((x: string) => x.trim()).filter(Boolean);
+                                    const isChecked = activitiesArray.includes(act);
 
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
-                            {(watch(`nnas.${nnaIndex}.actividadesTiempoLibreLista`) || []).map((activity, actIndex) => (
-                                <ActivityCard
-                                    key={activity.id}
-                                    activity={activity}
-                                    onEdit={() => {
-                                        setEditingActivityIndex(actIndex);
-                                        setShowTimeActivityModal(true);
-                                    }}
-                                    onDelete={() => handleDeleteActivity(nnaIndex, actIndex)}
-                                />
-                            ))}
+                                    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+                                        let newArray = [...activitiesArray];
+                                        if (e.target.checked) {
+                                            if (!newArray.includes(act)) newArray.push(act);
+                                        } else {
+                                            newArray = newArray.filter((x) => x !== act);
+                                        }
+                                        setValue(`nnas.${nnaIndex}.actividadesTiempoLibre`, newArray.join(', '));
+                                    };
+
+                                    return (
+                                        <label key={act} className={`flex items-center gap-2.5 p-3 rounded-lg border cursor-pointer transition-all ${isChecked ? 'border-blue-500 bg-blue-50/50 ring-1 ring-blue-500' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
+                                            <input
+                                                type="checkbox"
+                                                checked={isChecked}
+                                                onChange={handleChange}
+                                                className="rounded text-blue-600 focus:ring-blue-500 h-4 w-4"
+                                            />
+                                            <span className="text-xs font-bold text-gray-700">{act}</span>
+                                        </label>
+                                    );
+                                })}
+                                {(() => {
+                                    const currentValue = watch(`nnas.${nnaIndex}.actividadesTiempoLibre`) || '';
+                                    const activitiesArray = currentValue.split(',').map((x: string) => x.trim()).filter(Boolean);
+                                    const hasCustomValue = activitiesArray.some((x) => !OPCIONES_ACTIVIDADES_LIBRE.includes(x));
+
+                                    const handleOtroToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
+                                        if (!e.target.checked) {
+                                            const newArray = activitiesArray.filter((x) => OPCIONES_ACTIVIDADES_LIBRE.includes(x));
+                                            setValue(`nnas.${nnaIndex}.actividadesTiempoLibre`, newArray.join(', '));
+                                        } else {
+                                            const newArray = [...activitiesArray];
+                                            if (!hasCustomValue) {
+                                                newArray.push('Otro');
+                                                setValue(`nnas.${nnaIndex}.actividadesTiempoLibre`, newArray.join(', '));
+                                            }
+                                        }
+                                    };
+
+                                    return (
+                                        <label className={`flex items-center gap-2.5 p-3 rounded-lg border cursor-pointer transition-all ${hasCustomValue ? 'border-blue-500 bg-blue-50/50 ring-1 ring-blue-500' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
+                                            <input
+                                                type="checkbox"
+                                                checked={hasCustomValue}
+                                                onChange={handleOtroToggle}
+                                                className="rounded text-blue-600 focus:ring-blue-500 h-4 w-4"
+                                            />
+                                            <span className="text-xs font-bold text-gray-700">Otro (especificar)</span>
+                                        </label>
+                                    );
+                                })()}
+                            </div>
+                            {(() => {
+                                const currentValue = watch(`nnas.${nnaIndex}.actividadesTiempoLibre`) || '';
+                                const activitiesArray = currentValue.split(',').map((x: string) => x.trim()).filter(Boolean);
+                                const hasCustomValue = activitiesArray.some((x) => !OPCIONES_ACTIVIDADES_LIBRE.includes(x));
+                                const customValue = activitiesArray.find((x) => !OPCIONES_ACTIVIDADES_LIBRE.includes(x)) || '';
+
+                                if (!hasCustomValue) return null;
+
+                                return (
+                                    <div className="animate-slideDown mt-2">
+                                        <InputField
+                                            label="Especifique otra actividad"
+                                            value={customValue === 'Otro' ? '' : customValue}
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                const standardArray = activitiesArray.filter((x) => OPCIONES_ACTIVIDADES_LIBRE.includes(x));
+                                                standardArray.push(val.trim() || 'Otro');
+                                                setValue(`nnas.${nnaIndex}.actividadesTiempoLibre`, standardArray.join(', '));
+                                            }}
+                                            placeholder="Detalle la actividad..."
+                                        />
+                                    </div>
+                                );
+                            })()}
                         </div>
+                    </div>
+                </div>
+            ))}
 
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setEditingActivityIndex(null);
-                                setShowTimeActivityModal(true);
-                                setCurrentNnaIndexForDuplicate(nnaIndex);
-                            }}
-                            className="w-full py-2 border-2 border-dashed border-blue-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 text-blue-600 hover:text-blue-700 font-bold transition-all flex items-center justify-center gap-2"
-                        >
-                            <Plus size={18} /> Agregar Actividad de Tiempo Libre
-                        </button>
-
-                        <RiskAssessmentPanel
-                            nnaData={watch(`nnas.${nnaIndex}`)}
-                            actividadesList={watch(`nnas.${nnaIndex}.actividadesTiempoLibreLista`) || []}
+            {/* VIII. OBSERVACIONES */}
+            {fields.map((field, nnaIndex) => (
+                <div key={field.id} className="border border-gray-200 rounded-xl overflow-hidden shadow-sm bg-white mt-6">
+                    <h3 className="bg-purple-50 text-purple-900 font-bold px-4 py-3 border-b border-purple-100 flex items-center gap-2">
+                        <Calendar size={18} /> VIII. Observaciones
+                    </h3>
+                    <div className="p-5">
+                        <textarea
+                            {...register(`nnas.${nnaIndex}.caracteristicas` as const)}
+                            placeholder="Escriba aquí las observaciones generales del NNA..."
+                            rows={4}
+                            className="w-full bg-surface text-fg text-body px-3 py-2.5 rounded-md border border-gray-200 outline-none transition-shadow placeholder:text-gray-400 focus:border-primary focus:shadow-[0_0_0_3px_color-mix(in_oklch,var(--color-primary)_18%,transparent)] hover:border-primary/40 resize-y text-xs font-semibold text-gray-700"
                         />
-
                     </div>
                 </div>
             ))}

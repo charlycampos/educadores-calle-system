@@ -131,11 +131,11 @@ export const DISTRITOS: Record<string, { id: string; name: string }[]> = {
 };
 
 export const DISCAPACIDADES_CONADIS = [
-    "1: Motriz o física",
-    "2: Sensorial",
-    "3: Cognitivo-intelectual",
-    "4: Psicosocial o psíquica",
-    "5: Otros (especificar)"
+    "Motriz /física",
+    "Sensorial",
+    "cognitivo / Intelectual",
+    "Psicosocial /Psíquica",
+    "Más de una discapacidad"
 ];
 
 export const OPCIONES_MATRICULA_2026 = [

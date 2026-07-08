@@ -72,6 +72,9 @@ export interface NnaPersonalData {
 export interface CasoExpedienteData {
     estado?: string;
     zonaIntervencion?: string;
+    distritoIntervencion?: string;
+    departamentoIntervencion?: string;
+    provinciaIntervencion?: string;
     perfil?: string;
     situacionCalle?: string;
     fechaAbordaje?: string;
@@ -163,6 +166,8 @@ export interface RegistrarNnaPayload {
     perfil: string;
     zona_intervencion: string | null;
     distrito_intervencion: string | null;
+    departamento_intervencion: string | null;
+    provincia_intervencion: string | null;
     situacion_calle: string | null;
     actividad_realizada: string | null;
     tiempo_en_calle: string | null;
@@ -215,6 +220,9 @@ export interface FamiliarFormDataItem {
 
 export interface NnaFormData {
     zonaIntervencion: string;
+    departamentoIntervencion?: string;
+    provinciaIntervencion?: string;
+    distritoIntervencion?: string;
     departamentoDom: string;
     provinciaDom: string;
     distritoDom: string;

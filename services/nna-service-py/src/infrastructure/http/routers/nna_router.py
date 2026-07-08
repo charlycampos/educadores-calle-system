@@ -135,6 +135,8 @@ class RegistrarNnaRequest(BaseModel):
     perfil: Optional[str] = "SIN_PERFIL"
     zona_intervencion: Optional[str] = None
     distrito_intervencion: Optional[str] = None
+    departamento_intervencion: Optional[str] = None
+    provincia_intervencion: Optional[str] = None
     situacion_calle: Optional[str] = None
     actividad_realizada: Optional[str] = None
     tiempo_en_calle: Optional[str] = None
@@ -326,6 +328,8 @@ async def registrar_nna(body: RegistrarNnaRequest, background_tasks: BackgroundT
             perfil=body.perfil,
             zona_intervencion=body.zona_intervencion,
             distrito_intervencion=body.distrito_intervencion,
+            departamento_intervencion=body.departamento_intervencion,
+            provincia_intervencion=body.provincia_intervencion,
             situacion_calle=body.situacion_calle,
             actividad_realizada=body.actividad_realizada,
             tiempo_en_calle=body.tiempo_en_calle,
@@ -571,7 +575,7 @@ async def actualizar_expediente(carpeta_id: int, body: dict, background_tasks: B
         # 2. Actualizar datos del caso (perfil, etc) de la carpeta
         await caso_repo.update_caso_by_carpeta(carpeta_id, user.get("sedeId"), body, user.get("userId"))
 
-        # Si es_borrador se establece en False (promover/registrar borrador), actualizamos el estado de los casos a EN_EVALUACION
+        # Si es_borrador se establece en False (promover/registrar borrador), actualizamos el estado de los casos a PENDIENTE
         if "es_borrador" in body:
             es_borrador = body["es_borrador"]
             if not es_borrador:
@@ -579,7 +583,7 @@ async def actualizar_expediente(carpeta_id: int, body: dict, background_tasks: B
                 async with pool.acquire() as conn:
                     async with conn.cursor() as cur:
                         await cur.execute(
-                            """UPDATE NNA_CASO SET ESTADO = 'EN_EVALUACION', UPDATED_AT = SYSTIMESTAMP 
+                            """UPDATE NNA_CASO SET ESTADO = 'PENDIENTE', UPDATED_AT = SYSTIMESTAMP 
                                WHERE NNA_ID IN (SELECT ID FROM NNA WHERE CARPETA_ID = :cid) AND ESTADO = 'BORRADOR'""",
                             {"cid": carpeta_id}
                         )
@@ -877,6 +881,8 @@ def _caso_to_dict(caso) -> dict:
         "perfil": caso.perfil,
         "zonaIntervencion": caso.zona_intervencion,
         "distritoIntervencion": caso.distrito_intervencion,
+        "departamentoIntervencion": caso.departamento_intervencion,
+        "provinciaIntervencion": caso.provincia_intervencion,
         "situacionCalle": caso.situacion_calle,
         "actividadRealizada": caso.actividad_realizada,
         "tiempoEnCalle": caso.tiempo_en_calle,

@@ -13,3 +13,9 @@ class DiarioUseCase:
 
     async def eliminar_diario(self, entrada_id: int) -> bool:
         return await self.repository.delete_diario(entrada_id)
+
+    async def get_by_id(self, entrada_id: int) -> dict | None:
+        return await self.repository.get_by_id(entrada_id)
+
+    async def actualizar_diario(self, entrada_id: int, data: DiarioCampoCreate) -> dict | None:
+        return await self.repository.update_diario(entrada_id, data)

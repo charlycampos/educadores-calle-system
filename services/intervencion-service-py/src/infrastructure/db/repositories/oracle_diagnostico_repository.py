@@ -7,6 +7,40 @@ from src.infrastructure.db.connection import get_pool
 from src.domain.entities.diagnostico import DiagnosticoSocialCreate
 
 class OracleDiagnosticoRepository:
+
+    async def _sync_nna_datos_basicos(self, cur, nna_id: int, datos_extra: dict):
+        """Sincroniza campos básicos del NNA cuando son modificados en el F04."""
+        if not datos_extra or not nna_id:
+            return
+
+        fields = {}
+        if datos_extra.get('apellidoPaterno'):
+            fields['APELLIDO_PATERNO'] = datos_extra['apellidoPaterno']
+        if datos_extra.get('apellidoMaterno'):
+            fields['APELLIDO_MATERNO'] = datos_extra['apellidoMaterno']
+        if datos_extra.get('nombres'):
+            fields['NOMBRES'] = datos_extra['nombres']
+        if datos_extra.get('numeroDoc'):
+            fields['NUMERO_DOC'] = datos_extra['numeroDoc']
+        if datos_extra.get('fechaNacimiento'):
+            try:
+                fecha = datetime.strptime(datos_extra['fechaNacimiento'], '%Y-%m-%d').date()
+                fields['FECHA_NACIMIENTO'] = fecha
+            except Exception:
+                pass
+
+        if not fields:
+            return
+
+        cols = list(fields.keys())
+        vals = list(fields.values())
+        set_clause = ', '.join([f"{col} = :{i+1}" for i, col in enumerate(cols)])
+        vals.append(nna_id)
+        await cur.execute(
+            f"UPDATE NNA SET {set_clause}, UPDATED_AT = SYSTIMESTAMP WHERE ID = :{len(vals)}",
+            vals
+        )
+
     async def _row_to_dict(self, row, columns) -> dict:
         d = dict(zip(columns, row))
         if 'datos_extra' in d and d['datos_extra']:
@@ -73,14 +107,17 @@ class OracleDiagnosticoRepository:
                 anio = datetime.now().year
                 patron = f"F04-{sede_codigo}-{anio}-%"
                 try:
+                    # MAX del sufijo numérico (no COUNT): si se elimina un registro,
+                    # COUNT baja y el siguiente código se duplicaría.
                     await cur.execute(
-                        "SELECT COUNT(*) FROM DIAGNOSTICO_SOCIAL WHERE CODIGO_FICHA_04 LIKE :patron",
+                        "SELECT MAX(TO_NUMBER(REGEXP_SUBSTR(CODIGO_FICHA_04, '[0-9]+$'))) "
+                        "FROM DIAGNOSTICO_SOCIAL WHERE CODIGO_FICHA_04 LIKE :patron",
                         {"patron": patron}
                     )
                     row = await cur.fetchone()
                     num = (row[0] or 0) + 1
                 except Exception as e:
-                    print(f"Error counting F04 records: {e}")
+                    print(f"Error obteniendo correlativo F04: {e}")
                     num = 1
 
                 codigo_f04 = f"F04-{sede_codigo}-{anio}-{num:04d}"
@@ -106,6 +143,7 @@ class OracleDiagnosticoRepository:
                     data.direccion_tutor, data.telefono_tutor, datos_extra_str,
                     id_var, created_var, updated_var
                 ])
+                await self._sync_nna_datos_basicos(cur, nna_id, data.datos_extra)
                 await conn.commit()
                 
                 result = data.model_dump()
@@ -165,7 +203,8 @@ class OracleDiagnosticoRepository:
                            n.INSTITUCION_EDUCATIVA, n.MODALIDAD_ESTUDIO, n.DETALLE_NO_ESTUDIA, n.DATOS_F03, n.EDAD,
                            n.PRI_APE_TUT_APO, n.SEG_APE_TUT_APO, n.NOM_APE_TUT_APO, n.SEXO_APO, n.FECHA_NAC_APO,
                            n.NACIONALIDAD_APO, n.TIP_DOC_TUT_APO, n.NRO_DOC_TUT_APO, n.VIN_TUT_USU, n.LEN_MAT_APO,
-                           n.AUT_IDE_ET_APO, n.TIPO_DISCAP_APO, n.CERT_DISCAP_APO, n.CARPETA_ID
+                           n.AUT_IDE_ET_APO, n.TIPO_DISCAP_APO, n.CERT_DISCAP_APO, n.CARPETA_ID,
+                           n.TIENE_ANTECEDENTE_ALBERGUE, n.DETALLE_ANTECEDENTE_ALBERGUE
                     FROM NNA n
                     WHERE n.ID = :1
                 """
@@ -186,7 +225,8 @@ class OracleDiagnosticoRepository:
                                n.INSTITUCION_EDUCATIVA, n.MODALIDAD_ESTUDIO, n.DETALLE_NO_ESTUDIA, n.DATOS_F03, n.EDAD,
                                n.PRI_APE_TUT_APO, n.SEG_APE_TUT_APO, n.NOM_APE_TUT_APO, n.SEXO_APO, n.FECHA_NAC_APO,
                                n.NACIONALIDAD_APO, n.TIP_DOC_TUT_APO, n.NRO_DOC_TUT_APO, n.VIN_TUT_USU, n.LEN_MAT_APO,
-                               n.AUT_IDE_ET_APO, n.TIPO_DISCAP_APO, n.CERT_DISCAP_APO, n.CARPETA_ID
+                               n.AUT_IDE_ET_APO, n.TIPO_DISCAP_APO, n.CERT_DISCAP_APO, n.CARPETA_ID,
+                               n.TIENE_ANTECEDENTE_ALBERGUE, n.DETALLE_ANTECEDENTE_ALBERGUE
                         FROM NNA n
                         WHERE n.ID = :1
                     """
@@ -425,7 +465,7 @@ class OracleDiagnosticoRepository:
                         "eduNivel": nna_dict.get('nivel_educativo') or '',
                         "eduGrado": nna_dict.get('grado_estudio') or '',
                         "eduModalidad": nna_dict.get('modalidad_estudio') or '',
-                        "eduEstudia": "SI" if nna_dict.get('estudia_currently') or nna_dict.get('estudia_actualmente') == 1 else "NO",
+                        "eduEstudia": "SI" if str(nna_dict.get('estudia_actualmente') or '').strip().upper() in ('1', 'SI') else "NO",
                         "eduInstitucion": nna_dict.get('institucion_educativa') or '',
                         "eduMotivoNoEstudia": nna_dict.get('detalle_no_estudia') or '',
                         "afiliadoSIS": nna_dict.get('afiliado_sis') or 'NO',
@@ -513,6 +553,7 @@ class OracleDiagnosticoRepository:
                     data.direccion_tutor, data.telefono_tutor, datos_extra_str,
                     diag_id, updated_var
                 ])
+                await self._sync_nna_datos_basicos(cur, data.nna_id, data.datos_extra)
                 await conn.commit()
                 
                 updated_time = updated_var.getvalue()[0]

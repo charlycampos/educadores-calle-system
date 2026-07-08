@@ -10,18 +10,31 @@ interface ActividadModalProps {
     onClose: () => void;
     onSave: (actividad: ActividadPerfil) => void;
     initialData?: ActividadPerfil;
+    perfil?: string;
 }
 
-const OPCIONES_ACTIVIDAD_CALLE = [
-    'Venta de golosinas',
-    'Venta de productos en transporte',
-    'Limpieza de parabrisas',
-    'Lustrabotas',
-    'Reciclaje',
-    'Mendicidad',
-    'Malabares / Arte callejero',
-    'Otro (especificar)'
-];
+// Listado de actividades dependiente del Perfil del NNA (sección II).
+// Cada lista es corta y exclusiva de su perfil, y siempre cierra con "Otro (especificar)".
+const OPCIONES_POR_PERFIL: Record<string, string[]> = {
+    TRABAJO_EN_CALLE: [
+        'Venta de golosinas',
+        'Venta en transporte',
+        'Lustrabotas',
+        'Otro (especificar)'
+    ],
+    MENDICIDAD: [
+        'Pedir dinero',
+        'Acompañar a adulto',
+        'Otro (especificar)'
+    ],
+    VIDA_EN_CALLE: [
+        'Deambular',
+        'Frecuentar calles por horas con otros pares',
+        'Consumir sustancias/licor',
+        'Hacer hora',
+        'Otro (especificar)'
+    ]
+};
 
 const DIAS_SEMANA: (keyof AgendaSemanal)[] = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
 
@@ -35,7 +48,8 @@ const calcularHorasDia = (inicio: string, fin: string) => {
     return diff;
 };
 
-export const ActividadModal: React.FC<ActividadModalProps> = ({ isOpen, onClose, onSave, initialData }) => {
+export const ActividadModal: React.FC<ActividadModalProps> = ({ isOpen, onClose, onSave, initialData, perfil }) => {
+    const opcionesActividad = (perfil && OPCIONES_POR_PERFIL[perfil]) || [];
     const [actividad, setActividad] = useState('');
     const [actividadEspecifique, setActividadEspecifique] = useState('');
     const [tiempoModo, setTiempoModo] = useState<'simple' | 'detalle'>('simple');
@@ -134,9 +148,8 @@ export const ActividadModal: React.FC<ActividadModalProps> = ({ isOpen, onClose,
                 <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                     <div>
                         <h3 className="text-base font-black text-slate-800 uppercase flex items-center gap-2">
-                            {initialData ? '✏️ Editar Actividad en Calle' : '➕ Agregar Actividad en Calle'}
+                            {initialData ? '✏️ Editar Actividad Según Perfil' : '➕ Agregar Actividad Según Perfil'}
                         </h3>
-                        <p className="text-xs text-slate-500 mt-0.5">Configura la actividad, la permanencia de tiempo y su agenda semanal de horarios.</p>
                     </div>
                     <button 
                         type="button" 
@@ -152,18 +165,23 @@ export const ActividadModal: React.FC<ActividadModalProps> = ({ isOpen, onClose,
                     
                     {/* Actividad */}
                     <div className="space-y-2">
-                        <label className="text-xs font-black text-slate-700 uppercase block">¿Qué actividad realiza?</label>
+                        <label className="text-xs font-black text-slate-700 uppercase block">¿Qué actividad realiza? (características que lo califica como NNA en situación de calle)</label>
                         <select
                             value={actividad}
                             onChange={(e) => setActividad(e.target.value)}
-                            className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3 border text-sm bg-white"
+                            disabled={opcionesActividad.length === 0}
+                            className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3 border text-sm bg-white disabled:bg-slate-100 disabled:text-slate-400"
                         >
-                            <option value="">-- SELECCIONA UNA ACTIVIDAD --</option>
-                            {OPCIONES_ACTIVIDAD_CALLE.map(opt => (
+                            <option value="">
+                                {opcionesActividad.length === 0
+                                    ? '-- Primero selecciona el Perfil del NNA (Sección II) --'
+                                    : '-- SELECCIONA UNA ACTIVIDAD --'}
+                            </option>
+                            {opcionesActividad.map(opt => (
                                 <option key={opt} value={opt}>{opt}</option>
                             ))}
                         </select>
-                        
+
                         {actividad === 'Otro (especificar)' && (
                             <div className="pt-2 animate-slideDown">
                                 <label className="text-[10px] font-black text-slate-500 uppercase block mb-1">Especifica la actividad</label>
@@ -225,8 +243,6 @@ export const ActividadModal: React.FC<ActividadModalProps> = ({ isOpen, onClose,
                                         onChange={(e) => setTiempoUnidad(e.target.value)}
                                         className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2.5 border text-sm bg-white"
                                     >
-                                        <option value="Días">Día(s)</option>
-                                        <option value="Semanas">Semana(s)</option>
                                         <option value="Meses">Mes(es)</option>
                                         <option value="Años">Año(s)</option>
                                     </select>
@@ -246,46 +262,11 @@ export const ActividadModal: React.FC<ActividadModalProps> = ({ isOpen, onClose,
                         )}
                     </div>
 
-                    {/* Condición de acompañamiento */}
-                    <div className="space-y-2 pt-2 border-t border-slate-100 pt-6">
-                        <label className="text-xs font-black text-slate-700 uppercase block mb-3">¿Cómo o con quién realizas la actividad?</label>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                            {[
-                                { val: 'SOLO', label: 'Solo', desc: 'Sin compañía' },
-                                { val: 'PARES', label: 'Acompañado de Pares', desc: 'Amigos o hermanos menores' },
-                                { val: 'FAMILIA', label: 'Acompañado de familiar', desc: 'Padres o parientes directos' }
-                            ].map((opt) => (
-                                <label 
-                                    key={opt.val} 
-                                    className={clsx(
-                                        "cursor-pointer border rounded-xl p-4 flex flex-col gap-1 transition-all hover:bg-slate-50 text-left",
-                                        condicion === opt.val ? "border-blue-500 bg-blue-50/50 ring-1 ring-blue-500" : "border-gray-200 bg-white"
-                                    )}
-                                >
-                                    <input 
-                                        type="radio" 
-                                        value={opt.val} 
-                                        checked={condicion === opt.val}
-                                        onChange={() => setCondicion(opt.val)}
-                                        className="sr-only" 
-                                    />
-                                    <span className="font-bold text-xs text-gray-900 uppercase block">{opt.label}</span>
-                                    <span className="text-[10px] text-gray-500 leading-tight block">{opt.desc}</span>
-                                    <div className="flex justify-end mt-2">
-                                        <div className={clsx("w-4 h-4 rounded-full border flex items-center justify-center", condicion === opt.val ? "border-blue-600 bg-blue-600" : "border-gray-300")}>
-                                            {condicion === opt.val && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
-                                        </div>
-                                    </div>
-                                </label>
-                            ))}
-                        </div>
-                    </div>
-
                     {/* Sub-formulario de Agenda de Trabajo Semanal Checkboxes */}
                     <div className="border-t border-slate-100 pt-6 space-y-4">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                             <h4 className="text-xs font-black text-slate-700 uppercase flex items-center gap-1.5">
-                                <span>📅 Agenda Semanal de la Actividad</span>
+                                <span>📅 ¿Cuántos días a la semana trabajas o realizas esta actividad en calle?</span>
                             </h4>
                             
                             {/* Botones de selección rápida */}
@@ -338,6 +319,7 @@ export const ActividadModal: React.FC<ActividadModalProps> = ({ isOpen, onClose,
                                         {/* Despliegue de Horas si está activo */}
                                         {isDiaActivo && (
                                             <div className="mt-4 pt-3 border-t border-dashed border-slate-200 space-y-4 animate-slideDown">
+                                                <span className="text-[10px] font-black text-slate-700 uppercase block">¿En qué horario la realiza?</span>
                                                 <div className="flex flex-col md:flex-row gap-4">
                                                     {/* Turno 1 */}
                                                     <div className="flex-1 space-y-1">
@@ -395,6 +377,41 @@ export const ActividadModal: React.FC<ActividadModalProps> = ({ isOpen, onClose,
                                     </div>
                                 );
                             })}
+                        </div>
+                    </div>
+
+                    {/* Condición de acompañamiento */}
+                    <div className="space-y-2 pt-2 border-t border-slate-100 pt-6">
+                        <label className="text-xs font-black text-slate-700 uppercase block mb-3">¿Cómo o con quién realizas la actividad?</label>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            {[
+                                { val: 'SOLO', label: 'Solo', desc: 'Sin compañía' },
+                                { val: 'PARES', label: 'Acompañado de Pares', desc: 'Amigos o hermanos menores' },
+                                { val: 'FAMILIA', label: 'Acompañado de familiar', desc: 'Padres o parientes directos' }
+                            ].map((opt) => (
+                                <label
+                                    key={opt.val}
+                                    className={clsx(
+                                        "cursor-pointer border rounded-xl p-4 flex flex-col gap-1 transition-all hover:bg-slate-50 text-left",
+                                        condicion === opt.val ? "border-blue-500 bg-blue-50/50 ring-1 ring-blue-500" : "border-gray-200 bg-white"
+                                    )}
+                                >
+                                    <input
+                                        type="radio"
+                                        value={opt.val}
+                                        checked={condicion === opt.val}
+                                        onChange={() => setCondicion(opt.val)}
+                                        className="sr-only"
+                                    />
+                                    <span className="font-bold text-xs text-gray-900 uppercase block">{opt.label}</span>
+                                    <span className="text-[10px] text-gray-500 leading-tight block">{opt.desc}</span>
+                                    <div className="flex justify-end mt-2">
+                                        <div className={clsx("w-4 h-4 rounded-full border flex items-center justify-center", condicion === opt.val ? "border-blue-600 bg-blue-600" : "border-gray-300")}>
+                                            {condicion === opt.val && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                                        </div>
+                                    </div>
+                                </label>
+                            ))}
                         </div>
                     </div>
                 </div>

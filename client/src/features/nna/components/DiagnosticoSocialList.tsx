@@ -52,7 +52,9 @@ export const DiagnosticoSocialList = ({
                                 : '') ||
                             nnaFullName ||
                             '---',
-                        estado: d.estado,
+                        // El backend no tiene columna ESTADO: se deriva del flag
+                        // es_borrador que viaja en datos_extra (mezclado al raíz).
+                        estado: d.es_borrador ? 'BORRADOR' : 'COMPLETO',
                     }))
                 );
             } else {
@@ -86,6 +88,7 @@ export const DiagnosticoSocialList = ({
     const estadoBadge = (estado: string) => {
         const map: Record<string, { cls: string; label: string }> = {
             COMPLETO:   { cls: 'bg-success-soft text-success',  label: 'Completo'    },
+            BORRADOR:   { cls: 'bg-warning-soft text-warning',  label: 'Borrador'    },
             EN_PROCESO: { cls: 'bg-warning-soft text-warning',  label: 'En Proceso'  },
             PENDIENTE:  { cls: 'bg-primary-soft text-primary',  label: 'Pendiente'   },
         };
@@ -188,7 +191,9 @@ export const DiagnosticoSocialList = ({
                         ) : (
                             diagnosticos.map(diag => {
                                 const year = new Date(diag.fechaCreacion).getFullYear();
-                                const code = `${String(diag.id).padStart(4, '0')}-${year}`;
+                                // Mostrar el código oficial de la ficha (el mismo que sale en el PDF).
+                                // Antes se derivaba del ID de la fila en BD, lo que generaba números distintos.
+                                const code = diag.codigoFicha04 || `${String(diag.id).padStart(4, '0')}-${year}`;
                                 return (
                                     <tr
                                         key={diag.id}

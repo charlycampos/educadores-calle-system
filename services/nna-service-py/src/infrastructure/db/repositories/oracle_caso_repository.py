@@ -38,7 +38,9 @@ _SELECT_CASO = """
         n.APELLIDO_MATERNO AS NNA_APELLIDO_M,                  -- 25
         c.FASE,                                                -- 26
         u.NOMBRE_COMPLETO AS RESP_NOMBRE,                      -- 27
-        c.VICTIMA_EXPLOTACION                                  -- 28
+        c.VICTIMA_EXPLOTACION,                                 -- 28
+        c.DEPARTAMENTO_INTERVENCION,                           -- 29
+        c.PROVINCIA_INTERVENCION                               -- 30
     FROM NNA_CASO c
     JOIN NNA n ON n.ID = c.NNA_ID
     LEFT JOIN SEC_USUARIO u ON u.ID = c.RESPONSABLE_ID
@@ -62,6 +64,8 @@ def _row_to_caso(row) -> Caso:
         fase=row[26],
         responsable_nombre=row[27],
         victima_explotacion=row[28] if len(row) > 28 else "NO",
+        departamento_intervencion=row[29] if len(row) > 29 else None,
+        provincia_intervencion=row[30] if len(row) > 30 else None,
     )
 
 
@@ -229,6 +233,8 @@ class OracleCasoRepository:
                     "fecha_reingreso": caso_input.fecha_reingreso,
                     "fecha_cambio_p":  caso_input.fecha_cambio_perfil,
                     "victima_explotacion": caso_input.victima_explotacion or "NO",
+                    "departamento":    caso_input.departamento_intervencion,
+                    "provincia":       caso_input.provincia_intervencion,
                     "out_id":          out_id,
                 }
                 try:
@@ -242,7 +248,7 @@ class OracleCasoRepository:
                             HORARIO_INICIO, HORARIO_FIN, HORARIO_INICIO2, HORARIO_FIN2,
                             DIAS_TRABAJO,
                             FECHA_ABORDAJE, FECHA_INGRESO, FECHA_REINGRESO, FECHA_CAMBIO_PERFIL,
-                            VICTIMA_EXPLOTACION
+                            VICTIMA_EXPLOTACION, DEPARTAMENTO_INTERVENCION, PROVINCIA_INTERVENCION
                         ) VALUES (
                             :codigo, :nna_id, :sede_id, :resp_id,
                             :perfil, :estado, 'CONTACTO_INICIAL',
@@ -252,7 +258,7 @@ class OracleCasoRepository:
                             :horario_inicio, :horario_fin, :horario_inicio2, :horario_fin2,
                             :dias_trabajo,
                             :abordaje, :fecha_ingreso, :fecha_reingreso, :fecha_cambio_p,
-                            :victima_explotacion
+                            :victima_explotacion, :departamento, :provincia
                         ) RETURNING ID INTO :out_id""",
                         params,
                     )
@@ -298,16 +304,49 @@ class OracleCasoRepository:
         """Actualiza campos del caso más reciente vinculado a un NNA."""
         if not data:
             return
-        sets = ", ".join(f"{k} = :{k}" for k in data)
-        data["nna_id"] = nna_id
+        # Convertir nombres de campos de python/JSON a columnas correctas de BD Oracle
+        CAMPO_A_COLUMNA_LOCAL = {
+            "perfil": "PERFIL",
+            "zona_intervencion": "ZONA_INTERVENCION",
+            "distrito_intervencion": "DISTRITO_INTERVENCION",
+            "departamento_intervencion": "DEPARTAMENTO_INTERVENCION",
+            "provincia_intervencion": "PROVINCIA_INTERVENCION",
+            "situacion_calle": "SITUACION_CALLE",
+            "actividad_realizada": "ACTIVIDAD_REALIZADA",
+            "tiempo_en_calle": "TIEMPO_EN_CALLE",
+            "condicion": "CONDICION",
+            "horario_inicio": "HORARIO_INICIO",
+            "horario_fin": "HORARIO_FIN",
+            "horario_inicio2": "HORARIO_INICIO2",
+            "horario_fin2": "HORARIO_FIN2",
+            "dias_trabajo": "DIAS_TRABAJO",
+            "fecha_abordaje": "FECHA_ABORDAJE",
+            "fecha_ingreso": "FECHA_INGRESO",
+            "fecha_reingreso": "FECHA_REINGRESO",
+            "fecha_cambio_perfil": "FECHA_CAMBIO_PERFIL",
+            "victima_explotacion": "VICTIMA_EXPLOTACION",
+            "estado": "ESTADO",
+            "sede_id": "SEDE_ID",
+            "responsable_id": "RESPONSABLE_ID",
+        }
+        
+        sets = []
+        bind = {}
+        for k, v in data.items():
+            col = CAMPO_A_COLUMNA_LOCAL.get(k, k.upper())
+            sets.append(f"{col} = :{k}")
+            bind[k] = v
+            
+        sets_sql = ", ".join(sets)
+        bind["nna_id"] = nna_id
         pool = get_pool()
         async with pool.acquire() as conn:
             async with conn.cursor() as cur:
                 await cur.execute(
-                    f"""UPDATE NNA_CASO SET {sets}, UPDATED_AT = SYSTIMESTAMP
+                    f"""UPDATE NNA_CASO SET {sets_sql}, UPDATED_AT = SYSTIMESTAMP
                         WHERE NNA_ID = :nna_id
                           AND ID = (SELECT MAX(ID) FROM NNA_CASO WHERE NNA_ID = :nna_id)""",
-                    data,
+                    bind,
                 )
                 await conn.commit()
 
@@ -327,6 +366,8 @@ class OracleCasoRepository:
             "perfil":              "PERFIL",
             "zona_intervencion":   "ZONA_INTERVENCION",
             "distrito_intervencion": "DISTRITO_INTERVENCION",
+            "departamento_intervencion": "DEPARTAMENTO_INTERVENCION",
+            "provincia_intervencion": "PROVINCIA_INTERVENCION",
             "situacion_calle":     "SITUACION_CALLE",
             "actividad_realizada": "ACTIVIDAD_REALIZADA",
             "tiempo_en_calle":     "TIEMPO_EN_CALLE",
@@ -377,13 +418,13 @@ class OracleCasoRepository:
 
         es_borrador = data.get("es_borrador", False)
 
-        # Si NO es borrador, nos aseguramos de que el estado pase a 'EN_EVALUACION' si estaba en 'BORRADOR'
+        # Si NO es borrador, nos aseguramos de que el estado pase a 'PENDIENTE' si estaba en 'BORRADOR'
         if not es_borrador:
             async with pool.acquire() as conn:
                 async with conn.cursor() as cur:
                     await cur.execute(
                         """UPDATE NNA_CASO 
-                           SET ESTADO = 'EN_EVALUACION' 
+                           SET ESTADO = 'PENDIENTE' 
                            WHERE ESTADO = 'BORRADOR' 
                              AND NNA_ID IN (SELECT ID FROM NNA WHERE CARPETA_ID = :cid)""",
                         {"cid": carpeta_id}

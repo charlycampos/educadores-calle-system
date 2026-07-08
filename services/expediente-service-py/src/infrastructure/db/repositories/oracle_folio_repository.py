@@ -61,6 +61,14 @@ class OracleFolioRepository:
                         "hash": hash_documento, "usr": creado_por_id, "out_id": out_id,
                     },
                 )
+                # Si es compromiso, promover el caso de PENDIENTE a EN_EVALUACION
+                if tipo_documento.upper().startswith("COMPROMISO DEL NNA Y/O APODERADO") or "COMPROMISO" in tipo_documento.upper():
+                    await cur.execute(
+                        """UPDATE NNA_CASO 
+                           SET ESTADO = 'EN_EVALUACION', UPDATED_AT = SYSTIMESTAMP 
+                           WHERE ID = :caso AND ESTADO = 'PENDIENTE'""",
+                        {"caso": caso_id}
+                    )
                 await conn.commit()
                 new_id = out_id.getvalue()[0]
 

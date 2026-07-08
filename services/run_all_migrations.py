@@ -38,6 +38,7 @@ SQL_FILES = [
     "intervencion-service-py/src/infrastructure/db/migrations/006_add_area_objetivo_accion_pti.sql",
     "intervencion-service-py/src/infrastructure/db/migrations/007_add_ciclo_vida_plan_trabajo.sql",
     "intervencion-service-py/src/infrastructure/db/migrations/008_add_gps_diario_campo.sql",
+    "intervencion-service-py/src/infrastructure/db/migrations/009_allow_null_caso_diario.sql",
     "talleres-service-py/src/infrastructure/db/migrations/001_create_taller_tables.sql",
     "derivacion-service-py/src/infrastructure/db/migrations/001_create_derivacion.sql"
 ]

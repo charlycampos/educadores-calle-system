@@ -99,6 +99,8 @@ class CasoInput:
     perfil: str
     zona_intervencion: Optional[str] = None
     distrito_intervencion: Optional[str] = None
+    departamento_intervencion: Optional[str] = None
+    provincia_intervencion: Optional[str] = None
     situacion_calle: Optional[str] = None
     actividad_realizada: Optional[str] = None
     tiempo_en_calle: Optional[str] = None
@@ -221,6 +223,8 @@ class RegistrarNnaUseCase:
                         "perfil": caso_input.perfil,
                         "zona_intervencion": caso_input.zona_intervencion,
                         "distrito_intervencion": caso_input.distrito_intervencion,
+                        "departamento_intervencion": caso_input.departamento_intervencion,
+                        "provincia_intervencion": caso_input.provincia_intervencion,
                         "situacion_calle": caso_input.situacion_calle,
                         "actividad_realizada": caso_input.actividad_realizada,
                         "tiempo_en_calle": caso_input.tiempo_en_calle,
@@ -235,14 +239,14 @@ class RegistrarNnaUseCase:
                         "horario_fin2": caso_input.horario_fin2,
                         "dias_trabajo": caso_input.dias_trabajo,
                         "victima_explotacion": caso_input.victima_explotacion or "NO",
-                        "estado": "BORRADOR" if es_borrador else "EN_EVALUACION",
+                        "estado": "BORRADOR" if es_borrador else "PENDIENTE",
                     }
                     await self._caso_repo.update_by_nna_id(nna.id, case_data)
                     cases = await self._caso_repo.find_by_nna_id(nna.id)
                     caso = cases[0]
                 else:
                     codigo_caso = await self._caso_repo.get_next_codigo_caso(caso_input.sede_id)
-                    caso_input.estado = "BORRADOR" if es_borrador else "EN_EVALUACION"
+                    caso_input.estado = "BORRADOR" if es_borrador else "PENDIENTE"
                     caso = await self._caso_repo.create(
                         nna_id=nna.id,
                         codigo_caso=codigo_caso,
@@ -267,7 +271,7 @@ class RegistrarNnaUseCase:
                 if es_borrador:
                     caso_input.estado = "BORRADOR"
                 else:
-                    caso_input.estado = "EN_EVALUACION"
+                    caso_input.estado = "PENDIENTE"
 
                 caso = await self._caso_repo.create(
                     nna_id=nna.id,

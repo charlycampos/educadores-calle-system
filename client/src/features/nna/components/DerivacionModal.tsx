@@ -44,11 +44,18 @@ export const DerivacionModal = ({ isOpen, onClose, casoId, nnaName }: Derivacion
     // Cargar usuarios si es interna
     useEffect(() => {
         if (isOpen && tipo === 'INTERNA') {
-            fetch(`${AUTH_API_URL}/usuarios`, {
+            fetch(`${AUTH_API_URL}/usuarios/`, {
                 headers: { Authorization: `Bearer ${token}` }
             })
                 .then(res => res.json())
-                .then(data => setUsers(data))
+                .then(data => {
+                    if (Array.isArray(data)) {
+                        setUsers(data);
+                    } else {
+                        console.error('API Error:', data);
+                        setUsers([]);
+                    }
+                })
                 .catch(console.error);
         }
     }, [isOpen, tipo, token]);

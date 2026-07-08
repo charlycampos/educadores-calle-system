@@ -457,20 +457,20 @@ export const useNnaStore = create<NnaState>((set, get) => ({
                         'FICHA DE DERIVACIÓN (FORMATO 0': 'FICHA DE DERIVACIÓN (FORMATO 06)',
                         'FICHA DE INSCRIPCIÓN (FORMATO ': 'FICHA DE INSCRIPCIÓN (FORMATO 3)',
                         'ACTA DE COMPROMISO (FORMATO 09': 'ACTA DE COMPROMISO (FORMATO 09)',
+                        'COMPROMISO DEL NNA Y/O APODERA': 'COMPROMISO DEL NNA Y/O APODERADO (FORMATO 09)',
                     };
                     backendDocs = await Promise.all(folios.map(async (f: any) => {
                         const isF05Full  = f.tipo_documento === 'F05';
                         const isF05Fase  = Object.prototype.hasOwnProperty.call(F05_FASE_LABELS, f.tipo_documento);
                         const isInformeSituacional = f.tipo_documento === 'F09' || f.tipo_documento === 'INFORME_SITUACIONAL';
                         const isSeguimientoF12 = f.tipo_documento === 'SEG_F12';
-                        const usePdfUrl  = isF05Full || isF05Fase || isInformeSituacional || isSeguimientoF12;
+                        const isDiarioCampo = f.tipo_documento === 'DIARIO_CAMPO';
+                        const usePdfUrl  = isF05Full || isF05Fase || isInformeSituacional || isSeguimientoF12 || isDiarioCampo;
 
-                        const resolvedArchivoUrl = f.archivo_url.startsWith('/api/')
-                            ? EXPEDIENTE_API_URL + f.archivo_url.substring(4)
-                            : f.archivo_url;
+                        const resolvedArchivoUrl = f.archivo_url;
 
                         let pages = 1;
-                        if (isF05Fase) {
+                        if (isF05Fase || isDiarioCampo) {
                             try {
                                 const pagesResp = await fetch(`${resolvedArchivoUrl}/pages`, {
                                     headers: { 'Authorization': `Bearer ${token}` },
@@ -493,11 +493,11 @@ export const useNnaStore = create<NnaState>((set, get) => ({
                                         ? 'INFORME SITUACIONAL'
                                         : isSeguimientoF12
                                             ? 'FICHA DE SEGUIMIENTO FAMILIAR (FORMATO 12)'
-                                            : (TIPO_FULL_LABELS[f.tipo_documento] || f.tipo_documento || 'DOCUMENTO SUBIDO'),
+                                            : (TIPO_FULL_LABELS[f.tipo_documento] || f.titulo || f.tipo_documento || 'DOCUMENTO SUBIDO'),
                             code: f.hash_documento ? f.hash_documento.toUpperCase() : `FOLIO-${f.numero_folio}`,
                             date: f.fecha_creacion || new Date().toISOString(),
                             pages,
-                            nombreResponsable: f.nombreResponsable || 'Usuario Autenticado',
+                            nombreResponsable: f.usuario_responsable || f.nombreResponsable || 'Usuario Autenticado',
                             ...(usePdfUrl
                                 ? { pdfUrl: resolvedArchivoUrl }
                                 : { filename: resolvedArchivoUrl.split('/').pop() }
@@ -566,7 +566,7 @@ export const useNnaStore = create<NnaState>((set, get) => ({
         const metadata = await response.json(); // {filename, original_name, pages, path}
 
         // Registrar el Folio en la base de datos si hay un caso activo
-        const selectedNna = get().selectedNna;
+        const selectedNna = get().selectedNna || get().selectedExpediente?.find((n: any) => n.id === nnaId);
         const activeCase = selectedNna?.casos?.find((c: any) => c.estado !== 'CERRADO') || selectedNna?.casos?.[0];
         
         if (activeCase) {

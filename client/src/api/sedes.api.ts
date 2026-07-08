@@ -31,7 +31,7 @@ export interface SedeConStats extends Sede {
 
 /** Lista todas las sedes activas */
 export const getSedesAll = async (): Promise<Sede[]> => {
-    const response = await fetch(`${AUTH_API_URL}/sedes`, { headers: getHeaders() });
+    const response = await fetch(`${AUTH_API_URL}/sedes/`, { headers: getHeaders() });
     if (!response.ok) throw new Error('Error al obtener las sedes');
     const data = await response.json();
     // El backend envuelve en { data: [...] } con el helper ok()
@@ -48,7 +48,7 @@ export const getMiSede = async (): Promise<Sede> => {
 
 /** Obtiene usuarios filtrados por sede */
 export const getUsuariosBySede = async (sedeId: number) => {
-    const response = await fetch(`${AUTH_API_URL}/usuarios?sedeId=${sedeId}`, { headers: getHeaders() });
+    const response = await fetch(`${AUTH_API_URL}/usuarios/?sedeId=${sedeId}`, { headers: getHeaders() });
     if (!response.ok) throw new Error('Error al obtener usuarios de la sede');
     return response.json();
 };

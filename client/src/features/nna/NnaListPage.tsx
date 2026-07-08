@@ -4,11 +4,12 @@ import { useNnaStore } from '../../store/nna.store';
 import { useAuthStore } from '../../store/auth.store';
 import { ROLES } from '../../config/api';
 import { clsx } from 'clsx';
-import { Plus, Search, FileDown, MoreHorizontal, ArrowRightCircle, Briefcase, FileText, User, Pencil, FolderOpen } from 'lucide-react';
+import { Plus, Search, FileDown, MoreHorizontal, ArrowRightCircle, Briefcase, FileText, User, Pencil, FolderOpen, FileSignature } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { DerivacionModal } from './components/DerivacionModal';
 import { Button } from '../../components/ui/Button';
 import { PdfViewerModal } from './components/PdfViewerModal';
+import { CompromisoModal } from './components/CompromisoModal';
 import { calculateAge } from '../../utils/age';
 
 export const NnaListPage = () => {
@@ -25,6 +26,8 @@ export const NnaListPage = () => {
     const [selectedCase, setSelectedCase] = useState<{ nnaId: number, casoId: number, nnaName: string } | null>(null);
     const [isPdfOpen, setIsPdfOpen] = useState(false);
     const [selectedPdfNna, setSelectedPdfNna] = useState<{ id: number, name: string, codigoFicha03?: string | null } | null>(null);
+    const [isCompromisoOpen, setIsCompromisoOpen] = useState(false);
+    const [selectedCompromisoNna, setSelectedCompromisoNna] = useState<any | null>(null);
 
     const isNacional = user && [ROLES.ADMIN_NACIONAL, ROLES.MONITOR, ROLES.ESTADISTICO].includes(user.rol);
     const [selectedSede, setSelectedSede] = useState('TODAS');
@@ -46,16 +49,12 @@ export const NnaListPage = () => {
 
     const handleDerivar = (nna: any) => {
         const activeCase = nna.casos?.find((c: any) => c.estado !== 'CERRADO');
-        if (activeCase) {
-            setSelectedCase({
-                nnaId: nna.id,
-                casoId: activeCase.id,
-                nnaName: `${nna.nombres} ${nna.apellidoPaterno} ${nna.apellidoMaterno}`
-            });
-            setIsDerivacionOpen(true);
-        } else {
-            toast.info('Este beneficiario no tiene casos activos para derivar.');
-        }
+        setSelectedCase({
+            nnaId: nna.id,
+            casoId: activeCase?.id || 0,
+            nnaName: `${nna.nombres} ${nna.apellidoPaterno} ${nna.apellidoMaterno}`
+        });
+        setIsDerivacionOpen(true);
     };
 
     // Filter Logic
@@ -221,146 +220,172 @@ export const NnaListPage = () => {
                                             </tr>
                                         )}
 
-                                        {group.map((nna: any, idx: number) => (
-                                            <tr key={nna.id} className="hover:bg-surface-muted/50 transition-colors bg-surface relative">
-                                                
-                                                {/* Col 1: N° Ficha */}
-                                                <td className={clsx("px-4 py-3 border-r border-border", idx > 0 ? "border-t border-border" : "")}>
-                                                    <span className="text-[12px] font-mono font-semibold text-fg-secondary">
-                                                        {nna.codigoFicha03 || '---'}
-                                                    </span>
-                                                </td>
+                                        {group.map((nna: any, idx: number) => {
+                                            const activeCase = nna.casos?.find((c: any) => c.estado !== 'CERRADO') || nna.casos?.[0];
+                                            const isBorrador = activeCase?.estado === 'BORRADOR' || (!nna.codigoFicha03 && activeCase?.estado !== 'PENDIENTE');
+                                            const isPendiente = activeCase?.estado === 'PENDIENTE';
+                                            const isActivo = !isBorrador && !isPendiente;
+                                            return (
+                                                <tr key={nna.id} className="hover:bg-surface-muted/50 transition-colors bg-surface relative">
+                                                    
+                                                    {/* Col 1: N° Ficha */}
+                                                    <td className={clsx("px-4 py-3 border-r border-border", idx > 0 ? "border-t border-border" : "")}>
+                                                        <span className="text-[12px] font-mono font-semibold text-fg-secondary">
+                                                            {nna.codigoFicha03 || '---'}
+                                                        </span>
+                                                    </td>
 
-                                                {/* Col 2: Fecha Reg. */}
-                                                <td className={clsx("px-4 py-3 border-r border-border", idx > 0 ? "border-t border-border" : "")}>
-                                                    <p className="text-[13px] text-fg font-mono">
-                                                        {nna.createdAt ? new Date(nna.createdAt).toLocaleDateString() : '-'}
-                                                    </p>
-                                                </td>
+                                                    {/* Col 2: Fecha Reg. */}
+                                                    <td className={clsx("px-4 py-3 border-r border-border", idx > 0 ? "border-t border-border" : "")}>
+                                                        <p className="text-[13px] text-fg font-mono">
+                                                            {nna.createdAt ? new Date(nna.createdAt).toLocaleDateString() : '-'}
+                                                        </p>
+                                                    </td>
 
-                                                {/* Col 3: Beneficiario */}
-                                                <td className={clsx("px-4 py-3 border-r border-border", idx > 0 ? "border-t border-border" : "")}>
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-9 h-9 rounded-full bg-primary-soft flex items-center justify-center text-primary font-bold text-[12px] shrink-0">
-                                                            {(nna?.nombres || '').charAt(0)}{(nna?.apellidoPaterno || '').charAt(0)}
-                                                        </div>
-                                                        <div className="min-w-0 flex items-center gap-2">
-                                                            <p className="text-fg text-[13px] truncate">{nna.nombres} {nna.apellidoPaterno} {nna.apellidoMaterno}</p>
-                                                            {isNacional && nna.casos?.[0]?.sede_id && (
-                                                                <span className="inline-flex px-1.5 py-0.5 bg-[#f1f5f9] border border-gray-200 text-gray-600 rounded text-[9px] font-bold uppercase shrink-0">
-                                                                    Sede {nna.casos[0].sede_id}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </td>
-
-                                                {/* Col 4: Edad */}
-                                                <td className={clsx("px-4 py-3 border-r border-border", idx > 0 ? "border-t border-border" : "")}>
-                                                    <p className="text-fg font-medium text-[13px]">
-                                                        {nna.fechaNacimiento
-                                                            ? `${calculateAge(nna.fechaNacimiento)} años`
-                                                            : nna.edad != null
-                                                                ? `${nna.edad} ${nna.unidadEdad === 'MESES' ? 'meses' : nna.unidadEdad === 'DIAS' ? 'días' : 'años'}`
-                                                                : '-'}
-                                                    </p>
-                                                </td>
-
-                                                {/* Col 5: Sexo */}
-                                                <td className={clsx("px-4 py-3 border-r border-border", idx > 0 ? "border-t border-border" : "")}>
-                                                    <p className="text-[11px] text-fg-muted capitalize">
-                                                        {['1', 'M'].includes(String(nna.sexo).trim().toUpperCase()) ? 'Hombre' : ['2', 'F'].includes(String(nna.sexo).trim().toUpperCase()) ? 'Mujer' : '-'}
-                                                    </p>
-                                                </td>
-
-                                                {/* Col 6: Expediente (with rowSpan, only on index 0) */}
-                                                {idx === 0 && (
-                                                    <td className="px-4 py-3 align-top border-r border-border bg-surface-muted/30" rowSpan={group.length}>
-                                                        <div className="flex flex-col gap-2.5 sticky top-4">
-                                                            <div className="flex items-center gap-2">
-                                                                  <div className="bg-warning-soft text-warning p-1.5 rounded-md">
-                                                                      <Briefcase size={16} />
-                                                                  </div>
-                                                                  <div>
-                                                                      <span className="font-mono text-[13px] font-semibold text-fg block whitespace-nowrap">
-                                                                          {nna.carpeta?.codigo || '---'}
-                                                                      </span>
-                                                                  </div>
+                                                    {/* Col 3: Beneficiario */}
+                                                    <td className={clsx("px-4 py-3 border-r border-border", idx > 0 ? "border-t border-border" : "")}>
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-9 h-9 rounded-full bg-primary-soft flex items-center justify-center text-primary font-bold text-[12px] shrink-0">
+                                                                {(nna?.nombres || '').charAt(0)}{(nna?.apellidoPaterno || '').charAt(0)}
                                                             </div>
-                                                            {group.length > 1 && (
-                                                                  <div className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-info-soft text-info rounded-md text-[11px] font-semibold w-fit ml-0.5">
-                                                                      <User size={12} />
-                                                                      {group.length} Beneficiarios
-                                                                  </div>
-                                                            )}
+                                                            <div className="min-w-0 flex items-center gap-2">
+                                                                <p className="text-fg text-[13px] truncate">{nna.nombres} {nna.apellidoPaterno} {nna.apellidoMaterno}</p>
+                                                                {isNacional && nna.casos?.[0]?.sede_id && (
+                                                                    <span className="inline-flex px-1.5 py-0.5 bg-[#f1f5f9] border border-gray-200 text-gray-600 rounded text-[9px] font-bold uppercase shrink-0">
+                                                                        Sede {nna.casos[0].sede_id}
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     </td>
-                                                )}
 
-                                                {/* Col 7: Estado de la Ficha F03 */}
-                                                <td className={clsx("px-4 py-3 border-r border-border", idx > 0 ? "border-t border-border" : "")}>
-                                                    {nna.codigoFicha03 ? (
-                                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 uppercase tracking-wider w-fit">
-                                                            Registrado
-                                                        </span>
-                                                    ) : (
-                                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200 uppercase tracking-wider w-fit">
-                                                            Borrador
-                                                        </span>
+                                                    {/* Col 4: Edad */}
+                                                    <td className={clsx("px-4 py-3 border-r border-border", idx > 0 ? "border-t border-border" : "")}>
+                                                        <p className="text-fg font-medium text-[13px]">
+                                                            {nna.fechaNacimiento
+                                                                ? `${calculateAge(nna.fechaNacimiento)} años`
+                                                                : nna.edad != null
+                                                                    ? `${nna.edad} ${nna.unidadEdad === 'MESES' ? 'meses' : nna.unidadEdad === 'DIAS' ? 'días' : 'años'}`
+                                                                    : '-'}
+                                                        </p>
+                                                    </td>
+
+                                                    {/* Col 5: Sexo */}
+                                                    <td className={clsx("px-4 py-3 border-r border-border", idx > 0 ? "border-t border-border" : "")}>
+                                                        <p className="text-[11px] text-fg-muted capitalize">
+                                                            {['1', 'M'].includes(String(nna.sexo).trim().toUpperCase()) ? 'Hombre' : ['2', 'F'].includes(String(nna.sexo).trim().toUpperCase()) ? 'Mujer' : '-'}
+                                                        </p>
+                                                    </td>
+
+                                                    {/* Col 6: Expediente (with rowSpan, only on index 0) */}
+                                                    {idx === 0 && (
+                                                        <td className="px-4 py-3 align-top border-r border-border bg-surface-muted/30" rowSpan={group.length}>
+                                                            <div className="flex flex-col gap-2.5 sticky top-4">
+                                                                <div className="flex items-center gap-2">
+                                                                      <div className="bg-warning-soft text-warning p-1.5 rounded-md">
+                                                                          <Briefcase size={16} />
+                                                                      </div>
+                                                                      <div>
+                                                                          <span className="font-mono text-[13px] font-semibold text-fg block whitespace-nowrap">
+                                                                              {nna.carpeta?.codigo || '---'}
+                                                                          </span>
+                                                                      </div>
+                                                                </div>
+                                                                {group.length > 1 && (
+                                                                      <div className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-info-soft text-info rounded-md text-[11px] font-semibold w-fit ml-0.5">
+                                                                          <User size={12} />
+                                                                          {group.length} Beneficiarios
+                                                                      </div>
+                                                                )}
+                                                            </div>
+                                                        </td>
                                                     )}
-                                                </td>
 
-                                                {/* Col 8: Acciones (with rowSpan, only on index 0) */}
-                                                {idx === 0 && (
-                                                    <td className="px-4 py-3 text-right align-middle bg-surface-muted/30" rowSpan={group.length}>
-                                                        <div className="flex items-center justify-end gap-1.5 h-full">
-                                                            <Link
-                                                                to={`/nna/expediente/${nna.carpeta?.id ?? nna.id}?nnaId=${nna.id}`}
-                                                                title="Abrir Expediente"
-                                                                className="p-1.5 bg-primary text-primary-fg rounded-md hover:bg-primary/90 transition-colors"
-                                                            >
-                                                                <FolderOpen size={15} />
-                                                            </Link>
-                                                            <button
-                                                                onClick={() => {
-                                                                    setSelectedPdfNna({
-                                                                        id: nna.id,
-                                                                        name: `${nna.nombres} ${nna.apellidoPaterno} ${nna.apellidoMaterno}`,
-                                                                        codigoFicha03: nna.codigoFicha03
-                                                                    });
-                                                                    setIsPdfOpen(true);
-                                                                }}
-                                                                title="Ver Ficha PDF"
-                                                                className="p-1.5 bg-surface text-fg-muted border border-border rounded-md hover:text-primary hover:border-primary/30 hover:bg-primary-soft transition-colors"
-                                                            >
-                                                                <FileText size={15} />
-                                                            </button>
-                                                            {canEdit && (
-                                                                <Link
-                                                                    to={`/nna/editar/${nna.id}`}
-                                                                    title="Editar"
+                                                    {/* Col 7: Estado de la Ficha F03 */}
+                                                    <td className={clsx("px-4 py-3 border-r border-border", idx > 0 ? "border-t border-border" : "")}>
+                                                        {isPendiente ? (
+                                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200 uppercase tracking-wider w-fit">
+                                                                Pendiente
+                                                            </span>
+                                                        ) : nna.codigoFicha03 ? (
+                                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 uppercase tracking-wider w-fit">
+                                                                Registrado
+                                                            </span>
+                                                        ) : (
+                                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-800 border border-gray-200 uppercase tracking-wider w-fit">
+                                                                Borrador
+                                                            </span>
+                                                        )}
+                                                    </td>
+
+                                                    {/* Col 8: Acciones (with rowSpan, only on index 0) */}
+                                                    {idx === 0 && (
+                                                        <td className="px-4 py-3 text-right align-middle bg-surface-muted/30" rowSpan={group.length}>
+                                                            <div className="flex items-center justify-end gap-1.5 h-full">
+                                                                {isActivo && (
+                                                                    <Link
+                                                                        to={`/nna/expediente/${nna.carpeta?.id ?? nna.id}?nnaId=${nna.id}`}
+                                                                        title="Abrir Expediente"
+                                                                        className="p-1.5 bg-primary text-primary-fg rounded-md hover:bg-primary/90 transition-colors"
+                                                                    >
+                                                                        <FolderOpen size={15} />
+                                                                    </Link>
+                                                                )}
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setSelectedPdfNna({
+                                                                            id: nna.id,
+                                                                            name: `${nna.nombres} ${nna.apellidoPaterno} ${nna.apellidoMaterno}`,
+                                                                            codigoFicha03: nna.codigoFicha03
+                                                                        });
+                                                                        setIsPdfOpen(true);
+                                                                    }}
+                                                                    title="Ver Ficha PDF"
                                                                     className="p-1.5 bg-surface text-fg-muted border border-border rounded-md hover:text-primary hover:border-primary/30 hover:bg-primary-soft transition-colors"
                                                                 >
-                                                                    <Pencil size={15} />
-                                                                </Link>
-                                                            )}
-                                                            {canEdit && (
-                                                                <button
-                                                                    onClick={() => handleDerivar(nna)}
-                                                                    title="Derivar"
-                                                                    className="p-1.5 bg-surface text-fg-muted border border-border rounded-md hover:text-warning hover:border-warning/30 hover:bg-warning-soft transition-colors"
-                                                                >
-                                                                    <ArrowRightCircle size={15} />
+                                                                    <FileText size={15} />
                                                                 </button>
-                                                            )}
-                                                            <button className="p-1.5 bg-surface text-fg-muted border border-border rounded-md hover:bg-surface-muted transition-colors">
-                                                                <MoreHorizontal size={15} />
-                                                            </button>
-                                                        </div>
-                                                    </td>
-                                                )}
-                                            </tr>
-                                        ))}
+                                                                {canEdit && (isBorrador || isPendiente) && (
+                                                                    <Link
+                                                                        to={`/nna/editar/${nna.id}`}
+                                                                        title="Editar"
+                                                                        className="p-1.5 bg-surface text-fg-muted border border-border rounded-md hover:text-primary hover:border-primary/30 hover:bg-primary-soft transition-colors"
+                                                                    >
+                                                                        <Pencil size={15} />
+                                                                    </Link>
+                                                                )}
+                                                                {canEdit && isActivo && (
+                                                                    <button
+                                                                        onClick={() => handleDerivar(nna)}
+                                                                        title="Derivar"
+                                                                        className="p-1.5 bg-surface text-fg-muted border border-border rounded-md hover:text-warning hover:border-warning/30 hover:bg-warning-soft transition-colors"
+                                                                    >
+                                                                        <ArrowRightCircle size={15} />
+                                                                    </button>
+                                                                )}
+                                                                {canEdit && isPendiente && (
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setSelectedCompromisoNna(nna);
+                                                                            setIsCompromisoOpen(true);
+                                                                        }}
+                                                                        title="Compromiso del NNA y/o Apoderado"
+                                                                        className="p-1.5 bg-surface text-fg-muted border border-border rounded-md hover:text-primary hover:border-primary/30 hover:bg-primary-soft transition-colors text-primary"
+                                                                    >
+                                                                        <FileSignature size={15} />
+                                                                    </button>
+                                                                )}
+                                                                {isActivo && (
+                                                                    <button className="p-1.5 bg-surface text-fg-muted border border-border rounded-md hover:bg-surface-muted transition-colors">
+                                                                        <MoreHorizontal size={15} />
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                    )}
+                                                </tr>
+                                            );
+                                        })}
                                     </React.Fragment>
                                 ))
                             )}
@@ -385,6 +410,10 @@ export const NnaListPage = () => {
                         }, {})).map((group: any, groupIndex) => {
                             const representativeNna = group[0];
                             const folderCode = representativeNna.carpeta?.codigo || 'Sin Expediente';
+                            const activeCaseGroup = representativeNna.casos?.find((c: any) => c.estado !== 'CERRADO') || representativeNna.casos?.[0];
+                            const isBorradorGroup = activeCaseGroup?.estado === 'BORRADOR' || (!representativeNna.codigoFicha03 && activeCaseGroup?.estado !== 'PENDIENTE');
+                            const isPendienteGroup = activeCaseGroup?.estado === 'PENDIENTE';
+                            const isActivoGroup = !isBorradorGroup && !isPendienteGroup;
                             
                             return (
                                 <div key={groupIndex} className="bg-surface rounded-xl border border-border shadow-sm overflow-hidden divide-y divide-border/60">
@@ -397,12 +426,14 @@ export const NnaListPage = () => {
                                             </span>
                                         </div>
                                         <div className="flex gap-2">
-                                            <Link
-                                                to={`/nna/expediente/${representativeNna.carpeta?.id ?? representativeNna.id}?nnaId=${representativeNna.id}`}
-                                                className="px-2 py-1 bg-primary text-white text-[11px] font-bold rounded flex items-center gap-1 shadow-sm"
-                                            >
-                                                <FolderOpen size={12} /> Carpeta
-                                            </Link>
+                                            {isActivoGroup && (
+                                                <Link
+                                                    to={`/nna/expediente/${representativeNna.carpeta?.id ?? representativeNna.id}?nnaId=${representativeNna.id}`}
+                                                    className="px-2 py-1 bg-primary text-white text-[11px] font-bold rounded flex items-center gap-1 shadow-sm"
+                                                >
+                                                    <FolderOpen size={12} /> Carpeta
+                                                </Link>
+                                            )}
                                         </div>
                                     </div>
 
@@ -415,6 +446,10 @@ export const NnaListPage = () => {
                                                     ? `${nna.edad} ${nna.unidadEdad === 'MESES' ? 'meses' : nna.unidadEdad === 'DIAS' ? 'días' : 'años'}`
                                                     : '-';
                                             const gender = ['1', 'M'].includes(String(nna.sexo).trim().toUpperCase()) ? 'Hombre' : ['2', 'F'].includes(String(nna.sexo).trim().toUpperCase()) ? 'Mujer' : '-';
+                                            const activeCase = nna.casos?.find((c: any) => c.estado !== 'CERRADO') || nna.casos?.[0];
+                                            const isBorrador = activeCase?.estado === 'BORRADOR' || (!nna.codigoFicha03 && activeCase?.estado !== 'PENDIENTE');
+                                            const isPendiente = activeCase?.estado === 'PENDIENTE';
+                                            const isActivo = !isBorrador && !isPendiente;
                                             
                                             return (
                                                 <div key={nna.id} className="p-4 space-y-3.5 bg-surface">
@@ -434,12 +469,16 @@ export const NnaListPage = () => {
                                                             </div>
                                                         </div>
 
-                                                        {nna.codigoFicha03 ? (
+                                                        {isPendiente ? (
+                                                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-extrabold bg-amber-100 text-amber-800 border border-amber-200/50 uppercase tracking-wider shrink-0">
+                                                                Pendiente
+                                                            </span>
+                                                        ) : nna.codigoFicha03 ? (
                                                             <span className="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200/50 uppercase tracking-wider shrink-0">
                                                                 Registrado
                                                             </span>
                                                         ) : (
-                                                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-extrabold bg-amber-100 text-amber-800 border border-amber-200/50 uppercase tracking-wider shrink-0">
+                                                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-extrabold bg-gray-100 text-gray-800 border border-gray-200/50 uppercase tracking-wider shrink-0">
                                                                 Borrador
                                                             </span>
                                                         )}
@@ -480,7 +519,7 @@ export const NnaListPage = () => {
                                                         >
                                                             <FileText size={14} /> PDF
                                                         </button>
-                                                        {canEdit && (
+                                                        {canEdit && (isBorrador || isPendiente) && (
                                                             <Link
                                                                 to={`/nna/editar/${nna.id}`}
                                                                 className="flex-1 py-2 bg-surface text-fg-muted border border-border rounded-lg text-xs font-bold hover:text-primary hover:bg-primary-soft transition-colors flex items-center justify-center gap-1.5 shadow-sm"
@@ -488,7 +527,19 @@ export const NnaListPage = () => {
                                                                 <Pencil size={14} /> Editar
                                                             </Link>
                                                         )}
-                                                        {canEdit && (
+                                                        {canEdit && isPendiente && (
+                                                            <button
+                                                                onClick={() => {
+                                                                    setSelectedCompromisoNna(nna);
+                                                                    setIsCompromisoOpen(true);
+                                                                }}
+                                                                className="p-2 bg-surface text-fg-muted border border-border rounded-lg hover:text-primary hover:bg-primary-soft transition-colors flex items-center justify-center shadow-sm text-primary"
+                                                                title="Compromiso del NNA y/o Apoderado"
+                                                            >
+                                                                <FileSignature size={15} />
+                                                            </button>
+                                                        )}
+                                                        {canEdit && isActivo && (
                                                             <button
                                                                 onClick={() => handleDerivar(nna)}
                                                                 className="p-2 bg-surface text-fg-muted border border-border rounded-lg hover:text-warning hover:bg-warning-soft transition-colors flex items-center justify-center shadow-sm"
@@ -531,6 +582,16 @@ export const NnaListPage = () => {
                     codigoFicha03={selectedPdfNna.codigoFicha03}
                 />
             )}
+
+            <CompromisoModal
+                isOpen={isCompromisoOpen}
+                onClose={() => {
+                    setIsCompromisoOpen(false);
+                    setSelectedCompromisoNna(null);
+                    fetchAllNnas();
+                }}
+                nna={selectedCompromisoNna}
+            />
         </div>
     );
 };

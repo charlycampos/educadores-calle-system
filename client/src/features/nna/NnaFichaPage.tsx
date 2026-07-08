@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { toast } from '../../components/ui/Toast';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { useNnaStore } from '../../store/nna.store';
 import { Printer, ArrowLeft, Send } from 'lucide-react';
 import { Formato3Print } from './components/Formato3Print';
@@ -12,14 +12,19 @@ interface NnaFichaPageProps {
 
 export const NnaFichaPage = ({ embed = false }: NnaFichaPageProps) => {
     const { id } = useParams();
+    const [searchParams] = useSearchParams();
     const { selectedExpediente, isLoading, fetchExpediente } = useNnaStore();
     const [isDerivacionOpen, setIsDerivacionOpen] = useState(false);
 
     useEffect(() => {
-        if (id && (!selectedExpediente || selectedExpediente.length === 0)) {
-            fetchExpediente(Number(id));
+        // Usar el ID de NNA real (nnaId), NO el de carpeta del path: el endpoint
+        // del backend espera un ID de NNA y, si recibe un ID de carpeta que coincide
+        // con otro NNA, devuelve el expediente equivocado (colisión de IDs).
+        const fetchId = searchParams.get('nnaId') || id;
+        if (fetchId) {
+            fetchExpediente(Number(fetchId));
         }
-    }, [id, fetchExpediente, selectedExpediente]);
+    }, [id, searchParams, fetchExpediente]);
 
     if (isLoading) {
         return (
@@ -40,15 +45,16 @@ export const NnaFichaPage = ({ embed = false }: NnaFichaPageProps) => {
         );
     }
 
-    const mainNna = selectedExpediente[0];
+    // Seleccionar el NNA indicado por ?nnaId=, no siempre el [0] de la carpeta.
+    // Una carpeta puede contener varios NNA; sin esto siempre se mostraba el de menor ID.
+    const nnaIdParam = searchParams.get('nnaId');
+    const mainNna = nnaIdParam
+        ? (selectedExpediente.find((n: any) => n.id === Number(nnaIdParam)) ?? selectedExpediente[0])
+        : selectedExpediente[0];
     const carpetaCode = mainNna.carpeta?.codigo || '---';
     const activeCase = mainNna.casos?.find((c: any) => c.estado !== 'CERRADO');
 
     const handleDerivar = () => {
-        if (!activeCase) {
-            toast.info('No hay un caso activo para derivar.');
-            return;
-        }
         setIsDerivacionOpen(true);
     };
 
@@ -65,14 +71,12 @@ export const NnaFichaPage = ({ embed = false }: NnaFichaPageProps) => {
                         <ArrowLeft size={16} /> Cerrar / Volver
                     </Link>
                     <div className="flex gap-2">
-                        {activeCase && (
-                            <button
-                                onClick={handleDerivar}
-                                className="flex items-center gap-1.5 bg-warning text-white px-4 py-2 rounded-[6px] text-[13px] font-medium hover:opacity-90 transition-opacity"
-                            >
-                                <Send size={15} /> Derivar Caso
-                            </button>
-                        )}
+                        <button
+                            onClick={handleDerivar}
+                            className="flex items-center gap-1.5 bg-warning text-white px-4 py-2 rounded-[6px] text-[13px] font-medium hover:opacity-90 transition-opacity"
+                        >
+                            <Send size={15} /> Derivar Caso
+                        </button>
                         <button
                             onClick={() => window.print()}
                             className="flex items-center gap-1.5 bg-primary text-primary-fg px-4 py-2 rounded-[6px] text-[13px] font-medium hover:bg-primary/90 transition-colors"
@@ -125,9 +129,11 @@ export const NnaFichaPage = ({ embed = false }: NnaFichaPageProps) => {
                             <p className="text-[12px] text-fg-2 mt-0.5">Ubicación, perfil identificado y marco temporal del caso.</p>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-4 mb-5 text-[13px]">
-                            <Field label="Distrito de Intervención" value={activeCase?.zonaIntervencion || '---'} />
-                            <Field label="Provincia / Región" value={`${mainNna.provinciaDom || '---'} / ${mainNna.departamentoDom || '---'}`} />
+                        <div className="grid grid-cols-4 gap-4 mb-5 text-[13px]">
+                            <Field label="Región (Intervención)" value={activeCase?.departamentoIntervencion || '---'} />
+                            <Field label="Provincia (Intervención)" value={activeCase?.provinciaIntervencion || '---'} />
+                            <Field label="Distrito (Intervención)" value={activeCase?.distritoIntervencion || '---'} />
+                            <Field label="Zona Específica" value={activeCase?.zonaIntervencion || '---'} />
                             <Field label="Modalidad de Permanencia" value={activeCase?.situacionCalle?.replace(/_/g, ' ') || '---'} />
                         </div>
 
@@ -194,7 +200,7 @@ export const NnaFichaPage = ({ embed = false }: NnaFichaPageProps) => {
                                 </div>
                                 <div>
                                     <h3 className="font-bold text-[15px] text-fg uppercase tracking-tight">
-                                        {nna.apellidoPaterno} {nna.apellidoMaterno}, {nna.nombres}
+                                        {nna.nombres} {nna.apellidoPaterno} {nna.apellidoMaterno}
                                     </h3>
                                     <span className="text-[11px] font-medium text-fg-muted uppercase">
                                         {index === 0 ? 'Beneficiario Principal' : 'Hermano / Grupo Familiar'}
@@ -222,7 +228,7 @@ export const NnaFichaPage = ({ embed = false }: NnaFichaPageProps) => {
 
                                 {/* III. Datos Perfil */}
                                 <section>
-                                    <SectionHeader label="III. Datos Según Perfil (Entrevista)" />
+                                    <SectionHeader label="III. Datos Según Perfil de la Niña, Niño y Adolescente (entrevista)" />
                                     <div className="bg-surface-muted border border-border rounded-[6px] p-4 grid grid-cols-3 gap-4 text-[13px]">
                                         <div className="col-span-3 md:col-span-1">
                                             <Field label="Actividad Realizada" value={activeCase?.actividadRealizada || '---'} />
@@ -328,15 +334,13 @@ export const NnaFichaPage = ({ embed = false }: NnaFichaPageProps) => {
             </div>
 
             {/* Modal Derivación */}
-            {activeCase && (
-                <DerivacionModal
-                    isOpen={isDerivacionOpen}
-                    onClose={() => { setIsDerivacionOpen(false); if (id) fetchExpediente(Number(id)); }}
-                    nnaId={mainNna.id}
-                    casoId={activeCase.id}
-                    nnaName={`${mainNna.nombres} ${mainNna.apellidoPaterno} ${mainNna.apellidoMaterno}`}
-                />
-            )}
+            <DerivacionModal
+                isOpen={isDerivacionOpen}
+                onClose={() => { setIsDerivacionOpen(false); const fid = searchParams.get('nnaId') || id; if (fid) fetchExpediente(Number(fid)); }}
+                nnaId={mainNna.id}
+                casoId={activeCase?.id || 0}
+                nnaName={`${mainNna.nombres} ${mainNna.apellidoPaterno} ${mainNna.apellidoMaterno}`}
+            />
         </div>
     );
 };

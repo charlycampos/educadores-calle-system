@@ -15,6 +15,8 @@ import {
     ArrowLeftRight,
     BarChart3,
     Siren,
+    BookOpen,
+    Calendar,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import clsx from 'clsx';
@@ -99,6 +101,8 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
                 }
             }
             if (user.rol === ROLES.EDUCADOR) {
+                items.push({ label: 'Mis Diarios', icon: BookOpen, path: '/educador/diarios' });
+                items.push({ label: 'Calendario', icon: Calendar, path: '/educador/calendario' });
                 items.push({ label: 'Talleres', icon: Presentation, path: '/talleres' });
             }
         }

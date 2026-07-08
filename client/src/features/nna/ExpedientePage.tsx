@@ -70,10 +70,14 @@ export const ExpedientePage = () => {
     const [isExpedienteModalOpen, setIsExpedienteModalOpen] = useState(false);
 
     useEffect(() => {
-        if (id) {
-            fetchExpediente(Number(id));
+        // Usar el ID de NNA real (nnaId), NO el de carpeta del path: el endpoint
+        // del backend espera un ID de NNA y, si recibe un ID de carpeta que coincide
+        // con otro NNA, devuelve el expediente equivocado (colisión de IDs).
+        const fetchId = searchParams.get('nnaId') || id;
+        if (fetchId) {
+            fetchExpediente(Number(fetchId));
         }
-    }, [id, fetchExpediente]);
+    }, [id, searchParams, fetchExpediente]);
 
 
     // Fetch diagnóstico para edición — usar el NNA seleccionado, no siempre el [0]
@@ -88,7 +92,11 @@ export const ExpedientePage = () => {
     }, [selectedExpediente, searchParams]);
 
     useEffect(() => {
-        if (currentDiagnosticoId) {
+        // Depende también de showDiagnosticoForm: al reabrir el MISMO registro
+        // (id sin cambiar) hay que volver a consultar la BD. Antes se reutilizaba
+        // la copia vieja en memoria y los cambios recién guardados no aparecían
+        // al editar (y se podían sobreescribir con datos viejos al guardar).
+        if (currentDiagnosticoId && showDiagnosticoForm) {
             const token = getToken();
             fetch(`${INTERVENCION_API_URL}/diagnostico/${currentDiagnosticoId}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
@@ -96,10 +104,10 @@ export const ExpedientePage = () => {
                 .then(res => res.json())
                 .then(data => setCurrentDiagnosticoData(data))
                 .catch(err => console.error('Error cargando diagnóstico:', err));
-        } else {
+        } else if (!currentDiagnosticoId) {
             setCurrentDiagnosticoData(null);
         }
-    }, [currentDiagnosticoId]);
+    }, [currentDiagnosticoId, showDiagnosticoForm]);
 
     useEffect(() => {
         if (currentLogrosId) {
@@ -474,10 +482,6 @@ export const ExpedientePage = () => {
 
                     {/* FASE 1: CONTACTO E INTEGRACIÓN */}
                     <div>
-                        <div className="px-4 mb-3">
-                            <span className="inline-block px-2 py-0.5 rounded text-[10px] font-black bg-primary-soft text-primary uppercase tracking-wider mb-1">Fase 1</span>
-                            <p className="text-[12px] font-bold text-fg">Contacto e Integración</p>
-                        </div>
                         <NavButton
                             active={activeTab === 'social'}
                             onClick={() => setActiveTab('social')}
@@ -497,16 +501,11 @@ export const ExpedientePage = () => {
                             onClick={() => setActiveTab('informe')}
                             icon={FileSignature}
                             label="Informe Situacional"
-                            subLabel="Cierre Fase 1"
                         />
                     </div>
 
                     {/* FASE 2: DESARROLLO E INTERVENCIÓN */}
                     <div>
-                        <div className="px-4 mb-3">
-                            <span className="inline-block px-2 py-0.5 rounded text-[10px] font-black bg-info-soft text-info uppercase tracking-wider mb-1">Fase 2</span>
-                            <p className="text-[12px] font-bold text-fg">Desarrollo e Intervención</p>
-                        </div>
                         <NavButton
                             active={activeTab === 'pti'}
                             onClick={() => setActiveTab('pti')}
@@ -527,10 +526,6 @@ export const ExpedientePage = () => {
 
                     {/* FASE 3: SEGUIMIENTO Y EGRESO */}
                     <div>
-                        <div className="px-4 mb-3">
-                            <span className="inline-block px-2 py-0.5 rounded text-[10px] font-black bg-success-soft text-success uppercase tracking-wider mb-1">Fase 3</span>
-                            <p className="text-[12px] font-bold text-fg">Seguimiento y Egreso</p>
-                        </div>
                         <NavButton
                             active={activeTab === 'seguimiento_familiar'}
                             onClick={() => setActiveTab('seguimiento_familiar')}
