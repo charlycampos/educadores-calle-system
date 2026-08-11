@@ -1,4 +1,22 @@
 import { NNA_API_URL, DERIVACION_API_URL, EXPEDIENTE_API_URL, INTERVENCION_API_URL } from '../config/api';
+
+/**
+ * Los folios que crea el propio expediente-service guardan su ruta interna
+ * ("/api/informe-situacional/caso/12/pdf"), sin el prefijo por el que el
+ * navegador llega al servicio. El visor pedia esa ruta tal cual y recibia 404:
+ * el folio existia y el PDF se generaba, pero el enlace apuntaba a otro lado.
+ *
+ * Los folios que crea el cliente ya vienen con la ruta completa, asi que se
+ * dejan intactos. Normalizar aca --y no en la base-- arregla de una vez los
+ * folios que ya quedaron guardados mal.
+ */
+const normalizarUrlFolio = (url?: string): string => {
+    if (!url) return '';
+    if (/^https?:\/\//.test(url)) return url;
+    if (url.startsWith(EXPEDIENTE_API_URL) || url.startsWith(INTERVENCION_API_URL)) return url;
+    if (url.startsWith('/api/')) return `${EXPEDIENTE_API_URL}${url.slice(4)}`;
+    return url;
+};
 import { create } from 'zustand';
 import { useAuthStore } from './auth.store';
 
@@ -116,13 +134,13 @@ interface NnaState {
     getNextCarpetaCode: () => Promise<string>;
     createDerivacion: (data: any) => Promise<void>;
     saveFamiliares: (carpetaId: number, familiares: any[]) => Promise<void>;
-    checkNnaDuplicates: (params: { nombres?: string, apellidoPaterno?: string, apellidoMaterno?: string, numeroDoc?: string }) => Promise<any>;
+    checkNnaDuplicates: (params: { nombres?: string, apellidoPaterno?: string, apellidoMaterno?: string, numeroDoc?: string, fechaNacimiento?: string, excluirId?: number }) => Promise<any>;
 
     // Expediente Digital
     documents: any[];
     loadDocuments: (nnaId: number, nnaData: any) => Promise<void>;
     registerDocument: (doc: any) => void;
-    uploadPhysicalDocument: (nnaId: number, file: File, docType: string) => Promise<any>;
+    uploadPhysicalDocument: (nnaId: number, file: File, docType: string, casoId?: number) => Promise<any>;
     fetchNnaPdfBlob: (nnaId: number) => Promise<Blob>;
 }
 
@@ -172,6 +190,10 @@ export const useNnaStore = create<NnaState>((set, get) => ({
             if (params.apellidoPaterno) queryParams.append('apellido_paterno', params.apellidoPaterno);
             if (params.apellidoMaterno) queryParams.append('apellido_materno', params.apellidoMaterno);
             if (params.numeroDoc) queryParams.append('numero_doc', params.numeroDoc);
+            // La fecha de nacimiento sube el puntaje; excluirId evita que un NNA
+            // se detecte a sí mismo cuando se edita su ficha.
+            if (params.fechaNacimiento) queryParams.append('fecha_nacimiento', params.fechaNacimiento);
+            if (params.excluirId) queryParams.append('excluir_id', String(params.excluirId));
 
             const response = await fetch(`${NNA_API_URL}/nna/buscar-duplicados?${queryParams.toString()}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
@@ -467,9 +489,13 @@ export const useNnaStore = create<NnaState>((set, get) => ({
                         const isDiarioCampo = f.tipo_documento === 'DIARIO_CAMPO';
                         const usePdfUrl  = isF05Full || isF05Fase || isInformeSituacional || isSeguimientoF12 || isDiarioCampo;
 
-                        const resolvedArchivoUrl = f.archivo_url;
+                        const resolvedArchivoUrl = normalizarUrlFolio(f.archivo_url);
 
-                        let pages = 1;
+                        // El foliado del expediente acumula páginas, así que este
+                        // número decide el rango de todos los documentos siguientes.
+                        // Los subidos ya lo traen persistido (contado con pypdf);
+                        // los generados al vuelo se consultan al servicio.
+                        let pages = f.paginas || 1;
                         if (isF05Fase || isDiarioCampo) {
                             try {
                                 const pagesResp = await fetch(`${resolvedArchivoUrl}/pages`, {
@@ -545,8 +571,18 @@ export const useNnaStore = create<NnaState>((set, get) => ({
         localStorage.setItem(`expediente_docs_${nnaId}`, JSON.stringify([...storedDocs, newDoc]));
     },
 
-    uploadPhysicalDocument: async (nnaId: number, file: File, docType: string) => {
+    uploadPhysicalDocument: async (nnaId: number, file: File, docType: string, casoId?: number) => {
         const token = useAuthStore.getState().token;
+        const selectedNna = get().selectedNna || get().selectedExpediente?.find((n: any) => n.id === nnaId);
+        const activeCase = selectedNna?.casos?.find((c: any) => c.estado !== 'CERRADO') || selectedNna?.casos?.[0];
+        const resolvedCasoId = casoId ?? activeCase?.id;
+        const esCompromiso = docType.toUpperCase().includes('COMPROMISO');
+
+        // Un compromiso sin caso no puede formalizar la inscripción ni foliarse.
+        if (esCompromiso && !resolvedCasoId) {
+            throw new Error('No se encontró el caso asociado al NNA para registrar el compromiso.');
+        }
+
         const formData = new FormData();
         formData.append('file', file);
 
@@ -565,13 +601,10 @@ export const useNnaStore = create<NnaState>((set, get) => ({
 
         const metadata = await response.json(); // {filename, original_name, pages, path}
 
-        // Registrar el Folio en la base de datos si hay un caso activo
-        const selectedNna = get().selectedNna || get().selectedExpediente?.find((n: any) => n.id === nnaId);
-        const activeCase = selectedNna?.casos?.find((c: any) => c.estado !== 'CERRADO') || selectedNna?.casos?.[0];
-        
-        if (activeCase) {
-            try {
-                const folioResponse = await fetch(`${EXPEDIENTE_API_URL}/expediente/caso/${activeCase.id}/folio`, {
+        // Registrar el folio en Oracle. Para el compromiso, este paso también
+        // asigna el F03 y cambia PENDIENTE -> EN_EVALUACION.
+        if (resolvedCasoId) {
+            const folioResponse = await fetch(`${EXPEDIENTE_API_URL}/expediente/caso/${resolvedCasoId}/folio`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -581,16 +614,18 @@ export const useNnaStore = create<NnaState>((set, get) => ({
                         tipo_documento: docType.substring(0, 30).toUpperCase(),
                         titulo: file.name,
                         archivo_url: `${EXPEDIENTE_API_URL}/expediente/documento/${metadata.filename}`,
-                        contenido_hash: metadata.filename.substring(0, 20)
+                        contenido_hash: metadata.filename.substring(0, 20),
+                        // Hojas reales contadas por pypdf, no las que escriba el
+                        // usuario: de esto depende el foliado de todo el expediente.
+                        paginas: metadata.pages || 1
                     })
                 });
-                if (folioResponse.ok) {
-                    const savedFolio = await folioResponse.json();
-                    console.log("Folio successfully persisted in DB:", savedFolio);
-                }
-            } catch (err) {
-                console.error("Error persisting folio in DB:", err);
+            if (!folioResponse.ok) {
+                const folioError = await folioResponse.json().catch(() => ({}));
+                throw new Error(folioError.detail || 'El archivo se cargó, pero no pudo registrarse en el expediente.');
             }
+            const savedFolio = await folioResponse.json();
+            console.log("Folio successfully persisted in DB:", savedFolio);
         }
 
         // Registrar el documento recién creado en el store local para mantener persistencia visual inmediata

@@ -45,6 +45,46 @@ const GRADOS_ESTUDIO_DEFAULT = [
     { value: '99', label: '99: No aplica / No sabe' }
 ];
 
+/**
+ * La primera infancia comprende hasta el día anterior a cumplir 3 años.
+ * Se usa la fecha de nacimiento como fuente para evitar errores con edades
+ * expresadas en meses o días.
+ */
+const esMenorDeTresAnios = (
+    fechaNacimiento: string,
+    edad: unknown,
+    unidadEdad: string
+): boolean => {
+    // La fecha es la fuente más precisa cuando está disponible.
+    if (fechaNacimiento) {
+        const fechaNac = new Date(`${fechaNacimiento}T00:00:00`);
+        if (!Number.isNaN(fechaNac.getTime())) {
+            const hoy = new Date();
+            hoy.setHours(0, 0, 0, 0);
+            if (fechaNac > hoy) return false;
+
+            const tercerCumpleanios = new Date(fechaNac);
+            tercerCumpleanios.setFullYear(tercerCumpleanios.getFullYear() + 3);
+            return hoy < tercerCumpleanios;
+        }
+    }
+
+    // La ficha también admite una edad estimada cuando no se conoce la fecha.
+    if (edad === '' || edad === null || edad === undefined) return false;
+    const edadNumerica = Number(edad);
+    if (!Number.isFinite(edadNumerica) || edadNumerica < 0) return false;
+
+    switch (unidadEdad) {
+        case 'MESES':
+            return edadNumerica < 36;
+        case 'DIAS':
+            return edadNumerica < 1095;
+        case 'ANIOS':
+        default:
+            return edadNumerica < 3;
+    }
+};
+
 interface NnaEducacionCardProps {
     index: number;
     nombre: string;
@@ -55,8 +95,42 @@ const NnaEducacionCard: React.FC<NnaEducacionCardProps> = ({ index, nombre }) =>
     const { parametros } = useNnaStore();
 
     const estudiaActualmente = String(watch(`nnas.${index}.estudiaActualmente`));
+    const fechaNacimiento = String(watch(`nnas.${index}.fechaNacimiento`) || '');
+    const edad = watch(`nnas.${index}.edad`);
+    const unidadEdad = String(watch(`nnas.${index}.unidadEdad`) || 'ANIOS');
+    const noAplicaAutomatico = Boolean(watch(`nnas.${index}.noAplicaEducacionAutomatico`));
     const nivelActual = String(watch(`nnas.${index}.nivelEducativo`) || '');
     const gradoActual = String(watch(`nnas.${index}.gradoEstudio`) || '');
+    const esPrimeraInfancia = esMenorDeTresAnios(fechaNacimiento, edad, unidadEdad);
+
+    useEffect(() => {
+        if (esPrimeraInfancia) {
+            if (!noAplicaAutomatico) {
+                setValue(`nnas.${index}.noAplicaEducacionAutomatico`, true);
+            }
+
+            if (estudiaActualmente !== 'NO_APLICA') {
+                setValue(`nnas.${index}.estudiaActualmente`, 'NO_APLICA', { shouldDirty: true });
+            }
+
+            // Evita conservar y guardar información educativa incompatible oculta.
+            setValue(`nnas.${index}.nivelEducativo`, '');
+            setValue(`nnas.${index}.gradoEstudio`, '');
+            setValue(`nnas.${index}.institucionEducativa`, '');
+            setValue(`nnas.${index}.modalidadEstudio`, '');
+            setValue(`nnas.${index}.detalleNoEstudia`, '');
+            return;
+        }
+
+        // La marca vive en el formulario para sobrevivir al uso de Atrás/Siguiente.
+        // Así solo se retira un "No aplica" que haya sido colocado por esta regla.
+        if (noAplicaAutomatico) {
+            if (estudiaActualmente === 'NO_APLICA') {
+                setValue(`nnas.${index}.estudiaActualmente`, '', { shouldDirty: true });
+            }
+            setValue(`nnas.${index}.noAplicaEducacionAutomatico`, false);
+        }
+    }, [esPrimeraInfancia, estudiaActualmente, index, noAplicaAutomatico, setValue]);
 
     const gradosEstudio = parametros?.GRADOS_ESTUDIO_2026 || GRADOS_ESTUDIO_DEFAULT;
     const codigosValidos = NIVEL_A_GRADOS[nivelActual];
@@ -90,6 +164,11 @@ const NnaEducacionCard: React.FC<NnaEducacionCardProps> = ({ index, nombre }) =>
                     <SelectField
                         label="¿Estudia Actualmente? / Situación de Matrícula"
                         register={register(`nnas.${index}.estudiaActualmente` as const)}
+                        aria-disabled={esPrimeraInfancia}
+                        tabIndex={esPrimeraInfancia ? -1 : undefined}
+                        onMouseDown={esPrimeraInfancia ? (event) => event.preventDefault() : undefined}
+                        onKeyDown={esPrimeraInfancia ? (event) => event.preventDefault() : undefined}
+                        style={esPrimeraInfancia ? { pointerEvents: 'none', opacity: 0.65 } : undefined}
                         options={parametros?.OPCIONES_MATRICULA_2026 || [
                             { value: 'SI', label: '1. Sí (cuenta con ficha de matrícula)' },
                             { value: 'NO', label: '2. No (no se encuentra matriculado)' },
@@ -97,6 +176,11 @@ const NnaEducacionCard: React.FC<NnaEducacionCardProps> = ({ index, nombre }) =>
                             { value: 'NO_APLICA', label: '99. No aplica (menores de 3 años o egresados de secundaria)' }
                         ]}
                     />
+                    {esPrimeraInfancia && (
+                        <p className="md:col-span-2 -mt-2 text-xs text-blue-700 bg-blue-50 border border-blue-100 rounded-md px-3 py-2" role="status">
+                            No aplica: seleccionado automáticamente porque el NNA es menor de 3 años.
+                        </p>
+                    )}
                 </div>
 
                 {['SI', 'PROCESO'].includes(estudiaActualmente) && (

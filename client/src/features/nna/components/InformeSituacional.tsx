@@ -2,44 +2,121 @@ import { getToken } from '../../../utils/auth';
 import { confirmar } from '../../../components/ui/ConfirmDialog';
 import { toast } from '../../../components/ui/Toast';
 import { useState, useEffect } from 'react';
-import { Printer, Save, CheckCircle2 as CheckIcon, ClipboardList, MapPin, Users, CheckCircle2, FileSignature, PenLine } from 'lucide-react';
+import {
+    Save, CheckCircle2 as CheckIcon, ClipboardList, MapPin, Users,
+    FileSignature, PenLine, AlertTriangle, Target, Lock,
+} from 'lucide-react';
 import { EXPEDIENTE_API_URL } from '../../../config/api';
 import { formatTipoDoc } from '../../../data/ubigeo';
 import { useNnaStore } from '../../../store/nna.store';
+import { SEXO_MAP, gradoInstruccion, lugarNacimiento } from '../../../data/catalogos-sec';
 
-const formatSexo = (sexo: any): string => {
-    if (!sexo) return '---';
-    const s = String(sexo).trim();
-    if (s.startsWith('1')) return 'Masculino';
-    if (s.startsWith('2')) return 'Femenino';
-    return s;
-};
+/**
+ * Informe Situacional — estructura del modelo oficial que usan los educadores
+ * (informe de los hermanos Ruiz Culqui, 8 secciones en números romanos).
+ *
+ * Dos cosas lo diferencian del resto de fichas:
+ *
+ * 1. **Cubre a varios NNA.** "Cuando son hermanos, se hace un solo informe de
+ *    todos los hermanos" (Luis). Los expedientes siguen siendo individuales;
+ *    lo compartido es este documento. La selección la hace el educador, porque
+ *    si los hermanos se inscribieron en momentos distintos el informe va
+ *    separado (Mari).
+ *
+ * 2. **La sección I no se escribe.** Sale de los mismos datos que alimentan el
+ *    Resumen del Caso. En el modelo la educadora reescribe a mano el nombre y
+ *    la edad de los cinco hermanos en seis párrafos distintos, con el riesgo
+ *    de que una edad quede vieja.
+ */
+
+const MESES_FASE: Record<number, number> = { 1: 3, 2: 15, 3: 6 };
 
 interface InformeSituacionalProps {
     nna: any;
     caso: any;
+    /** Todos los NNA de la carpeta. Es la misma lista que usa el Resumen del Caso. */
+    familia?: any[];
     onClose: () => void;
 }
 
-export const InformeSituacional = ({ nna, caso, onClose }: InformeSituacionalProps) => {
+const edadDe = (nna: any): string => {
+    if (!nna?.fechaNacimiento) return '---';
+    const hoy = new Date();
+    const nac = new Date(nna.fechaNacimiento);
+    let anios = hoy.getFullYear() - nac.getFullYear();
+    if (hoy.getMonth() < nac.getMonth() || (hoy.getMonth() === nac.getMonth() && hoy.getDate() < nac.getDate())) {
+        anios--;
+    }
+    return `${anios} años`;
+};
+
+const fechaLarga = (iso: any): string => {
+    if (!iso) return '---';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '---';
+    return d.toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric' });
+};
+
+/** "los hermanos Kiara (16), Carlos (14) y Liam (3) Ruiz Culqui" */
+const frasehermanos = (seleccionados: any[]): string => {
+    if (!seleccionados.length) return '';
+    const nombres = seleccionados.map(n => `${n.nombres} (${(edadDe(n).split(' ')[0])})`);
+    const apellidos = `${seleccionados[0].apellidoPaterno} ${seleccionados[0].apellidoMaterno || ''}`.trim();
+    if (nombres.length === 1) return `${nombres[0]} ${apellidos}`;
+    const ultimo = nombres.pop();
+    return `los hermanos ${nombres.join(', ')} y ${ultimo} ${apellidos}`;
+};
+
+const Seccion = ({ icon: Icon, titulo, ayuda, children }: any) => (
+    <div className="bg-surface border border-border rounded-[8px] overflow-hidden">
+        <div className="px-4 py-3 border-b border-border bg-surface-muted flex items-center gap-2">
+            <Icon size={14} className="text-fg-muted" />
+            <span className="text-[11px] font-bold uppercase tracking-widest text-fg-muted">{titulo}</span>
+        </div>
+        <div className="p-4">
+            {ayuda && <p className="text-[11px] text-fg-muted italic mb-2">{ayuda}</p>}
+            {children}
+        </div>
+    </div>
+);
+
+const Campo = ({ label, valor }: { label: string; valor: any }) => (
+    <div>
+        <label className="text-[11px] font-medium text-fg-muted block mb-1">{label}</label>
+        <div className="text-[13px] font-semibold text-fg px-3 py-2 bg-surface-muted border border-border rounded-[6px]">
+            {valor || '---'}
+        </div>
+    </div>
+);
+
+export const InformeSituacional = ({ nna, caso, familia, onClose }: InformeSituacionalProps) => {
     const [isSaving, setIsSaving] = useState(false);
     const [isFinalizing, setIsFinalizing] = useState(false);
     const [estadoActual, setEstadoActual] = useState<string>('BORRADOR');
     const [codigoInforme, setCodigoInforme] = useState<string>('');
- 
+    const [informeId, setInformeId] = useState<number | null>(null);
+
+    // Candidatos: todos los NNA de la carpeta. Si no llega la lista, al menos
+    // el NNA en curso, para que el informe nunca quede sin nadie.
+    const candidatos: any[] = (familia && familia.length ? familia : [nna]).filter(Boolean);
+    const [nnaIds, setNnaIds] = useState<number[]>([nna.id]);
+    const seleccionados = candidatos.filter(c => nnaIds.includes(c.id));
+
     const [formData, setFormData] = useState({
         fechaInforme:       new Date().toISOString().split('T')[0],
         destinatario:       'COORDINACIÓN DEL SERVICIO DE EDUCADORES DE CALLE',
         asunto:             `INFORME SITUACIONAL DEL NNA ${nna.nombres} ${nna.apellidoPaterno}`.toUpperCase(),
         antecedentes:       '',
-        estrategias:        '',
-        situacionSalud:     '',
-        situacionEducacion: '',
-        situacionFamiliar:  '',
-        conclusiones:       '',
-        recomendaciones:    '',
+        estrategias:        '',   // III. Acciones realizadas
+        situacionFamiliar:  '',   // IV
+        indicadores:        '',   // V
+        piiFase1:           '',   // VI
+        piiFase2:           '',
+        piiFase3:           '',
+        conclusiones:       '',   // VII. Apreciación profesional
+        recomendaciones:    '',   // VIII
     });
- 
+
     useEffect(() => {
         if (!caso?.id) return;
         const token = getToken();
@@ -54,41 +131,63 @@ export const InformeSituacional = ({ nna, caso, onClose }: InformeSituacionalPro
             if (!data) return;
             setEstadoActual(data.estado || 'BORRADOR');
             setCodigoInforme(data.codigo_informe || '');
+            setInformeId(data.id ?? null);
+            if (Array.isArray(data.nna_ids) && data.nna_ids.length) setNnaIds(data.nna_ids);
             setFormData({
                 fechaInforme: data.fecha_informe || new Date().toISOString().split('T')[0],
                 destinatario: data.destinatario || 'COORDINACIÓN DEL SERVICIO DE EDUCADORES DE CALLE',
                 asunto: data.asunto || `INFORME SITUACIONAL DEL NNA ${nna.nombres} ${nna.apellidoPaterno}`.toUpperCase(),
                 antecedentes: data.antecedentes || '',
                 estrategias: data.estrategias || '',
-                situacionSalud: data.situacion_salud || '',
-                situacionEducacion: data.situacion_educativa || '',
-                situacionFamiliar: data.situacion_familiar || '',
+                // Los informes anteriores partían la situación en tres campos.
+                // Al abrirlos se juntan en el texto único que pide el modelo.
+                situacionFamiliar: [data.situacion_familiar, data.situacion_salud, data.situacion_educativa]
+                    .filter(Boolean).join('\n\n'),
+                indicadores: data.indicadores_vulnerab || '',
+                piiFase1: data.pii_fase1 || '',
+                piiFase2: data.pii_fase2 || '',
+                piiFase3: data.pii_fase3 || '',
                 conclusiones: data.conclusiones || '',
                 recomendaciones: data.recomendaciones || '',
             });
         })
-        .catch(err => {
-            console.log(err.message);
-        });
+        .catch(err => console.log(err.message));
     }, [caso?.id, nna]);
- 
+
+    const bloqueado = estadoActual === 'FINALIZADO';
+
     const up = (key: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
         setFormData(prev => ({ ...prev, [key]: e.target.value }));
- 
+
+    const toggleNna = (id: number) => {
+        if (bloqueado) return;
+        setNnaIds(prev => {
+            if (prev.includes(id)) {
+                // El informe no puede quedarse sin nadie.
+                return prev.length === 1 ? prev : prev.filter(x => x !== id);
+            }
+            return [...prev, id];
+        });
+    };
+
     const buildBody = (estado: string) => ({
+        id: informeId,
         fecha_informe: formData.fechaInforme,
         destinatario: formData.destinatario,
         asunto: formData.asunto,
         antecedentes: formData.antecedentes,
         estrategias: formData.estrategias,
-        situacion_salud: formData.situacionSalud,
-        situacion_educativa: formData.situacionEducacion,
         situacion_familiar: formData.situacionFamiliar,
+        indicadores_vulnerab: formData.indicadores,
+        pii_fase1: formData.piiFase1,
+        pii_fase2: formData.piiFase2,
+        pii_fase3: formData.piiFase3,
         conclusiones: formData.conclusiones,
         recomendaciones: formData.recomendaciones,
+        nna_ids: nnaIds,
         estado,
     });
- 
+
     const saveToApi = async (estado: string) => {
         const token = getToken();
         const res = await fetch(`${EXPEDIENTE_API_URL}/informe-situacional/caso/${caso.id}`, {
@@ -99,16 +198,19 @@ export const InformeSituacional = ({ nna, caso, onClose }: InformeSituacionalPro
         if (!res.ok) throw new Error('Error al guardar el informe');
         return res.json();
     };
- 
+
+    const aplicarRespuesta = (data: any) => {
+        if (!data) return;
+        if (data.codigo_informe) setCodigoInforme(data.codigo_informe);
+        if (data.id) setInformeId(data.id);
+    };
+
     const handleSaveBorrador = async () => {
         if (!caso?.id) { toast.error('No existe un caso activo para este NNA'); return; }
         setIsSaving(true);
         try {
-            const data = await saveToApi('BORRADOR');
+            aplicarRespuesta(await saveToApi('BORRADOR'));
             setEstadoActual('BORRADOR');
-            if (data && data.codigo_informe) {
-                setCodigoInforme(data.codigo_informe);
-            }
             toast.success('Borrador guardado correctamente');
         } catch (e) {
             console.error(e);
@@ -117,21 +219,20 @@ export const InformeSituacional = ({ nna, caso, onClose }: InformeSituacionalPro
             setIsSaving(false);
         }
     };
- 
+
     const handleFinalizar = async () => {
         if (!caso?.id) { toast.error('No existe un caso activo para este NNA'); return; }
-        if (!(await confirmar('El informe se registrará en el Expediente Digital y no podrá editarse.', { titulo: 'Finalizar informe situacional', textoConfirmar: 'Finalizar' }))) return;
+        const cuantos = seleccionados.length;
+        const detalle = cuantos > 1
+            ? `El informe cubre a ${cuantos} NNA y se archivará en el expediente de cada uno. `
+            : '';
+        if (!(await confirmar(`${detalle}El informe se registrará en el Expediente Digital y no podrá editarse.`,
+            { titulo: 'Finalizar informe situacional', textoConfirmar: 'Finalizar' }))) return;
         setIsFinalizing(true);
         try {
-            const data = await saveToApi('FINALIZADO');
+            aplicarRespuesta(await saveToApi('FINALIZADO'));
             setEstadoActual('FINALIZADO');
-            if (data && data.codigo_informe) {
-                setCodigoInforme(data.codigo_informe);
-            }
- 
-            // Recargar los documentos en el store del expediente digital
             await useNnaStore.getState().loadDocuments(nna.id, nna);
- 
             toast.success('Informe finalizado y registrado en el Expediente Digital.');
             onClose();
         } catch (e) {
@@ -141,250 +242,207 @@ export const InformeSituacional = ({ nna, caso, onClose }: InformeSituacionalPro
             setIsFinalizing(false);
         }
     };
- 
-    const edad = (() => {
-        if (!nna.fechaNacimiento) return '---';
-        const hoy = new Date();
-        const nac = new Date(nna.fechaNacimiento);
-        let años = hoy.getFullYear() - nac.getFullYear();
-        if (hoy.getMonth() < nac.getMonth() || (hoy.getMonth() === nac.getMonth() && hoy.getDate() < nac.getDate())) {
-            años--;
-        }
-        return `${años} años`;
-    })();
- 
+
+    const areaClass = `w-full text-[13px] px-3 py-2 border border-border-strong rounded-[6px] text-fg outline-none resize-vertical focus:border-primary focus:ring-1 focus:ring-primary ${bloqueado ? 'bg-surface-muted cursor-default' : 'bg-surface'}`;
+
     return (
         <div className="bg-bg flex flex-col gap-3">
- 
-            {/* ── I. Datos de Identificación ── */}
+
+            {/* ── I. Datos generales ── */}
             <div className="bg-surface border border-border rounded-[8px] overflow-hidden">
                 <div className="px-4 py-3 border-b border-border bg-surface-muted flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                         <ClipboardList size={14} className="text-fg-muted" />
-                        <span className="text-[11px] font-bold uppercase tracking-widest text-fg-muted">I. Datos de Identificación</span>
+                        <span className="text-[11px] font-bold uppercase tracking-widest text-fg-muted">
+                            I. Datos Generales de la Niña, Niño o Adolescente
+                        </span>
                     </div>
                     {codigoInforme && (
                         <span className="text-[12px] font-bold text-primary bg-primary-soft border border-primary/20 px-2.5 py-1 rounded-[6px]">
-                            N° {codigoInforme}
+                            {codigoInforme}
                         </span>
                     )}
                 </div>
-                <div className="p-4 flex flex-col gap-3">
-                    <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <label className="text-[12px] font-medium text-fg-2 block mb-1">Nombres y Apellidos</label>
-                            <div className="text-[13px] font-semibold text-fg px-3 py-2 bg-surface-muted border border-border rounded-[6px]">
-                                {nna.nombres} {nna.apellidoPaterno} {nna.apellidoMaterno}
+
+                <div className="p-4 flex flex-col gap-4">
+                    {/* Selector de hermanos */}
+                    {candidatos.length > 1 && (
+                        <div className="bg-primary-soft/40 border border-primary/20 rounded-[8px] p-3">
+                            <p className="text-[11px] font-bold text-fg-2 uppercase mb-1">¿A quiénes cubre este informe?</p>
+                            <p className="text-[11px] text-fg-muted mb-2.5">
+                                Cuando son hermanos se hace un solo informe. Si se inscribieron en
+                                momentos y situaciones distintas, conviene hacerlos por separado.
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                                {candidatos.map(c => {
+                                    const activo = nnaIds.includes(c.id);
+                                    return (
+                                        <button
+                                            key={c.id}
+                                            type="button"
+                                            onClick={() => toggleNna(c.id)}
+                                            disabled={bloqueado}
+                                            className={`px-3 py-1.5 rounded-[6px] text-[12px] font-semibold border transition-all ${
+                                                activo
+                                                    ? 'bg-primary text-white border-primary'
+                                                    : 'bg-surface text-fg-2 border-border hover:bg-surface-muted'
+                                            } ${bloqueado ? 'cursor-default' : ''}`}
+                                        >
+                                            {c.nombres} · {edadDe(c)}
+                                        </button>
+                                    );
+                                })}
                             </div>
                         </div>
-                        <div>
-                            <label className="text-[12px] font-medium text-fg-2 block mb-1">Documento de Identidad</label>
-                            <div className="text-[13px] font-semibold text-fg px-3 py-2 bg-surface-muted border border-border rounded-[6px]">
-                                {formatTipoDoc(nna.tipoDoc)} {nna.numeroDoc || 'S/D'}
+                    )}
+
+                    {/* Un bloque por NNA, como en el modelo */}
+                    {seleccionados.map(n => (
+                        <div key={n.id} className="border border-border rounded-[8px] p-3">
+                            <p className="text-[13px] font-bold text-fg uppercase mb-2.5">
+                                {n.nombres} {n.apellidoPaterno} {n.apellidoMaterno}
+                            </p>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                <Campo label="Edad" valor={edadDe(n)} />
+                                <Campo label="Lugar de Nacimiento" valor={lugarNacimiento(n)} />
+                                <Campo label="Fecha de Nacimiento" valor={fechaLarga(n.fechaNacimiento)} />
+                                <Campo label="Documento de Identificación" valor={n.numeroDoc ? `${formatTipoDoc(n.tipoDoc)} ${n.numeroDoc}` : 'S/D'} />
+                                <Campo label="Grado de Instrucción" valor={gradoInstruccion(n)} />
+                                <Campo label="Sexo" valor={SEXO_MAP[String(n.sexo)] || n.sexo} />
                             </div>
                         </div>
+                    ))}
+
+                    {/* Datos comunes de la familia */}
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                        <Campo label="Perfil del NNA" valor={caso?.perfil} />
+                        <Campo label="Dirección" valor={nna.domicilioActual} />
+                        <Campo label="Referencia" valor={nna.referenciaDomicilio} />
+                        <Campo label="Referente Familiar de Contacto" valor={nna.nombreTutor} />
+                        <Campo label="Teléfono" valor={nna.telefonoContacto || 'No cuentan con teléfono'} />
+                        <Campo label="Carpeta" valor={nna.carpeta?.codigo} />
                     </div>
-                    <div className="grid grid-cols-3 gap-3">
-                        <div>
-                            <label className="text-[12px] font-medium text-fg-2 block mb-1">Edad</label>
-                            <div className="text-[13px] font-semibold text-fg px-3 py-2 bg-surface-muted border border-border rounded-[6px]">{edad}</div>
-                        </div>
-                        <div>
-                            <label className="text-[12px] font-medium text-fg-2 block mb-1">Sexo</label>
-                            <div className="text-[13px] font-semibold text-fg px-3 py-2 bg-surface-muted border border-border rounded-[6px]">{formatSexo(nna.sexo)}</div>
-                        </div>
-                        <div>
-                            <label className="text-[12px] font-medium text-fg-2 block mb-1">Carpeta</label>
-                            <div className="text-[13px] font-semibold text-fg px-3 py-2 bg-surface-muted border border-border rounded-[6px]">{nna.carpeta?.codigo || '---'}</div>
-                        </div>
-                    </div>
+
                     <div className="grid grid-cols-2 gap-3">
                         <div>
-                            <label className="text-[12px] font-medium text-fg-2 block mb-1">Dirigido a</label>
-                            <input
-                                type="text"
-                                value={formData.destinatario}
-                                onChange={up('destinatario')}
-                                className="w-full text-[13px] px-3 py-2 border border-border-strong rounded-[6px] bg-surface text-fg outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                            />
+                            <label className="text-[11px] font-medium text-fg-muted block mb-1">Dirigido a</label>
+                            <input type="text" value={formData.destinatario} onChange={up('destinatario')} disabled={bloqueado}
+                                className={`w-full text-[13px] px-3 py-2 border border-border-strong rounded-[6px] text-fg outline-none focus:border-primary focus:ring-1 focus:ring-primary ${bloqueado ? 'bg-surface-muted cursor-default' : 'bg-surface'}`} />
                         </div>
                         <div>
-                            <label className="text-[12px] font-medium text-fg-2 block mb-1">Fecha del Informe</label>
-                            <input
-                                type="date"
-                                value={formData.fechaInforme}
-                                onChange={up('fechaInforme')}
-                                className="w-full text-[13px] px-3 py-2 border border-border-strong rounded-[6px] bg-surface text-fg outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                            />
+                            <label className="text-[11px] font-medium text-fg-muted block mb-1">Fecha del Informe</label>
+                            <input type="date" value={formData.fechaInforme} onChange={up('fechaInforme')} disabled={bloqueado}
+                                className={`w-full text-[13px] px-3 py-2 border border-border-strong rounded-[6px] text-fg outline-none focus:border-primary focus:ring-1 focus:ring-primary ${bloqueado ? 'bg-surface-muted cursor-default' : 'bg-surface'}`} />
                         </div>
                     </div>
                 </div>
             </div>
 
             {/* ── II. Antecedentes ── */}
-            <div className="bg-surface border border-border rounded-[8px] overflow-hidden">
-                <div className="px-4 py-3 border-b border-border bg-surface-muted flex items-center gap-2">
-                    <MapPin size={14} className="text-fg-muted" />
-                    <span className="text-[11px] font-bold uppercase tracking-widest text-fg-muted">II. Antecedentes y Circunstancias del Hallazgo</span>
-                </div>
-                <div className="p-4">
-                    <p className="text-[11px] text-fg-muted italic mb-2">¿En qué circunstancias y condiciones se encontró al NNA? (Ubicación, horario, actividad, compañía, apariencia).</p>
-                    <textarea
-                        value={formData.antecedentes}
-                        onChange={up('antecedentes')}
-                        rows={4}
-                        placeholder="Redacte aquí las circunstancias del contacto inicial..."
-                        className="w-full text-[13px] px-3 py-2 border border-border-strong rounded-[6px] bg-surface text-fg outline-none resize-vertical focus:border-primary focus:ring-1 focus:ring-primary"
-                        style={{ lineHeight: 1.6 }}
-                    />
-                </div>
-            </div>
+            <Seccion icon={MapPin} titulo="II. Antecedentes del Caso"
+                ayuda="¿En qué circunstancias y condiciones se encontró al NNA? ¿Cómo llegó al servicio y cuándo se inscribió?">
+                <textarea value={formData.antecedentes} onChange={up('antecedentes')} rows={5} disabled={bloqueado}
+                    placeholder="Redacte aquí las circunstancias del contacto inicial y la inscripción..."
+                    className={areaClass} style={{ lineHeight: 1.6 }} />
+            </Seccion>
 
-            {/* ── III. Estrategias ── */}
-            <div className="bg-surface border border-border rounded-[8px] overflow-hidden">
-                <div className="px-4 py-3 border-b border-border bg-surface-muted flex items-center gap-2">
-                    <Users size={14} className="text-fg-muted" />
-                    <span className="text-[11px] font-bold uppercase tracking-widest text-fg-muted">III. Estrategias de Acercamiento</span>
-                </div>
-                <div className="p-4">
-                    <p className="text-[11px] text-fg-muted italic mb-2">¿Qué estrategias utilizó para establecer la relación de confianza?</p>
-                    <textarea
-                        value={formData.estrategias}
-                        onChange={up('estrategias')}
-                        rows={3}
-                        placeholder="Técnicas de abordaje, lúdicas, observación participante..."
-                        className="w-full text-[13px] px-3 py-2 border border-border-strong rounded-[6px] bg-surface text-fg outline-none resize-vertical focus:border-primary focus:ring-1 focus:ring-primary"
-                        style={{ lineHeight: 1.6 }}
-                    />
-                </div>
-            </div>
+            {/* ── III. Acciones realizadas ── */}
+            <Seccion icon={Users} titulo="III. Acciones Realizadas"
+                ayuda="Estrategias de acercamiento, visitas domiciliarias, orientaciones, consejerías, coordinaciones.">
+                <textarea value={formData.estrategias} onChange={up('estrategias')} rows={5} disabled={bloqueado}
+                    placeholder="Detalle las acciones desarrolladas con el NNA y su familia..."
+                    className={areaClass} style={{ lineHeight: 1.6 }} />
+            </Seccion>
 
-            {/* ── IV. Análisis ── */}
+            {/* ── IV. Situación familiar ── */}
+            <Seccion icon={FileSignature} titulo="IV. Situación Familiar"
+                ayuda="Composición y dinámica familiar, situación económica, vivienda, salud y educación de los NNA.">
+                <textarea value={formData.situacionFamiliar} onChange={up('situacionFamiliar')} rows={10} disabled={bloqueado}
+                    placeholder="Describa la situación a nivel personal, familiar y social..."
+                    className={areaClass} style={{ lineHeight: 1.6 }} />
+            </Seccion>
+
+            {/* ── V. Indicadores de vulnerabilidad ── */}
+            <Seccion icon={AlertTriangle} titulo="V. Indicadores de Vulnerabilidad"
+                ayuda="Un factor por línea. Se imprimen como viñetas en el informe.">
+                <textarea value={formData.indicadores} onChange={up('indicadores')} rows={6} disabled={bloqueado}
+                    placeholder={'Familia nuclear con recursos económicos muy limitados\nExposición de menores a la mendicidad\nLimitaciones de espacio y condiciones precarias de vivienda'}
+                    className={areaClass} style={{ lineHeight: 1.6 }} />
+            </Seccion>
+
+            {/* ── VI. Plan de Intervención Individual ── */}
             <div className="bg-surface border border-border rounded-[8px] overflow-hidden">
                 <div className="px-4 py-3 border-b border-border bg-surface-muted flex items-center gap-2">
-                    <FileSignature size={14} className="text-fg-muted" />
-                    <span className="text-[11px] font-bold uppercase tracking-widest text-fg-muted">IV. Análisis de la Situación</span>
+                    <Target size={14} className="text-fg-muted" />
+                    <span className="text-[11px] font-bold uppercase tracking-widest text-fg-muted">
+                        VI. Plan de Intervención Individual
+                    </span>
                 </div>
                 <div className="p-4 flex flex-col gap-4">
-                    <div className="flex gap-3 items-start">
-                        <div className="w-[3px] self-stretch rounded-full bg-danger flex-shrink-0" />
-                        <div className="flex-1">
-                            <label className="text-[12px] font-medium text-fg-2 block mb-1">4.1 Situación de Salud</label>
-                            <textarea value={formData.situacionSalud} onChange={up('situacionSalud')} rows={2}
-                                placeholder="Estado de salud, nutrición, higiene…"
-                                className="w-full text-[13px] px-3 py-2 border border-border-strong rounded-[6px] bg-surface text-fg outline-none resize-vertical focus:border-primary focus:ring-1 focus:ring-primary"
-                                style={{ lineHeight: 1.6 }} />
+                    <p className="text-[11px] text-fg-muted italic">
+                        El PII va dentro del informe. Por cada fase, los objetivos y actividades
+                        previstas — un objetivo por línea. Los plazos son referenciales.
+                    </p>
+                    {([1, 2, 3] as const).map(fase => (
+                        <div key={fase}>
+                            <label className="text-[12px] font-bold text-fg-2 block mb-1">
+                                Fase {fase} <span className="font-normal text-fg-muted">({MESES_FASE[fase]} meses)</span>
+                            </label>
+                            <textarea
+                                value={formData[`piiFase${fase}` as keyof typeof formData] as string}
+                                onChange={up(`piiFase${fase}`)}
+                                rows={4}
+                                disabled={bloqueado}
+                                placeholder={`Objetivos y actividades de la Fase ${fase}...`}
+                                className={areaClass}
+                                style={{ lineHeight: 1.6 }}
+                            />
                         </div>
-                    </div>
-                    <div className="flex gap-3 items-start">
-                        <div className="w-[3px] self-stretch rounded-full bg-info flex-shrink-0" />
-                        <div className="flex-1">
-                            <label className="text-[12px] font-medium text-fg-2 block mb-1">4.2 Situación Educativa</label>
-                            <textarea value={formData.situacionEducacion} onChange={up('situacionEducacion')} rows={2}
-                                placeholder="Escolaridad, deserción, rezago…"
-                                className="w-full text-[13px] px-3 py-2 border border-border-strong rounded-[6px] bg-surface text-fg outline-none resize-vertical focus:border-primary focus:ring-1 focus:ring-primary"
-                                style={{ lineHeight: 1.6 }} />
-                        </div>
-                    </div>
-                    <div className="flex gap-3 items-start">
-                        <div className="w-[3px] self-stretch rounded-full bg-success flex-shrink-0" />
-                        <div className="flex-1">
-                            <label className="text-[12px] font-medium text-fg-2 block mb-1">4.3 Situación Familiar y Social</label>
-                            <textarea value={formData.situacionFamiliar} onChange={up('situacionFamiliar')} rows={3}
-                                placeholder="Dinámica familiar, violencia, soporte…"
-                                className="w-full text-[13px] px-3 py-2 border border-border-strong rounded-[6px] bg-surface text-fg outline-none resize-vertical focus:border-primary focus:ring-1 focus:ring-primary"
-                                style={{ lineHeight: 1.6 }} />
-                        </div>
-                    </div>
+                    ))}
                 </div>
             </div>
 
-            {/* ── V. Conclusiones ── */}
-            <div className="bg-surface border border-border rounded-[8px] overflow-hidden">
-                <div className="px-4 py-3 border-b border-border bg-surface-muted flex items-center gap-2">
-                    <CheckCircle2 size={14} className="text-fg-muted" />
-                    <span className="text-[11px] font-bold uppercase tracking-widest text-fg-muted">V. Conclusiones y Recomendaciones</span>
-                </div>
-                <div className="p-4 flex flex-col gap-3">
-                    <div>
-                        <label className="text-[12px] font-medium text-fg-2 block mb-1">Conclusiones principales</label>
-                        <textarea value={formData.conclusiones} onChange={up('conclusiones')} rows={3}
-                            placeholder="Conclusiones principales del caso..."
-                            className="w-full text-[13px] px-3 py-2 border border-border-strong rounded-[6px] bg-surface text-fg outline-none resize-vertical focus:border-primary focus:ring-1 focus:ring-primary"
-                            style={{ lineHeight: 1.6 }} />
-                    </div>
-                    <div className="bg-surface-muted border border-border rounded-[6px] p-3">
-                        <label className="text-[12px] font-medium text-fg-2 block mb-2">Se recomienda:</label>
-                        <textarea value={formData.recomendaciones} onChange={up('recomendaciones')} rows={2}
-                            placeholder="Acciones inmediatas, derivaciones, ingreso a Fase II..."
-                            className="w-full text-[13px] px-3 py-2 border border-border-strong rounded-[6px] bg-surface text-fg outline-none resize-vertical focus:border-primary focus:ring-1 focus:ring-primary"
-                            style={{ lineHeight: 1.6 }} />
-                    </div>
-                </div>
-            </div>
+            {/* ── VII. Apreciación profesional ── */}
+            <Seccion icon={PenLine} titulo="VII. Apreciación Profesional"
+                ayuda="Valoración del educador sobre la familia, su disposición al cambio y los avances observados.">
+                <textarea value={formData.conclusiones} onChange={up('conclusiones')} rows={6} disabled={bloqueado}
+                    placeholder="Redacte su apreciación profesional del caso..."
+                    className={areaClass} style={{ lineHeight: 1.6 }} />
+            </Seccion>
 
-            {/* ── Firmas ── */}
-            <div className="bg-surface border border-border rounded-[8px] overflow-hidden">
-                <div className="px-4 py-3 border-b border-border bg-surface-muted flex items-center gap-2">
-                    <PenLine size={14} className="text-fg-muted" />
-                    <span className="text-[11px] font-bold uppercase tracking-widest text-fg-muted">Firmas</span>
-                </div>
-                <div className="p-4">
-                    <div className="grid grid-cols-2 gap-12 text-center mt-8">
-                        <div className="border-t border-border-strong pt-2">
-                            <p className="text-[13px] font-semibold text-fg">Educador/a de Calle</p>
-                            <p className="text-[12px] text-fg-muted mt-1">Responsable del Caso</p>
-                        </div>
-                        <div className="border-t border-border-strong pt-2">
-                            <p className="text-[13px] font-semibold text-fg">Coordinador/a</p>
-                            <p className="text-[12px] text-fg-muted mt-1">V° B°</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            {/* ── VIII. Recomendación ── */}
+            <Seccion icon={CheckIcon} titulo="VIII. Recomendación"
+                ayuda="A quién se informa y qué se recomienda: continuar en el servicio, derivar o egresar.">
+                <textarea value={formData.recomendaciones} onChange={up('recomendaciones')} rows={5} disabled={bloqueado}
+                    placeholder="Se informa a... y se recomienda..."
+                    className={areaClass} style={{ lineHeight: 1.6 }} />
+            </Seccion>
 
-            {/* ── Footer con botones ── */}
-            <div className="bg-surface border border-border rounded-[8px] px-5 py-3 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                    {estadoActual === 'FINALIZADO' && (
-                        <span className="flex items-center gap-1.5 text-[12px] font-bold text-success bg-success-soft border border-success/20 px-3 py-1.5 rounded-[6px]">
-                            <CheckIcon size={13} /> Informe Finalizado
+            {/* ── Barra de acciones ── */}
+            <div className="bg-surface border border-border rounded-[8px] p-4 flex items-center justify-between gap-3 flex-wrap">
+                <div className="text-[12px] text-fg-muted">
+                    {bloqueado ? (
+                        <span className="flex items-center gap-1.5 text-success font-semibold">
+                            <Lock size={13} /> Informe finalizado y archivado en el Expediente Digital.
                         </span>
-                    )}
-                    {estadoActual === 'BORRADOR' && (
-                        <span className="text-[11px] text-fg-muted font-medium px-2 py-1 bg-warning-soft border border-warning/20 rounded-[6px]">
-                            Borrador
-                        </span>
+                    ) : (
+                        <>Cubre a <b className="text-fg">{seleccionados.length}</b> {seleccionados.length === 1 ? 'NNA' : 'NNA'}
+                        {seleccionados.length > 1 && <> — {frasehermanos(seleccionados)}</>}</>
                     )}
                 </div>
-                <div className="flex gap-2">
-                    <button
-                        onClick={() => window.print()}
-                        className="flex items-center gap-1.5 bg-surface border border-border-strong text-fg px-4 py-2 rounded-[6px] text-[13px] font-medium hover:bg-surface-muted transition-colors"
-                    >
-                        <Printer size={14} /> Imprimir
-                    </button>
-                    {estadoActual !== 'FINALIZADO' && (
-                        <button
-                            onClick={handleSaveBorrador}
-                            disabled={isSaving || isFinalizing}
-                            className="flex items-center gap-1.5 bg-surface border border-border-strong text-fg px-4 py-2 rounded-[6px] text-[13px] font-medium hover:bg-surface-muted transition-colors disabled:opacity-50"
-                        >
-                            <Save size={14} /> {isSaving ? 'Guardando…' : 'Guardar Borrador'}
+                {!bloqueado && (
+                    <div className="flex gap-2">
+                        <button onClick={handleSaveBorrador} disabled={isSaving || isFinalizing}
+                            className="flex items-center gap-2 px-4 py-2 rounded-[6px] text-[13px] font-bold border border-border text-fg-2 hover:bg-surface-muted disabled:opacity-60">
+                            <Save size={14} /> {isSaving ? 'Guardando…' : 'Guardar borrador'}
                         </button>
-                    )}
-                    {estadoActual !== 'FINALIZADO' && (
-                        <button
-                            onClick={handleFinalizar}
-                            disabled={isSaving || isFinalizing}
-                            className="flex items-center gap-1.5 bg-success text-white px-4 py-2 rounded-[6px] text-[13px] font-medium hover:bg-success/90 transition-colors disabled:opacity-50"
-                        >
-                            <CheckIcon size={14} /> {isFinalizing ? 'Finalizando…' : 'Finalizar'}
+                        <button onClick={handleFinalizar} disabled={isSaving || isFinalizing}
+                            className="flex items-center gap-2 px-4 py-2 rounded-[6px] text-[13px] font-bold bg-primary text-white hover:bg-primary/90 disabled:opacity-60">
+                            <CheckIcon size={14} /> {isFinalizing ? 'Finalizando…' : 'Finalizar informe'}
                         </button>
-                    )}
-                </div>
+                    </div>
+                )}
             </div>
-
         </div>
     );
 };

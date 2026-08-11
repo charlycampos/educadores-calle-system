@@ -1,6 +1,7 @@
 """
 Caso de uso: Registrar NNA (puede ser batch — varios hermanos en una carpeta).
-Genera código F03 correlativo y crea el primer caso automáticamente.
+Guarda la inscripción inicial y crea el primer caso automáticamente.
+El código F03 se asigna al formalizar el compromiso del NNA/apoderado.
 """
 from dataclasses import dataclass
 from typing import Optional
@@ -196,14 +197,9 @@ class RegistrarNnaUseCase:
             sede_id = caso_input.sede_id if caso_input else None
             resolved_carpeta_id = await self._carpeta_repo.create_nueva(sede_id=sede_id)
 
-        # 3. Obtener próximo código F03 si estamos registrando definitivamente
-        proximo_f03 = None
-        if not es_borrador:
-            proximo_f03 = await self._nna_repo.get_next_codigo_f03(caso_input.sede_id)
-
-        # 4. Procesar cada NNA (Insertar o Actualizar según corresponda)
+        # 3. Procesar cada NNA (Insertar o Actualizar según corresponda)
         resultado = []
-        for i, (nna_data, ext_nna, ext_case) in enumerate(nnas_to_process):
+        for nna_data, ext_nna, ext_case in nnas_to_process:
             if ext_nna:
                 # UPDATE: Actualizar borrador existente
                 nna_dict = {}
@@ -254,16 +250,12 @@ class RegistrarNnaUseCase:
                     )
             else:
                 # INSERT: Crear nuevo registro
-                codigo_f03 = None
-                if not es_borrador and proximo_f03 is not None:
-                    sede_codigo = await self._nna_repo.get_sede_codigo(caso_input.sede_id)
-                    codigo_f03 = f"F03-{sede_codigo}-{datetime.now().year}-{(proximo_f03 + i):04d}"
                 codigo_caso = await self._caso_repo.get_next_codigo_caso(caso_input.sede_id)
 
                 nna = await self._nna_repo.create(
                     nna_data=nna_data,
                     carpeta_id=resolved_carpeta_id,
-                    codigo_f03=codigo_f03,
+                    codigo_f03=None,
                     tiene_hermanos=len(nnas_input) > 1,
                     cant_hermanos=len(nnas_input) - 1,
                 )

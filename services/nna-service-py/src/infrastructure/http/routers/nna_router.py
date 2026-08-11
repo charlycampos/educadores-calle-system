@@ -1,3 +1,5 @@
+import unicodedata
+from difflib import SequenceMatcher
 import logging
 from typing import Optional
 from datetime import datetime
@@ -377,7 +379,9 @@ async def registrar_nna(body: RegistrarNnaRequest, background_tasks: BackgroundT
     except Exception as e:
         logger.error(f"Error en registro: {e}", exc_info=True)
         err_msg = str(e)
-        if "ORA-01400" in err_msg:
+        if "ORA-01438" in err_msg:
+            user_friendly = "Uno de los valores numéricos supera el tamaño permitido en la base de datos. Verifique que las migraciones del sistema estén actualizadas."
+        elif "ORA-01400" in err_msg:
             user_friendly = "Error de validación de datos obligatorio: Intenta ingresar un campo vacío que es requerido por el sistema."
         elif "ORA-00001" in err_msg:
             user_friendly = "Registro duplicado: El número de documento o código de ficha ingresado ya existe en la base de datos."
@@ -442,105 +446,168 @@ async def get_next_code(user: dict = Depends(get_current_user)):
     return {"code": code}
 
 
+def _similitud(a: str, b: str) -> int:
+    """
+    Parecido entre dos textos, de 0 a 100.
+
+    Se calcula en Python y no en SQL para no depender de UTL_MATCH, que puede no
+    estar disponible según cómo se haya instalado la base.
+    """
+    if not a or not b:
+        return 0
+    if a == b:
+        return 100
+    return int(SequenceMatcher(None, a, b).ratio() * 100)
+
+
 @router.get("/buscar-duplicados")
 async def buscar_duplicados(
     nombres: Optional[str] = None,
     apellido_paterno: Optional[str] = None,
     apellido_materno: Optional[str] = None,
     numero_doc: Optional[str] = None,
-    user: dict = Depends(get_current_user)
+    fecha_nacimiento: Optional[str] = None,
+    excluir_id: Optional[int] = None,
+    user: dict = Depends(get_current_user),
 ):
-    """Busca coincidencias exactas por DNI u homónimos por apellidos y nombres en todo el país (cruzando sedes)."""
-    from src.infrastructure.db.connection import get_pool
-    pool = get_pool()
-    matches = []
-    
-    # Normalizar valores para la búsqueda
-    n_doc = (numero_doc or "").strip()
-    ap_pat = (apellido_paterno or "").strip().upper()
-    ap_mat = (apellido_materno or "").strip().upper()
-    nom = (nombres or "").strip().upper()
+    """
+    Busca coincidencias por SIMILITUD, no por igualdad exacta.
 
-    if not n_doc and not ap_pat:
-        return {"status": "unique", "matches": []}
+    Los nombres se recogen en la calle, muchas veces de oído: "VERGARA" puede
+    quedar escrito "BERGARA", con o sin tilde, con el apellido materno primero.
+    Una comparación exacta deja pasar esos duplicados, que es justo lo que hay
+    que evitar.
+
+    Cada candidato viene con un puntaje y el motivo por el que aparece, para que
+    el educador decida. El sistema no descarta ni bloquea nada.
+
+    Reglas:
+      * mismo documento              -> crítico
+      * apellidos y nombre similares -> alto
+      * misma fecha de nacimiento    -> sube el puntaje
+      * apellidos invertidos         -> medio
+    """
+    from src.infrastructure.db.connection import get_pool
+
+    def normalizar(txt: Optional[str]) -> str:
+        """Sin tildes, sin dobles espacios, en mayúsculas."""
+        if not txt:
+            return ""
+        t = unicodedata.normalize("NFD", txt.strip().upper())
+        t = "".join(c for c in t if unicodedata.category(c) != "Mn")
+        return " ".join(t.split())
+
+    n_doc = (numero_doc or "").strip()
+    ap_pat = normalizar(apellido_paterno)
+    ap_mat = normalizar(apellido_materno)
+    nom = normalizar(nombres)
+
+    # Con cualquier dato se busca: antes se exigía apellido paterno.
+    if not n_doc and not ap_pat and not ap_mat and not nom:
+        return {"status": "unique", "message": "Ingresa un documento o un nombre para verificar.", "matches": []}
 
     try:
+        pool = get_pool()
         async with pool.acquire() as conn:
             async with conn.cursor() as cur:
-                # 1. Búsqueda exacta por número de documento si se proporciona
-                if n_doc:
-                    query = """
-                        SELECT n.ID, n.NOMBRES, n.APELLIDO_PATERNO, n.APELLIDO_MATERNO, n.TIPO_DOC, n.NUMERO_DOC, n.SEXO, s.NOMBRE AS SEDE
-                        FROM NNA n
-                        LEFT JOIN NNA_CASO c ON c.NNA_ID = n.ID AND c.ESTADO <> 'CERRADO'
-                        LEFT JOIN SEC_SEDE s ON s.ID = c.SEDE_ID
-                        WHERE n.NUMERO_DOC = :doc
+                # Una sola pasada: el DNI ya no corta la búsqueda de homónimos,
+                # porque un mismo NNA puede estar registrado con otro documento.
+                await cur.execute(
                     """
-                    await cur.execute(query, {"doc": n_doc})
-                    rows = await cur.fetchall()
-                    for r in rows:
-                        matches.append({
-                            "id": r[0],
-                            "nombres": r[1],
-                            "apellidoPaterno": r[2],
-                            "apellidoMaterno": r[3],
-                            "tipoDoc": r[4],
-                            "numeroDoc": r[5],
-                            "sexo": r[6],
-                            "sede": r[7] or "Sin Sede Activa"
-                        })
-                    
-                    if matches:
-                        return {
-                            "status": "duplicate",
-                            "message": f"CRÍTICO: Se encontró un NNA registrado con el mismo número de documento en la sede: {matches[0]['sede']}",
-                            "matches": matches
-                        }
+                    SELECT n.ID, n.NOMBRES, n.APELLIDO_PATERNO, n.APELLIDO_MATERNO,
+                           n.TIPO_DOC, n.NUMERO_DOC, n.SEXO, n.FECHA_NACIMIENTO,
+                           n.CODIGO_FICHA03, n.CARPETA_ID,
+                           (SELECT MIN(s.NOMBRE)
+                              FROM NNA_CASO c
+                              JOIN SEC_SEDE s ON s.ID = c.SEDE_ID
+                             WHERE c.NNA_ID = n.ID AND c.ESTADO <> 'CERRADO') AS SEDE
+                      FROM NNA n
+                     WHERE (:excluir IS NULL OR n.ID <> :excluir)
+                    """,
+                    {"excluir": excluir_id},
+                )
+                filas = await cur.fetchall()
 
-                # 2. Búsqueda de homónimos por nombres y apellidos
-                if ap_pat and nom:
-                    # Encontrar coincidencias similares en la BD
-                    query = """
-                        SELECT n.ID, n.NOMBRES, n.APELLIDO_PATERNO, n.APELLIDO_MATERNO, n.TIPO_DOC, n.NUMERO_DOC, n.SEXO, s.NOMBRE AS SEDE
-                        FROM NNA n
-                        LEFT JOIN NNA_CASO c ON c.NNA_ID = n.ID AND c.ESTADO <> 'CERRADO'
-                        LEFT JOIN SEC_SEDE s ON s.ID = c.SEDE_ID
-                        WHERE UPPER(n.APELLIDO_PATERNO) = :ap_pat
-                          AND (:ap_mat IS NULL OR UPPER(n.APELLIDO_MATERNO) = :ap_mat)
-                          AND UPPER(n.NOMBRES) LIKE :nom
-                    """
-                    await cur.execute(query, {
-                        "ap_pat": ap_pat,
-                        "ap_mat": ap_mat if ap_mat else None,
-                        "nom": f"%{nom}%"
-                    })
-                    rows = await cur.fetchall()
-                    for r in rows:
-                        # Evitar duplicar si ya se agregó por DNI
-                        if not any(m["id"] == r[0] for m in matches):
-                            matches.append({
-                                "id": r[0],
-                                "nombres": r[1],
-                                "apellidoPaterno": r[2],
-                                "apellidoMaterno": r[3],
-                                "tipoDoc": r[4],
-                                "numeroDoc": r[5],
-                                "sexo": r[6],
-                                "sede": r[7] or "Sin Sede Activa"
-                            })
+        candidatos = []
+        for r in filas:
+            c_nom = normalizar(r[1])
+            c_pat = normalizar(r[2])
+            c_mat = normalizar(r[3])
+            c_doc = (r[5] or "").strip()
+            c_fnac = r[7].strftime("%Y-%m-%d") if r[7] else None
 
-                    if matches:
-                        return {
-                            "status": "homonym",
-                            "message": f"ADVERTENCIA: Se encontraron {len(matches)} posible(s) homónimo(s) en el sistema nacional.",
-                            "matches": matches
-                        }
+            puntaje = 0
+            motivos = []
+
+            if n_doc and c_doc and n_doc == c_doc:
+                puntaje += 100
+                motivos.append("Mismo documento")
+
+            sim_pat = _similitud(ap_pat, c_pat)
+            sim_mat = _similitud(ap_mat, c_mat)
+            sim_nom = _similitud(nom, c_nom)
+
+            if ap_pat and sim_pat >= 80:
+                puntaje += 25
+            if ap_mat and sim_mat >= 80:
+                puntaje += 20
+            if nom and sim_nom >= 80:
+                puntaje += 25
+
+            if ap_pat and nom and sim_pat >= 80 and sim_nom >= 80:
+                motivos.append(f"Nombre y apellido {min(sim_pat, sim_nom)}% similares")
+            elif ap_pat and sim_pat >= 80:
+                motivos.append(f"Apellido paterno {sim_pat}% similar")
+            elif nom and sim_nom >= 80:
+                motivos.append(f"Nombre {sim_nom}% similar")
+
+            # Apellidos invertidos: se anotan al revés con frecuencia
+            if ap_pat and ap_mat and _similitud(ap_pat, c_mat) >= 85 and _similitud(ap_mat, c_pat) >= 85:
+                puntaje += 35
+                motivos.append("Apellidos en orden invertido")
+
+            if fecha_nacimiento and c_fnac and fecha_nacimiento[:10] == c_fnac:
+                puntaje += 30
+                motivos.append("Misma fecha de nacimiento")
+
+            if puntaje >= 45:
+                candidatos.append({
+                    "id": r[0],
+                    "nombres": r[1],
+                    "apellidoPaterno": r[2],
+                    "apellidoMaterno": r[3],
+                    "tipoDoc": r[4],
+                    "numeroDoc": r[5],
+                    "sexo": r[6],
+                    "fechaNacimiento": c_fnac,
+                    "codigoFicha03": r[8],
+                    "carpetaId": r[9],
+                    "sede": r[10] or "Sin sede activa",
+                    "puntaje": min(puntaje, 100),
+                    "motivo": " · ".join(motivos) or "Datos parecidos",
+                })
+
+        candidatos.sort(key=lambda c: c["puntaje"], reverse=True)
+        candidatos = candidatos[:10]
+
+        if not candidatos:
+            return {"status": "unique", "message": "No se encontraron coincidencias en el sistema nacional.", "matches": []}
+
+        if candidatos[0]["puntaje"] >= 100:
+            estado = "duplicate"
+            mensaje = f"Ya existe un NNA con el mismo documento, en la sede {candidatos[0]['sede']}."
+        elif candidatos[0]["puntaje"] >= 70:
+            estado = "duplicate"
+            mensaje = f"Hay {len(candidatos)} registro(s) muy parecido(s). Revísalos antes de continuar."
+        else:
+            estado = "homonym"
+            mensaje = f"Hay {len(candidatos)} registro(s) con datos parecidos."
+
+        return {"status": estado, "message": mensaje, "matches": candidatos}
 
     except Exception as e:
-        logger.error(f"Error al verificar duplicados: {e}")
-        raise HTTPException(status_code=500, detail="Error en la verificación de duplicados")
-
-    return {"status": "unique", "message": "NNA Único: No se encontraron coincidencias.", "matches": []}
+        logger.error(f"Error al buscar coincidencias: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Error al buscar coincidencias")
 
 
 @router.put("/{carpeta_id}")
@@ -613,7 +680,9 @@ async def actualizar_expediente(carpeta_id: int, body: dict, background_tasks: B
     except Exception as e:
         logger.error(f"Error en actualizar_expediente: {e}", exc_info=True)
         err_msg = str(e)
-        if "ORA-01400" in err_msg:
+        if "ORA-01438" in err_msg:
+            user_friendly = "Uno de los valores numéricos supera el tamaño permitido en la base de datos. Verifique que las migraciones del sistema estén actualizadas."
+        elif "ORA-01400" in err_msg:
             user_friendly = "Error de validación de datos obligatorio: Intenta actualizar con un campo vacío que es requerido por el sistema."
         elif "ORA-00001" in err_msg:
             user_friendly = "Registro duplicado: El número de documento o código de ficha ingresado ya existe en la base de datos."
@@ -1084,3 +1153,100 @@ def trigger_pdf_generation(nna_id: int):
         asyncio.run(_run())
 
 
+
+# ── Hermanos ──────────────────────────────────────────────────────────────────
+# El informe situacional es común a los hermanos, pero los expedientes son
+# individuales. Estos endpoints resuelven quiénes son hermanos sin mezclar
+# expedientes: el sistema sugiere y el educador confirma.
+
+class DetectarHermanosRequest(BaseModel):
+    """Datos del familiar que el educador acaba de registrar en el F03 o F04."""
+    parentesco: Optional[str] = None     # código de OPCIONES_VINCULO_TUTOR_2026
+    nombres: Optional[str] = None        # nombre del familiar registrado
+    dni: Optional[str] = None            # su documento
+
+
+class VincularHermanoRequest(BaseModel):
+    hermanoId: int
+    origen: str = "MANUAL"               # PARENTESCO | DNI_PADRE | MANUAL
+    confirmado: bool = True              # False = el educador dijo que no son hermanos
+
+
+@router.get("/{nna_id}/hermanos")
+async def listar_hermanos(nna_id: int, user: dict = Depends(get_current_user)):
+    """Hermanos confirmados de un NNA, para armar el informe situacional."""
+    from src.infrastructure.db.repositories.oracle_hermano_repository import OracleHermanoRepository
+    return await OracleHermanoRepository().list_by_nna(nna_id)
+
+
+@router.post("/{nna_id}/hermanos/detectar")
+async def detectar_hermanos(
+    nna_id: int,
+    body: DetectarHermanosRequest,
+    user: dict = Depends(get_current_user),
+):
+    """
+    Busca posibles hermanos a partir del familiar recién registrado.
+
+    Dos señales:
+      * parentesco "Hermano/a" -> se busca ese nombre entre los NNA del servicio;
+      * padre o madre -> se busca su DNI entre los familiares de otros NNA, lo
+        que detecta hermanos de distinto apellido.
+
+    Si el parentesco es hermano/a y NO aparece ningún NNA, se devuelve
+    `requiereRegistro`: ese hermano existe pero no está en el sistema, y sin
+    ficha propia no tiene caso que mencionar en el informe.
+    """
+    from src.infrastructure.db.repositories.oracle_hermano_repository import (
+        OracleHermanoRepository, PARENTESCO_HERMANO, PARENTESCO_PADRE_MADRE,
+    )
+    repo = OracleHermanoRepository()
+
+    candidatos: list = []
+    if body.parentesco == PARENTESCO_HERMANO and body.nombres:
+        candidatos = await repo.buscar_por_nombre(nna_id, body.nombres)
+    elif body.parentesco == PARENTESCO_PADRE_MADRE and body.dni:
+        candidatos = await repo.buscar_por_dni_padre(nna_id, body.dni)
+
+    # No repreguntar por pares que el educador ya resolvió
+    resueltos = await repo.pares_ya_resueltos(nna_id)
+    candidatos = [c for c in candidatos if c["nnaId"] not in resueltos]
+
+    requiere_registro = (
+        body.parentesco == PARENTESCO_HERMANO
+        and bool(body.nombres)
+        and not candidatos
+    )
+
+    return {
+        "candidatos": candidatos,
+        "requiereRegistro": requiere_registro,
+        "nombreHermano": body.nombres if requiere_registro else None,
+    }
+
+
+@router.post("/{nna_id}/hermanos")
+async def vincular_hermano(
+    nna_id: int,
+    body: VincularHermanoRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Confirma o descarta que dos NNA son hermanos. Siempre lo decide el educador."""
+    from src.infrastructure.db.repositories.oracle_hermano_repository import OracleHermanoRepository
+    if body.hermanoId == nna_id:
+        raise HTTPException(status_code=400, detail="Un NNA no puede ser hermano de sí mismo.")
+    return await OracleHermanoRepository().vincular(
+        nna_id, body.hermanoId, body.origen, user.get("userId"),
+        "CONFIRMADO" if body.confirmado else "DESCARTADO",
+    )
+
+
+@router.delete("/{nna_id}/hermanos/{hermano_id}")
+async def desvincular_hermano(
+    nna_id: int, hermano_id: int, user: dict = Depends(get_current_user)
+):
+    """Deshace el vínculo, para corregir una confirmación errónea."""
+    from src.infrastructure.db.repositories.oracle_hermano_repository import OracleHermanoRepository
+    if not await OracleHermanoRepository().desvincular(nna_id, hermano_id):
+        raise HTTPException(status_code=404, detail="No existe ese vínculo de hermanos.")
+    return {"message": "Vínculo eliminado"}

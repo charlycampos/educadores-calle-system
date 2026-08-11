@@ -53,6 +53,21 @@ import { PdfViewerModal } from './components/PdfViewerModal';
 import { formatTipoDoc } from '../../data/ubigeo';
 import { getLogrosById } from '../../api/logros.api';
 
+/**
+ * Módulos ocultos del expediente.
+ *
+ * No se borra nada: el código, las rutas y los datos siguen ahí. Solo dejan de
+ * aparecer en el menú lateral.
+ *
+ * - `pti`: el Plan de Intervención Individual deja de ser un módulo aparte —
+ *   va como una sección dentro del Informe Situacional ("está dentro del
+ *   informe situacional, como te decíamos", reunión 05/08/2026).
+ * - `seguimiento`: el seguimiento posterior al egreso no está normado todavía.
+ *
+ * Para volver a mostrar uno, quítalo de esta lista.
+ */
+const MODULOS_OCULTOS = ['pti', 'seguimiento'];
+
 export const ExpedientePage = () => {
     const { id } = useParams();
     const [searchParams] = useSearchParams();
@@ -144,6 +159,12 @@ export const ExpedientePage = () => {
     ];
 
     const renderContent = () => {
+        // Si el tab activo quedó apuntando a un módulo oculto (por ejemplo al
+        // volver de otra pantalla), caemos al resumen en vez de a una vista
+        // que ya no tiene forma de alcanzarse desde el menú.
+        if (MODULOS_OCULTOS.includes(activeTab)) {
+            return <ResumenCaso nna={mainNna} caso={activeCase} familia={selectedExpediente || [mainNna]} />;
+        }
         switch (activeTab) {
             case 'dashboard':
                 return <ResumenCaso nna={mainNna} caso={activeCase} familia={selectedExpediente || [mainNna]} />;
@@ -225,9 +246,19 @@ export const ExpedientePage = () => {
                                 caso={activeCase}
                                 initialData={currentLogrosData}
                                 onClose={() => setShowLogrosForm(false)}
-                                onSuccess={async () => {
-                                    setShowLogrosForm(false);
+                                onSuccess={async (_res, opts) => {
                                     setLogrosRefreshKey(k => k + 1);
+                                    if (opts?.mantenerAbierto) {
+                                        // Fase recién cerrada: recargamos el F05 y los
+                                        // documentos (de ahí sale si la fase está cerrada)
+                                        // sin salir del formulario.
+                                        if (currentLogrosId) {
+                                            try { setCurrentLogrosData(await getLogrosById(currentLogrosId)); } catch { /* se queda con lo que ya tenía */ }
+                                        }
+                                        await useNnaStore.getState().loadDocuments(mainNna.id, mainNna);
+                                        return;
+                                    }
+                                    setShowLogrosForm(false);
                                     const teniaCodigo = !!mainNna.carpeta?.codigo;
                                     await fetchExpediente(mainNna.id);
                                     if (!teniaCodigo) {
@@ -276,13 +307,14 @@ export const ExpedientePage = () => {
                                 <ArrowLeft size={18} />
                                 Volver a la Lista
                             </button>
-                            <InformeSituacional nna={mainNna} caso={activeCase} onClose={() => setShowInformeForm(false)} />
+                            <InformeSituacional nna={mainNna} caso={activeCase} familia={selectedExpediente || [mainNna]} onClose={() => setShowInformeForm(false)} />
                         </div>
                     );
                 }
                 return (
                     <InformeSituacionalList
                         casoId={activeCase?.id}
+                        nna={mainNna}
                         nnaFullName={`${mainNna.nombres} ${mainNna.apellidoPaterno} ${mainNna.apellidoMaterno}`}
                         onNuevoInforme={() => setShowInformeForm(true)}
                         onEditarInforme={() => setShowInformeForm(true)}
@@ -507,14 +539,6 @@ export const ExpedientePage = () => {
                     {/* FASE 2: DESARROLLO E INTERVENCIÓN */}
                     <div>
                         <NavButton
-                            active={activeTab === 'pti'}
-                            onClick={() => setActiveTab('pti')}
-                            icon={Target}
-                            label="Plan de Intervención Individual"
-                            subLabel="Restitución de Derechos"
-                        />
-
-                        <NavButton
                             active={activeTab === 'talleres'}
                             onClick={() => setActiveTab('talleres')}
                             icon={Presentation}
@@ -539,13 +563,6 @@ export const ExpedientePage = () => {
                             icon={CheckCircle2}
                             label="Ficha de Egreso"
                             subLabel="Formato 13"
-                        />
-                        <NavButton
-                            active={activeTab === 'seguimiento'}
-                            onClick={() => setActiveTab('seguimiento')}
-                            icon={Activity}
-                            label="Seguimiento"
-                            subLabel="Posterior Egreso"
                         />
                     </div>
                 </div>

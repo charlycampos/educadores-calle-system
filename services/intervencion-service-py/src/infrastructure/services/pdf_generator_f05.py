@@ -12,9 +12,9 @@ from reportlab.lib.units import inch
 ITEMS_FASE_1 = [
     "El/la NNA se integra y colabora con otras/os NNA.",
     "El/la NNA participa regularmente de las actividades del servicio de educadores de calle.",
-    "El adulto responsable muestra interés en cubrir necesidades básicas urgentes (identidad, salud y educación).",
-    "El/la NNA y adulto responsable muestran interés en cubrir sus necesidades básicas urgentes.",
-    "Muestra interés en acercarse a la comunidad a través de los actores sociales más próximos.",
+    "El adulto responsable muestra interés en cubrir necesidades básicas urgentes (identidad, salud y educación) de los NNA, lo cual ha permitido iniciar el proceso de restitución de derechos.",
+    "El/la NNA y adulto responsable muestran interés en cubrir sus necesidades básicas urgentes (identidad, salud y educación), lo cual ha permitido iniciar el proceso de restitución de sus derechos.",
+    "Muestra interés en acercarse a la comunidad a través de las/os actores sociales más próximos (y acorde a sus necesidades).",
 ]
 
 ITEMS_FASE_2 = [

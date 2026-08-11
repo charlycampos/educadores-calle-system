@@ -617,41 +617,9 @@ class OracleNnaRepository:
         except Exception as e:
             print(f"[NNA UPDATE] Error reading existing NNA info: {e}")
 
-        # Determinamos si debemos generar el CODIGO_FICHA03
-        es_borrador = _get("es_borrador", False)
+        # El código F03 se conserva si ya existe. Para registros nuevos se asigna
+        # recién al formalizar el Acta de Compromiso, no al pasar a PENDIENTE.
         new_codigo_f03 = existing_codigo_f03
-        if not es_borrador and not existing_codigo_f03:
-            # Look up active case's sede_id
-            sede_id = None
-            try:
-                async with pool.acquire() as conn:
-                    async with conn.cursor() as cur:
-                        await cur.execute(
-                            "SELECT SEDE_ID FROM NNA_CASO WHERE NNA_ID = :nna_id ORDER BY ID DESC",
-                            {"nna_id": nna_id}
-                        )
-                        row = await cur.fetchone()
-                        if row:
-                            sede_id = row[0]
-            except Exception as e:
-                print(f"[NNA UPDATE] Error fetching sede_id for case: {e}")
-            
-            # Default fallback if no case exists (CARPETA)
-            if not sede_id:
-                try:
-                    async with pool.acquire() as conn:
-                        async with conn.cursor() as cur:
-                            await cur.execute(
-                                "SELECT SEDE_ID FROM NNA n JOIN NNA_CARPETA c ON c.ID = n.CARPETA_ID WHERE n.ID = :nna_id",
-                                {"nna_id": nna_id}
-                            )
-                            row = await cur.fetchone()
-                            if row:
-                                sede_id = row[0]
-                except Exception:
-                    pass
-
-            new_codigo_f03 = await self.get_next_codigo_ficha03(sede_id)
 
         import json
         datos_json = {}

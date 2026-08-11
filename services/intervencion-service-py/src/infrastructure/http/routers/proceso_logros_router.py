@@ -178,9 +178,20 @@ async def cerrar_fase(
     repo: OracleProcesoLogrosRepository = Depends(get_repo),
 ):
     """
-    Cierra una fase del F05 (1, 2 ó 3): valida que todos sus ítems sean SI,
-    genera el PDF parcial de esa fase y devuelve la URL.
+    Cierra una fase del F05 (1, 2 ó 3), genera su PDF parcial y devuelve la URL.
     El frontend registra el folio en EXP_FOLIO tras llamar a este endpoint.
+
+    El cierre NO exige que los indicadores estén cumplidos. Acuerdo con los
+    educadores (reunión SEC 05/08/2026, Luis Gutiérrez):
+
+        "No necesariamente todo tiene que cumplirse para pasar. Porque hay
+         chicos que en la segunda fase los ponemos a estudiar, le matriculamos,
+         pero por su falta de interés ya no van. Entonces, si se tiene que
+         cumplir todos, entonces nunca pasaremos de fase."
+
+    Un 'NO' o un 'EN PROCESO' son evaluaciones válidas, no fallos que retengan
+    al NNA. Solo se exige haber evaluado al menos un indicador, para no archivar
+    en el expediente una ficha completamente vacía.
     """
     if fase_num not in (1, 2, 3):
         raise HTTPException(status_code=400, detail="Número de fase inválido. Debe ser 1, 2 ó 3.")
@@ -191,42 +202,19 @@ async def cerrar_fase(
 
     FASE_CONFIG = {1: (5, "I"), 2: (10, "II"), 3: (5, "III")}
 
-    # Para Fase 2 y 3, verificar que la fase anterior esté completa (o ya archivada en el expediente)
-    if fase_num >= 2:
-        prev_total, prev_label = FASE_CONFIG[fase_num - 1]
-        
-        # Verificar si la fase anterior ya tiene un folio registrado (está archivada)
-        fase_anterior_archivada = False
-        caso_id = logros.get("caso_id")
-        if caso_id:
-            try:
-                from src.infrastructure.db.connection import get_pool
-                db_pool = get_pool()
-                async with db_pool.acquire() as conn:
-                    async with conn.cursor() as cur:
-                        await cur.execute(
-                            "SELECT COUNT(*) FROM EXP_FOLIO WHERE CASO_ID = :1 AND TIPO_DOCUMENTO = :2",
-                            [caso_id, f"F05-FASE-{fase_num - 1}"]
-                        )
-                        crow = await cur.fetchone()
-                        if crow and crow[0] > 0:
-                            fase_anterior_archivada = True
-            except Exception as e:
-                logger.error(f"Error checkeando folio anterior en DB: {e}")
-
-        if not fase_anterior_archivada:
-            if not all(logros.get(f"f{fase_num - 1}_i{i}") == "SI" for i in range(1, prev_total + 1)):
-                raise HTTPException(
-                    status_code=422,
-                    detail=f"Debe completar la Fase {prev_label} antes de cerrar la Fase {FASE_CONFIG[fase_num][1]}.",
-                )
+    # No hay dependencia entre fases: cada una se cierra por su cuenta. El
+    # sistema no impone la secuencia — el educador evalúa y cierra la fase
+    # que corresponda según el momento del caso.
 
     total, label = FASE_CONFIG[fase_num]
-    pendientes = [f"ítem {i}" for i in range(1, total + 1) if logros.get(f"f{fase_num}_i{i}") != "SI"]
-    if pendientes:
+    evaluados = [
+        i for i in range(1, total + 1)
+        if logros.get(f"f{fase_num}_i{i}") in ("SI", "NO", "PROCESO")
+    ]
+    if not evaluados:
         raise HTTPException(
             status_code=422,
-            detail=f"Fase {label} incompleta. Ítems pendientes: {', '.join(pendientes)}",
+            detail=f"Marca al menos un indicador de la Fase {label} para poder cerrarla.",
         )
 
     from src.infrastructure.services.pdf_generator_f05 import generate_f05_fase_pdf
@@ -292,48 +280,24 @@ async def finalizar_logros(
     repo: OracleProcesoLogrosRepository = Depends(get_repo),
 ):
     """
-    Finaliza el F05: valida que los 20 ítems sean SI,
-    genera el PDF de forma síncrona y devuelve la URL.
+    Finaliza el F05: genera el PDF de forma síncrona y devuelve la URL.
     El frontend registra el folio en EXP_FOLIO tras llamar a este endpoint.
+
+    Igual que al cerrar una fase, no se exige que los indicadores estén
+    cumplidos: un NO o un EN PROCESO son evaluaciones válidas. Solo se pide
+    que las fases previas estén cerradas y que se haya evaluado algo en la III.
     """
     logros = await repo.get_by_id(logros_id)
     if not logros:
         raise HTTPException(status_code=404, detail="Registro F05 no encontrado")
 
-    # Las Fases I y II deben estar completas (o ya archivadas en el expediente) antes de poder finalizar la Fase III
-    caso_id = logros.get("caso_id")
-    for fase, total, nombre in [(1, 5, "I"), (2, 10, "II")]:
-        # Verificar si la fase ya está archivada
-        fase_archivada = False
-        if caso_id:
-            try:
-                from src.infrastructure.db.connection import get_pool
-                db_pool = get_pool()
-                async with db_pool.acquire() as conn:
-                    async with conn.cursor() as cur:
-                        await cur.execute(
-                            "SELECT COUNT(*) FROM EXP_FOLIO WHERE CASO_ID = :1 AND TIPO_DOCUMENTO = :2",
-                            [caso_id, f"F05-FASE-{fase}"]
-                        )
-                        crow = await cur.fetchone()
-                        if crow and crow[0] > 0:
-                            fase_archivada = True
-            except Exception as e:
-                logger.error(f"Error checkeando folio de fase {nombre} en DB: {e}")
+    # Tampoco aquí se exige que las fases anteriores estén cerradas.
 
-        if not fase_archivada:
-            if not all(logros.get(f"f{fase}_i{i}") == "SI" for i in range(1, total + 1)):
-                raise HTTPException(
-                    status_code=422,
-                    detail=f"Debe completar la Fase {nombre} antes de finalizar la Fase III.",
-                )
-
-    # Verificar que los 5 ítems de la Fase III estén en SI
-    pendientes = [f"ítem {i}" for i in range(1, 6) if logros.get(f"f3_i{i}") != "SI"]
-    if pendientes:
+    evaluados = [i for i in range(1, 6) if logros.get(f"f3_i{i}") in ("SI", "NO", "PROCESO")]
+    if not evaluados:
         raise HTTPException(
             status_code=422,
-            detail=f"Fase III incompleta. Pendientes: {', '.join(pendientes)}",
+            detail="Marca al menos un indicador de la Fase III para poder cerrarla.",
         )
 
     # Generar PDF de forma síncrona (no en background)

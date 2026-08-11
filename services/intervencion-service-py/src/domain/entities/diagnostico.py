@@ -1,6 +1,29 @@
 from typing import Optional, Dict, Any
-from datetime import datetime
+from datetime import date, datetime, timedelta, timezone
 from pydantic import BaseModel, model_validator
+
+MOTIVO_PRIMERA_INFANCIA = "MENOR DE 3 AÑOS"
+
+EDUCACION_DEPENDIENTE_VACIA = {
+    "eduNivel": "",
+    "eduGrado": "",
+    "eduTurno": "",
+    "eduTipoIE": "",
+    "eduModalidad": "",
+    "eduInstitucion": "",
+    "presentaAtraso": False,
+    "tiempoAtraso": "",
+    "motivoAtraso": "",
+    "problemasAprendizaje": False,
+    "problemasConducta": False,
+    "intensidadConducta": "",
+    "expulsado": False,
+    "vecesExpulsado": "",
+    "faltasTardanzas": False,
+    "seDuermeClase": False,
+    "sufreBullying": False,
+    "tutorConversaDocente": False,
+}
 
 class DiagnosticoSocialBase(BaseModel):
     nna_id: int
@@ -20,6 +43,98 @@ class DiagnosticoSocialBase(BaseModel):
     @classmethod
     def convert_camel_to_snake(cls, data: Any) -> Any:
         if isinstance(data, dict):
+            data = dict(data)
+
+            # La aplicación del F04 puede abarcar varias sesiones. El inicio se
+            # fija en el primer guardado y el fin al registrar la ficha completa.
+            hoy = datetime.now(timezone(timedelta(hours=-5))).date()
+            es_borrador = bool(data.get("es_borrador"))
+            inicio_raw = data.get("fechaInicioAplicacion") or hoy.isoformat()
+            fin_raw = data.get("fechaFinAplicacion") or (None if es_borrador else hoy.isoformat())
+
+            try:
+                inicio = date.fromisoformat(str(inicio_raw))
+                fin = date.fromisoformat(str(fin_raw)) if fin_raw else None
+            except ValueError as exc:
+                raise ValueError("Las fechas de aplicación deben tener el formato AAAA-MM-DD.") from exc
+
+            if inicio > hoy or (fin and fin > hoy):
+                raise ValueError("Las fechas de aplicación no pueden ser posteriores a la fecha actual.")
+            if fin and inicio > fin:
+                raise ValueError("La fecha de inicio de aplicación no puede ser posterior a la fecha de fin.")
+
+            # Primera infancia: se evalúa a la fecha de inicio del F04 para que
+            # la clasificación histórica no cambie al editar la ficha años después.
+            es_menor_de_tres = False
+            fecha_nacimiento_raw = data.get("fechaNacimiento")
+            if fecha_nacimiento_raw:
+                try:
+                    nacimiento = date.fromisoformat(str(fecha_nacimiento_raw))
+                    es_menor_de_tres = (
+                        inicio.year,
+                        inicio.month,
+                        inicio.day,
+                    ) < (
+                        nacimiento.year + 3,
+                        nacimiento.month,
+                        nacimiento.day,
+                    )
+                except ValueError:
+                    pass
+            elif data.get("edad") not in (None, ""):
+                try:
+                    edad = float(data.get("edad"))
+                    unidad = str(data.get("unidadEdad") or "ANIOS").upper()
+                    if "DIA" in unidad:
+                        es_menor_de_tres = edad < 1095
+                    elif "MES" in unidad:
+                        es_menor_de_tres = edad < 36
+                    else:
+                        es_menor_de_tres = edad < 3
+                except (TypeError, ValueError):
+                    pass
+
+            if es_menor_de_tres:
+                data.update(EDUCACION_DEPENDIENTE_VACIA)
+                data["eduEstudia"] = "NO_APLICA"
+                data["eduMotivoNoEstudia"] = MOTIVO_PRIMERA_INFANCIA
+            elif data.get("eduEstudia") in ("NO", "NO_APLICA"):
+                data.update(EDUCACION_DEPENDIENTE_VACIA)
+
+            # Solo General / Situación de calle es obligatorio para finalizar.
+            # Los borradores y las demás secciones admiten información parcial.
+            if not es_borrador:
+                faltantes = []
+                detalle = data.get("situacionCalleDetalle") or {}
+                perfil = detalle.get("perfil") or {}
+                tipo_doc = str(data.get("tipoDoc") or "").strip()
+
+                def vacio(valor: Any) -> bool:
+                    return valor is None or str(valor).strip() == ""
+
+                if vacio(data.get("apellidoPaterno")):
+                    faltantes.append("Primer apellido")
+                if vacio(data.get("nombres")):
+                    faltantes.append("Nombres")
+                if vacio(data.get("sexo")):
+                    faltantes.append("Sexo")
+                if vacio(data.get("fechaNacimiento")) and vacio(data.get("edad")):
+                    faltantes.append("Fecha de nacimiento o edad estimada")
+                if not tipo_doc:
+                    faltantes.append("Tipo de documento")
+                elif tipo_doc != "7" and vacio(data.get("numeroDoc")):
+                    faltantes.append("Número de documento")
+                elif tipo_doc == "7" and vacio(data.get("detalleSinDoc")):
+                    faltantes.append("Motivo por el que no tiene documento")
+                if not any(bool(valor) for valor in perfil.values()):
+                    faltantes.append("Perfil o situación de calle")
+
+                if faltantes:
+                    raise ValueError("Complete los campos obligatorios de General / Situación de calle: " + ", ".join(faltantes))
+
+            data["fechaInicioAplicacion"] = inicio.isoformat()
+            data["fechaFinAplicacion"] = fin.isoformat() if fin else ""
+
             # Translate keys from camelCase to snake_case
             mapping = {
                 "nnaId": "nna_id",

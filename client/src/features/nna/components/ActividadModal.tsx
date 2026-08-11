@@ -243,6 +243,7 @@ export const ActividadModal: React.FC<ActividadModalProps> = ({ isOpen, onClose,
                                         onChange={(e) => setTiempoUnidad(e.target.value)}
                                         className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2.5 border text-sm bg-white"
                                     >
+                                        <option value="Semanas">Semana(s)</option>
                                         <option value="Meses">Mes(es)</option>
                                         <option value="Años">Año(s)</option>
                                     </select>

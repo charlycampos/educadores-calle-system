@@ -12,6 +12,21 @@ interface DatosPersonalesSectionProps {
     checkDuplicates: (index: number, force: boolean) => void;
 }
 
+const MOTIVOS_SIN_DOCUMENTO = [
+    'No ha tramitado documento',
+    'Tiene documento, pero no lo porta',
+    'Tiene documento, pero no recuerda el número',
+    'Documento extraviado o sustraído',
+    'Documento en trámite',
+    'Documento en poder de un familiar o tercero',
+    'Desconoce o no brinda información',
+];
+
+const OPCIONES_MOTIVO_SIN_DOCUMENTO = [
+    ...MOTIVOS_SIN_DOCUMENTO.map(motivo => ({ value: motivo, label: motivo })),
+    { value: 'OTRO', label: 'Otro' },
+];
+
 const DuplicateSemaphore = ({ status, onClick }: { status: 'unique' | 'homonym' | 'duplicate'; onClick: () => void }) => {
     const configs = {
         unique: { color: 'bg-green-100 border-green-300', icon: '✓', label: 'Único', textColor: 'text-green-700' },
@@ -39,12 +54,41 @@ export const DatosPersonalesSection: React.FC<DatosPersonalesSectionProps> = ({
     const { register, control, watch, setValue } = useFormContext<NnaFormData>();
     const { fields, remove } = useFieldArray({ control, name: "nnas" });
     const { parametros } = useNnaStore();
+    const nnas = watch('nnas');
+
+    // Mantiene consistentes los campos existentes sin agregar variables nuevas:
+    // "No tiene" nunca conserva un número y cualquier otro tipo limpia el motivo.
+    React.useEffect(() => {
+        nnas?.forEach((nna, index) => {
+            const tipoDocumento = String(nna?.tipoDoc || '');
+            if (tipoDocumento === '7' && nna?.numeroDoc) {
+                setValue(`nnas.${index}.numeroDoc`, '');
+            } else if (tipoDocumento && tipoDocumento !== '7' && nna?.detalleSinDoc) {
+                setValue(`nnas.${index}.detalleSinDoc`, '');
+            }
+        });
+    }, [nnas, setValue]);
 
     return (
         <div className="space-y-8 animate-fadeIn">
             <SectionHeader title="II. Datos Personales del NNA" />
             
             {fields.map((field, index) => {
+                const tipoDocumento = String(watch(`nnas.${index}.tipoDoc`) || '');
+                const sinDocumento = tipoDocumento === '7';
+                const detalleSinDocumento = String(watch(`nnas.${index}.detalleSinDoc`) || '');
+                const motivoPredefinido = MOTIVOS_SIN_DOCUMENTO.includes(detalleSinDocumento);
+                const motivoSeleccionado = motivoPredefinido
+                    ? detalleSinDocumento
+                    : detalleSinDocumento
+                        ? 'OTRO'
+                        : '';
+                const detalleOtro = detalleSinDocumento.startsWith('Otro:')
+                    ? detalleSinDocumento.slice('Otro:'.length).trimStart()
+                    : motivoSeleccionado === 'OTRO'
+                        ? detalleSinDocumento
+                        : '';
+
                 // Determinar el status del semáforo para este NNA en base a las coincidencias y su DNI / nombre
                 let semaphoreStatus: 'unique' | 'homonym' | 'duplicate' = 'unique';
                 if (duplicateCheckResults?.matches && duplicateCheckResults.matches.length > 0) {
@@ -102,7 +146,7 @@ export const DatosPersonalesSection: React.FC<DatosPersonalesSectionProps> = ({
                                     ]} />
                                 </div>
                                 
-                                <InputField type="date" label="Fecha Nacimiento" register={register(`nnas.${index}.fechaNacimiento` as const)} />
+                                <InputField type="date" label="Fecha Nacimiento" register={register(`nnas.${index}.fechaNacimiento` as const, { onBlur: () => checkDuplicates(index, false) })} />
                             </div>
 
                             <div className="space-y-2 border-t border-gray-100 pt-4">
@@ -197,20 +241,22 @@ export const DatosPersonalesSection: React.FC<DatosPersonalesSectionProps> = ({
                                 <InputField 
                                     label="Nº de Documento / DNI" 
                                     register={register(`nnas.${index}.numeroDoc` as const, { onBlur: () => checkDuplicates(index, false) })} 
+                                    disabled={sinDocumento}
                                     placeholder={
-                                        watch(`nnas.${index}.tipoDoc`) === '1' || watch(`nnas.${index}.tipoDoc`) === 'DNI' 
+                                        sinDocumento
+                                            ? 'No corresponde'
+                                            : tipoDocumento === '1' || tipoDocumento === 'DNI'
                                             ? 'DNI de 8 dígitos' 
                                             : 'Ingrese número'
                                     } 
                                     maxLength={
-                                        watch(`nnas.${index}.tipoDoc`) === '1' || watch(`nnas.${index}.tipoDoc`) === 'DNI' 
+                                        tipoDocumento === '1' || tipoDocumento === 'DNI'
                                             ? 8 
                                             : 15
                                     }
                                     onKeyDown={(e) => {
-                                        const tipo = watch(`nnas.${index}.tipoDoc`);
                                         // Si es DNI, solo permitir números y teclas de control
-                                        if (tipo === '1' || tipo === 'DNI') {
+                                        if (tipoDocumento === '1' || tipoDocumento === 'DNI') {
                                             if (!/[0-9]/.test(e.key) && !['Backspace', 'ArrowLeft', 'ArrowRight', 'Delete', 'Tab'].includes(e.key)) {
                                                 e.preventDefault();
                                             }
@@ -232,9 +278,41 @@ export const DatosPersonalesSection: React.FC<DatosPersonalesSectionProps> = ({
                                     </div>
                                 </div>
 
-                                <div className="md:col-span-3">
-                                    <InputField label="¿Por qué? (En caso no tenga documento de identidad)" register={register(`nnas.${index}.detalleSinDoc` as const)} placeholder="Especifique motivo..." />
-                                </div>
+                                {sinDocumento && (
+                                    <div className="md:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <SelectField
+                                            label="¿Por qué? (En caso no tenga documento de identidad)"
+                                            register={register(`nnas.${index}.detalleSinDoc` as const)}
+                                            options={OPCIONES_MOTIVO_SIN_DOCUMENTO}
+                                            value={motivoSeleccionado}
+                                            required
+                                            onChange={(event) => {
+                                                const motivo = event.target.value;
+                                                setValue(
+                                                    `nnas.${index}.detalleSinDoc`,
+                                                    motivo === 'OTRO' ? 'Otro: ' : motivo,
+                                                    { shouldDirty: true }
+                                                );
+                                            }}
+                                        />
+
+                                        {motivoSeleccionado === 'OTRO' && (
+                                            <InputField
+                                                label="Especifique el motivo"
+                                                placeholder="Escriba el motivo..."
+                                                value={detalleOtro}
+                                                required
+                                                onChange={(event) => {
+                                                    setValue(
+                                                        `nnas.${index}.detalleSinDoc`,
+                                                        `Otro: ${event.target.value}`,
+                                                        { shouldDirty: true }
+                                                    );
+                                                }}
+                                            />
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>

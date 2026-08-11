@@ -168,9 +168,13 @@ export const LogrosList = ({ nnaId, refreshKey, onNuevoLogro, onEditarLogro, onF
         { num: 3, label: 'Fase III', sub: 'Seguimiento y Egreso · 6 meses',           keys: FASE_3_KEYS, fecha: record.f3_fecha },
     ] : [];
 
-    const fase1Done = record && FASE_1_KEYS.every(k => record[k] === 'SI');
-    const fase2Done = record && FASE_2_KEYS.every(k => record[k] === 'SI');
-    const fase3Done = record && FASE_3_KEYS.every(k => record[k] === 'SI');
+    // Basta con haber evaluado un indicador para poder cerrar la fase: un NO o un
+    // EN PROCESO son evaluaciones válidas. Exigir los cinco en SI retenía al NNA
+    // ("si se tiene que cumplir todos, entonces nunca pasaremos de fase" — Luis).
+    const evaluado = (k: string) => record && ['SI', 'NO', 'PROCESO'].includes(record[k]);
+    const fase1Done = FASE_1_KEYS.some(evaluado);
+    const fase2Done = FASE_2_KEYS.some(evaluado);
+    const fase3Done = FASE_3_KEYS.some(evaluado);
 
     // Detectar fases ya cerradas desde los folios reales del expediente (persiste entre recargas)
     const fase1Cerrada = cerradas.has(1) || documents.some(d => d.pdfUrl?.includes('/pdf/fase/1'));
@@ -308,7 +312,7 @@ export const LogrosList = ({ nnaId, refreshKey, onNuevoLogro, onEditarLogro, onF
                             <div className="flex items-start gap-3">
                                 <CheckCircle2 size={18} className="text-warning flex-shrink-0 mt-0.5" />
                                 <div>
-                                    <p className="font-bold text-warning text-[13px]">Fase I completada — todos los logros en SÍ</p>
+                                    <p className="font-bold text-warning text-[13px]">Fase I lista para cerrar</p>
                                     <p className="text-[12px] text-fg-muted mt-0.5">
                                         Cierra la Fase I para generar su PDF y registrarlo en el Expediente Digital.
                                     </p>
@@ -332,12 +336,12 @@ export const LogrosList = ({ nnaId, refreshKey, onNuevoLogro, onEditarLogro, onF
                     )}
 
                     {/* Banner Fase II */}
-                    {fase1Cerrada && fase2Done && !fase2Cerrada && (
+                    {fase2Done && !fase2Cerrada && (
                         <div className="mt-2 rounded-[8px] border border-primary/40 bg-primary-soft p-4 flex items-start justify-between gap-4">
                             <div className="flex items-start gap-3">
                                 <CheckCircle2 size={18} className="text-primary flex-shrink-0 mt-0.5" />
                                 <div>
-                                    <p className="font-bold text-primary text-[13px]">Fase II completada — todos los logros en SÍ</p>
+                                    <p className="font-bold text-primary text-[13px]">Fase II lista para cerrar</p>
                                     <p className="text-[12px] text-fg-muted mt-0.5">
                                         Cierra la Fase II para generar su PDF y registrarlo en el Expediente Digital.
                                     </p>
@@ -361,14 +365,14 @@ export const LogrosList = ({ nnaId, refreshKey, onNuevoLogro, onEditarLogro, onF
                     )}
 
                     {/* Banner Fase III — lista para finalizar */}
-                    {fase2Cerrada && fase3Done && !fase3Cerrada && (
+                    {fase3Done && !fase3Cerrada && (
                         <div className="mt-2 rounded-[8px] border border-success/30 bg-success-soft p-4">
                             <div className="flex items-start justify-between gap-4">
                                 <div className="flex items-start gap-3">
                                     <CheckCircle2 size={20} className="text-success flex-shrink-0 mt-0.5" />
                                     <div>
                                         <p className="font-bold text-success text-[14px]">
-                                            Fase III completada — los 20 logros en SÍ
+                                            Fase III lista para cerrar
                                         </p>
                                         <p className="text-[12px] text-fg-muted mt-1">
                                             Al finalizar se genera el PDF de Fase III y se archiva en el Expediente Digital. El NNA estará listo para el egreso.

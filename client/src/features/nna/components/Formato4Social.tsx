@@ -1,14 +1,18 @@
 import { getToken } from '../../../utils/auth';
 import { confirmar } from '../../../components/ui/ConfirmDialog';
 import { NNA_API_URL, DERIVACION_API_URL, INTERVENCION_API_URL, AUTH_API_URL, EXPEDIENTE_API_URL } from '../../../config/api';
-import { useState, useEffect, useMemo } from 'react';
-import { Printer, Save, Plus, Edit2, Trash2, X, ArrowLeft, User, Users, GraduationCap, HeartPulse, Target, Clock, Timer, Briefcase, AlertCircle, School, CheckCircle2, XCircle } from 'lucide-react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { Save, Plus, Edit2, Trash2, X, ArrowLeft, ArrowRight, User, Users, GraduationCap, HeartPulse, Target, Clock, Timer, Briefcase, AlertCircle, School, CheckCircle2, XCircle, Mic, Sparkles, Lock } from 'lucide-react';
 import { UbigeoSelectorSimple } from './UbigeoSelectorSimple';
 import { ActividadModal } from './ActividadModal';
 import { InputField, SelectField } from '../../../components/ui/FormFields';
 import { useNnaStore } from '../../../store/nna.store';
 import { DISCAPACIDADES_CONADIS } from '../../../data/ubigeo';
 import clsx from 'clsx';
+
+import { AvisoHermanos } from './AvisoHermanos';
+import { detectarHermanos } from '../../../api/hermanos.api';
+import type { DeteccionHermanos } from '../../../api/hermanos.api';
 
 interface Formato4SocialProps {
     nna: any;
@@ -17,6 +21,39 @@ interface Formato4SocialProps {
     onClose?: () => void; // Para volver a la lista
     onSuccess?: () => void; // Para refrescar la lista
 }
+
+type FormTabId = 'GENERAL' | 'FAMILIA' | 'EDUCACION' | 'SALUD' | 'NECESIDADES';
+
+const FORM_TABS: Array<{ id: FormTabId; label: string; icon: typeof User }> = [
+    { id: 'GENERAL',     label: 'I-III. General / Calle',       icon: User },
+    { id: 'FAMILIA',     label: 'IV-V. Familia / Vivienda',     icon: Users },
+    { id: 'EDUCACION',   label: 'VI. Educación',                icon: GraduationCap },
+    { id: 'SALUD',       label: 'VII-VIII. Salud / Recreación', icon: HeartPulse },
+    { id: 'NECESIDADES', label: 'IX. Necesidades',              icon: Target },
+];
+
+const MOTIVO_PRIMERA_INFANCIA = 'MENOR DE 3 AÑOS';
+
+const EDUCACION_DEPENDIENTE_VACIA = {
+    eduNivel: '',
+    eduGrado: '',
+    eduTurno: '',
+    eduTipoIE: '',
+    eduModalidad: '',
+    eduInstitucion: '',
+    presentaAtraso: false,
+    tiempoAtraso: '',
+    motivoAtraso: '',
+    problemasAprendizaje: false,
+    problemasConducta: false,
+    intensidadConducta: '',
+    expulsado: false,
+    vecesExpulsado: '',
+    faltasTardanzas: false,
+    seDuermeClase: false,
+    sufreBullying: false,
+    tutorConversaDocente: false,
+};
 
 interface FamilyMember {
     primerApellido: string;
@@ -53,11 +90,115 @@ interface FamilyMember {
 
 interface Need {
     categoria: string;
-    descripcion: string;
+    descripcion?: string; // Compatibilidad con fichas antiguas.
     faseI: string;
     faseII: string;
     faseIII: string;
+    acciones?: NeedAction[];
 }
+
+type NeedPhase = 'faseI' | 'faseII' | 'faseIII';
+
+interface NeedAction {
+    id: string;
+    flowId?: string;
+    titulo: string;
+    faseI: string;
+    faseII: string;
+    faseIII: string;
+    fasesActivas: NeedPhase[];
+}
+
+const NEED_PHASES: Array<{ key: NeedPhase; label: string }> = [
+    { key: 'faseI', label: 'Fase I' },
+    { key: 'faseII', label: 'Fase II' },
+    { key: 'faseIII', label: 'Fase III' },
+];
+
+const createNeedActionId = () => `accion-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+const normalizeNeedActions = (need: Partial<Need>, legacyIndex = 0): NeedAction[] => {
+    if (Array.isArray(need.acciones) && need.acciones.length > 0) {
+        return need.acciones.map((action, index) => ({
+            id: action.id || `accion-${legacyIndex}-${index}`,
+            flowId: action.flowId,
+            titulo: action.titulo || 'Acción de intervención',
+            faseI: action.faseI || '',
+            faseII: action.faseII || '',
+            faseIII: action.faseIII || '',
+            fasesActivas: Array.isArray(action.fasesActivas)
+                ? action.fasesActivas
+                : NEED_PHASES.filter(phase => Boolean(action[phase.key])).map(phase => phase.key),
+        }));
+    }
+
+    const legacyPhases = NEED_PHASES.filter(phase => Boolean(need[phase.key])).map(phase => phase.key);
+    if (legacyPhases.length === 0) return [];
+    return [{
+        id: `accion-legada-${legacyIndex}`,
+        titulo: need.categoria ? `Gestión de ${String(need.categoria).toLocaleLowerCase('es-PE')}` : 'Acción de intervención',
+        faseI: need.faseI || need.descripcion || '',
+        faseII: need.faseII || '',
+        faseIII: need.faseIII || '',
+        fasesActivas: legacyPhases,
+    }];
+};
+
+const NEED_CATEGORIES = [
+    { value: 'SALUD', label: 'Salud' },
+    { value: 'IDENTIFICACIÓN', label: 'Identificación' },
+    { value: 'ALIMENTACIÓN', label: 'Alimentación' },
+    { value: 'VIVIENDA', label: 'Vivienda' },
+    { value: 'EDUCACIÓN', label: 'Educación' },
+    { value: 'LEGAL', label: 'Legal' },
+    { value: 'PAUTAS DE CRIANZA', label: 'Pautas de Crianza' },
+    { value: 'VIOLENCIA', label: 'Violencia - Física y Psicológica' },
+    { value: 'RECREATIVAS', label: 'Recreativas' },
+    { value: 'OTRA', label: 'Otra' },
+] as const;
+
+interface NeedActionFlow {
+    id: string;
+    titulo: string;
+    faseI: string;
+    faseII: string[];
+    faseIII: string[];
+}
+
+const NEED_ACTION_FLOWS: Record<string, NeedActionFlow[]> = {
+    SALUD: [
+        { id: 'salud-sis', titulo: 'Afiliación y acceso al SIS', faseI: 'Gestionar afiliación al Seguro Integral de Salud (SIS).', faseII: ['Verificar la afiliación y gestionar la primera atención de salud.'], faseIII: ['Realizar seguimiento al acceso y continuidad de la atención en salud.'] },
+        { id: 'salud-medica', titulo: 'Atención médica', faseI: 'Coordinar evaluación médica general o especializada.', faseII: ['Acompañar el tratamiento o las atenciones médicas indicadas.'], faseIII: ['Verificar la evolución y continuidad del tratamiento médico.'] },
+        { id: 'salud-psicologica', titulo: 'Atención psicológica', faseI: 'Gestionar evaluación psicológica.', faseII: ['Acompañar el proceso de atención psicológica.'], faseIII: ['Realizar seguimiento a los avances y continuidad de la atención psicológica.'] },
+        { id: 'salud-higiene', titulo: 'Higiene y autocuidado', faseI: 'Brindar orientación sobre higiene y autocuidado.', faseII: ['Reforzar hábitos de higiene y autocuidado con el NNA y su familia.'], faseIII: ['Verificar la incorporación sostenida de hábitos de higiene y autocuidado.'] },
+    ],
+    IDENTIFICACIÓN: [
+        { id: 'identidad-documentacion', titulo: 'Gestión de documentación', faseI: 'Gestionar certificado de nacido vivo.', faseII: ['Gestionar la inscripción de la partida de nacimiento.'], faseIII: ['Gestionar la inscripción o duplicado del DNI.'] },
+    ],
+    ALIMENTACIÓN: [
+        { id: 'alimentacion-nutricion', titulo: 'Alimentación y nutrición', faseI: 'Coordinar evaluación nutricional del NNA.', faseII: ['Gestionar acceso a un programa de apoyo alimentario.', 'Orientar a la familia sobre alimentación saludable.'], faseIII: ['Realizar seguimiento al estado nutricional y a la alimentación del NNA.'] },
+    ],
+    VIVIENDA: [
+        { id: 'vivienda-condiciones', titulo: 'Condiciones de vivienda', faseI: 'Coordinar la evaluación de las condiciones de vivienda.', faseII: ['Orientar sobre acceso a servicios básicos y condiciones seguras de vivienda.'], faseIII: ['Realizar seguimiento a las mejoras gestionadas en la vivienda.'] },
+    ],
+    EDUCACIÓN: [
+        { id: 'educacion-insercion', titulo: 'Matrícula o reinserción educativa', faseI: 'Gestionar matrícula o reinserción educativa.', faseII: ['Coordinar seguimiento de asistencia y rendimiento escolar.'], faseIII: ['Verificar la permanencia y continuidad educativa.'] },
+        { id: 'educacion-apoyo', titulo: 'Apoyo educativo', faseI: 'Identificar necesidades de reforzamiento escolar o apoyo pedagógico.', faseII: ['Gestionar reforzamiento escolar o apoyo pedagógico.'], faseIII: ['Evaluar los avances obtenidos mediante el apoyo educativo.'] },
+    ],
+    LEGAL: [
+        { id: 'legal-orientacion', titulo: 'Orientación y acompañamiento legal', faseI: 'Brindar orientación legal a la familia.', faseII: ['Coordinar la derivación a la entidad competente.'], faseIII: ['Realizar seguimiento al trámite o procedimiento legal.'] },
+    ],
+    'PAUTAS DE CRIANZA': [
+        { id: 'crianza-positiva', titulo: 'Fortalecimiento de pautas de crianza', faseI: 'Brindar orientación sobre pautas de crianza positiva.', faseII: ['Promover la participación del familiar en talleres de crianza.'], faseIII: ['Realizar seguimiento y consejería familiar sobre pautas de crianza.'] },
+    ],
+    VIOLENCIA: [
+        { id: 'violencia-proteccion', titulo: 'Atención y protección frente a violencia', faseI: 'Activar la ruta de atención y protección correspondiente.', faseII: ['Gestionar evaluación psicológica y coordinar con la entidad competente.'], faseIII: ['Realizar seguimiento a las medidas de protección y recuperación.'] },
+    ],
+    RECREATIVAS: [
+        { id: 'recreacion-participacion', titulo: 'Participación recreativa y comunitaria', faseI: 'Identificar intereses deportivos, recreativos o culturales.', faseII: ['Gestionar la vinculación con una institución deportiva, cultural o comunitaria.'], faseIII: ['Realizar seguimiento a la participación sostenida del NNA.'] },
+    ],
+    OTRA: [],
+};
 
 const diffHours = (start: string, end: string): number => {
     if (!start || !end) return 0;
@@ -91,8 +232,265 @@ const normalizeCatalogText = (value: unknown): string => String(value ?? '')
     .trim()
     .toUpperCase();
 
+type TiempoSituacionCalle = {
+    cantidad: string;
+    unidad: 'SEMANAS' | 'MESES' | 'AÑOS';
+};
+
+const parseTiempoSituacionCalle = (value: unknown): TiempoSituacionCalle => {
+    const fallback: TiempoSituacionCalle = { cantidad: '', unidad: 'MESES' };
+
+    if (value && typeof value === 'object') {
+        const tiempo = value as { cantidad?: unknown; unidad?: unknown };
+        const cantidad = String(tiempo.cantidad ?? '').trim();
+        if (!cantidad) return fallback;
+        const unidadNormalizada = normalizeCatalogText(tiempo.unidad);
+        return {
+            cantidad,
+            unidad: unidadNormalizada.includes('SEMANA')
+                ? 'SEMANAS'
+                : unidadNormalizada.includes('ANO')
+                    ? 'AÑOS'
+                    : 'MESES',
+        };
+    }
+
+    const texto = String(value ?? '').trim();
+    if (!texto) return fallback;
+    const cantidad = texto.match(/\d+(?:[.,]\d+)?/)?.[0]?.replace(',', '.') || '';
+    if (!cantidad) return fallback;
+
+    const textoNormalizado = normalizeCatalogText(texto);
+    return {
+        cantidad,
+        unidad: textoNormalizado.includes('SEMANA')
+            ? 'SEMANAS'
+            : textoNormalizado.includes('ANO')
+                ? 'AÑOS'
+                : 'MESES',
+    };
+};
+
+const formatTiempoSituacionCalle = (tiempo?: { cantidad?: unknown; unidad?: unknown }): string => {
+    const cantidad = String(tiempo?.cantidad ?? '').trim();
+    const unidad = String(tiempo?.unidad ?? '').trim();
+    return cantidad ? `${cantidad} ${unidad}`.trim() : '';
+};
+
+const calcularTiempoDesdeActividades = (actividades: any[]): TiempoSituacionCalle | null => {
+    let mayor: { tiempo: TiempoSituacionCalle; mesesEquivalentes: number } | null = null;
+
+    actividades.forEach((actividad) => {
+        const unidad = normalizeCatalogText(actividad?.tiempoUnidad);
+        const tiempo = unidad === 'DETALLE'
+            ? parseTiempoSituacionCalle(actividad?.tiempoValor)
+            : parseTiempoSituacionCalle({
+                cantidad: actividad?.tiempoValor,
+                unidad: actividad?.tiempoUnidad,
+            });
+        const cantidad = Number(tiempo.cantidad);
+        if (!Number.isFinite(cantidad) || cantidad <= 0) return;
+
+        const mesesEquivalentes = tiempo.unidad === 'AÑOS'
+            ? cantidad * 12
+            : tiempo.unidad === 'SEMANAS'
+                ? cantidad / 4.345
+                : cantidad;
+
+        if (!mayor || mesesEquivalentes > mayor.mesesEquivalentes) {
+            mayor = { tiempo, mesesEquivalentes };
+        }
+    });
+
+    const resultado = mayor as { tiempo: TiempoSituacionCalle; mesesEquivalentes: number } | null;
+    return resultado?.tiempo ?? null;
+};
+
+const getTiempoGuardadoDiagnostico = (initialData: any): TiempoSituacionCalle | null => {
+    if (!initialData) return null;
+    let extra: any = {};
+    try {
+        extra = typeof initialData.datos_extra === 'string'
+            ? JSON.parse(initialData.datos_extra)
+            : initialData.datos_extra || {};
+    } catch {}
+
+    const detalle = initialData.situacionCalleDetalle?.tiempo
+        ?? extra.situacionCalleDetalle?.tiempo;
+    const tiempo = String(detalle?.cantidad ?? '').trim()
+        ? parseTiempoSituacionCalle(detalle)
+        : parseTiempoSituacionCalle(initialData.tiempo_en_calle ?? initialData.tiempoEnCalle);
+    return tiempo.cantidad ? tiempo : null;
+};
+
+type HorariosSituacionCalle = {
+    manana: boolean;
+    tarde: boolean;
+    noche: boolean;
+    madrugada: boolean;
+};
+
+const HORARIOS_VACIOS: HorariosSituacionCalle = {
+    manana: false,
+    tarde: false,
+    noche: false,
+    madrugada: false,
+};
+
+const calcularHorariosDesdeActividades = (actividades: any[]): HorariosSituacionCalle => {
+    const resultado = { ...HORARIOS_VACIOS };
+    const franjas: Record<keyof HorariosSituacionCalle, Array<[number, number]>> = {
+        madrugada: [[0, 360], [1440, 1800]],
+        manana: [[360, 720], [1800, 2160]],
+        tarde: [[720, 1080], [2160, 2520]],
+        noche: [[1080, 1440], [2520, 2880]],
+    };
+
+    const minutos = (hora: unknown): number | null => {
+        const match = String(hora ?? '').match(/^(\d{1,2}):(\d{2})$/);
+        if (!match) return null;
+        const total = Number(match[1]) * 60 + Number(match[2]);
+        return Number.isFinite(total) && total >= 0 && total <= 1440 ? total : null;
+    };
+
+    const marcarTurno = (inicioRaw: unknown, finRaw: unknown) => {
+        const inicio = minutos(inicioRaw);
+        const finBase = minutos(finRaw);
+        if (inicio === null || finBase === null || inicio === finBase) return;
+        const fin = finBase < inicio ? finBase + 1440 : finBase;
+
+        (Object.keys(franjas) as Array<keyof HorariosSituacionCalle>).forEach((franja) => {
+            if (franjas[franja].some(([desde, hasta]) => inicio < hasta && fin > desde)) {
+                resultado[franja] = true;
+            }
+        });
+    };
+
+    actividades.forEach((actividad) => {
+        Object.values(actividad?.agenda || {}).forEach((dia: any) => {
+            if (!dia?.activo) return;
+            marcarTurno(dia.turno1Inicio, dia.turno1Fin);
+            marcarTurno(dia.turno2Inicio, dia.turno2Fin);
+        });
+    });
+
+    return resultado;
+};
+
+const getHorariosGuardadosDiagnostico = (initialData: any): HorariosSituacionCalle | null => {
+    if (!initialData) return null;
+    let extra: any = {};
+    try {
+        extra = typeof initialData.datos_extra === 'string'
+            ? JSON.parse(initialData.datos_extra)
+            : initialData.datos_extra || {};
+    } catch {}
+    const horarios = initialData.situacionCalleDetalle?.horarios
+        ?? extra.situacionCalleDetalle?.horarios;
+
+    // "madrugada" identifica las fichas guardadas después de incorporar este bloque.
+    // Las fichas antiguas traían tres falsos por defecto, aunque nunca mostraron el campo.
+    if (!horarios || !Object.prototype.hasOwnProperty.call(horarios, 'madrugada')) return null;
+    return {
+        manana: Boolean(horarios.manana),
+        tarde: Boolean(horarios.tarde),
+        noche: Boolean(horarios.noche),
+        madrugada: Boolean(horarios.madrugada),
+    };
+};
+
+type FrecuenciaSituacionCalle = {
+    diario: boolean;
+    interdiario: boolean;
+    finesSemana: boolean;
+    temporadas: boolean;
+};
+
+const FRECUENCIA_VACIA: FrecuenciaSituacionCalle = {
+    diario: false,
+    interdiario: false,
+    finesSemana: false,
+    temporadas: false,
+};
+
+const calcularFrecuenciaDesdeActividades = (actividades: any[]): FrecuenciaSituacionCalle => {
+    const diasOrdenados = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
+    const diasActivos = new Set<number>();
+
+    actividades.forEach((actividad) => {
+        diasOrdenados.forEach((dia, index) => {
+            if (actividad?.agenda?.[dia]?.activo) diasActivos.add(index);
+        });
+    });
+
+    if (diasActivos.size >= 5) {
+        return { ...FRECUENCIA_VACIA, diario: true };
+    }
+    if (diasActivos.size > 0 && [...diasActivos].every((dia) => dia === 5 || dia === 6)) {
+        return { ...FRECUENCIA_VACIA, finesSemana: true };
+    }
+
+    const patron = [...diasActivos].sort((a, b) => a - b).join(',');
+    if (['0,2,4', '1,3,5', '0,2,4,6'].includes(patron)) {
+        return { ...FRECUENCIA_VACIA, interdiario: true };
+    }
+
+    return { ...FRECUENCIA_VACIA };
+};
+
+const getFrecuenciaGuardadaDiagnostico = (initialData: any): FrecuenciaSituacionCalle | null => {
+    if (!initialData) return null;
+    let extra: any = {};
+    try {
+        extra = typeof initialData.datos_extra === 'string'
+            ? JSON.parse(initialData.datos_extra)
+            : initialData.datos_extra || {};
+    } catch {}
+    const frecuencia = initialData.situacionCalleDetalle?.frecuencia
+        ?? extra.situacionCalleDetalle?.frecuencia;
+    if (!frecuencia || !Object.values(frecuencia).some(Boolean)) return null;
+    return {
+        diario: Boolean(frecuencia.diario),
+        interdiario: Boolean(frecuencia.interdiario),
+        finesSemana: Boolean(frecuencia.finesSemana),
+        temporadas: Boolean(frecuencia.temporadas),
+    };
+};
+
+const calcularActividadDesdeActividades = (actividades: any[]): string => {
+    const unicas = new Map<string, string>();
+    actividades.forEach((actividad) => {
+        const nombreBase = String(actividad?.actividad ?? '').trim();
+        const esOtro = normalizeCatalogText(nombreBase).startsWith('OTRO');
+        const nombre = String(
+            esOtro && actividad?.actividadEspecifique
+                ? actividad.actividadEspecifique
+                : nombreBase.replace(/_/g, ' ')
+        ).trim();
+        if (nombre) unicas.set(normalizeCatalogText(nombre), nombre);
+    });
+    return [...unicas.values()].join('; ');
+};
+
+const getActividadGuardadaDiagnostico = (initialData: any): string => {
+    if (!initialData) return '';
+    let extra: any = {};
+    try {
+        extra = typeof initialData.datos_extra === 'string'
+            ? JSON.parse(initialData.datos_extra)
+            : initialData.datos_extra || {};
+    } catch {}
+    return String(
+        initialData.situacionCalleDetalle?.actividad
+        ?? extra.situacionCalleDetalle?.actividad
+        ?? initialData.actividad_calle
+        ?? initialData.actividadCalle
+        ?? ''
+    ).trim();
+};
+
 const normalizeEstudiaActualmente = (value: unknown): string => {
-    if (value === null || value === undefined || value === '') return 'NO';
+    if (value === null || value === undefined || value === '') return '';
     const str = String(value).toUpperCase().trim();
     if (str === '1' || str === 'SI' || str === 'TRUE') return 'SI';
     if (str === '0' || str === 'NO' || str === 'FALSE') return 'NO';
@@ -207,7 +605,28 @@ const Toggle3 = ({ label, value, onChange }: { label: string; value: string; onC
     </div>
 );
 
+const NeedPhaseItems = ({ value }: { value?: string }) => {
+    const items = String(value || '').split(/\r?\n/).map(item => item.trim()).filter(Boolean);
+    if (items.length === 0) return <span>-</span>;
+    return (
+        <div className="space-y-1">
+            {items.map((item, index) => (
+                <div key={`${index}-${item}`} className="flex items-start gap-1">
+                    <span className="shrink-0 font-bold">-</span>
+                    <span>{item}</span>
+                </div>
+            ))}
+        </div>
+    );
+};
+
 export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: Formato4SocialProps) => {
+    const getTodayLocal = () => {
+        const now = new Date();
+        const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
+        return local.toISOString().slice(0, 10);
+    };
+
 
     const { parametros, fetchParametros } = useNnaStore();
 
@@ -283,7 +702,9 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
         { value: '4', label: 'En trámite' }
     ];
 
-    const [activeTab, setActiveTab] = useState<'GENERAL' | 'FAMILIA' | 'EDUCACION' | 'SALUD' | 'NECESIDADES'>('GENERAL');
+    const [activeTab, setActiveTab] = useState<FormTabId>('GENERAL');
+    const [generalErrors, setGeneralErrors] = useState<string[]>([]);
+    const activeTabIndex = FORM_TABS.findIndex(tab => tab.id === activeTab);
     const [loading, setLoading] = useState(false);
     const [showSaveConfirm, setShowSaveConfirm] = useState(false);
     const [showDraftConfirm, setShowDraftConfirm] = useState(false);
@@ -316,6 +737,9 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
 
     // ── Pre-carga de datos desde F03 (NNA + Caso) ──────────────────────────
     const perfilCaso = caso?.perfil || '';
+    // El modal de actividades usa estos códigos para cargar sus opciones.
+    // Normalizamos el valor legado para que "Vida en calle" también lo habilite.
+    const perfilActividad = perfilCaso === 'VIDA_CALLE' ? 'VIDA_EN_CALLE' : perfilCaso;
     const perfilCalle = {
         trabajoInfantil: perfilCaso === 'TRABAJO_EN_CALLE',
         mendicidad:      perfilCaso === 'MENDICIDAD',
@@ -326,6 +750,9 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
     const explotacionSexualF03: boolean | null =
         caso?.victimaExplotacion === 'SI' || caso?.victima_explotacion === 'SI' || perfilCaso === 'EXPLOTACION_SEXUAL' ? true : 
         (caso?.victimaExplotacion === 'NO' || caso?.victima_explotacion === 'NO' ? false : null);
+    const tiempoSituacionDesdeInscripcion = parseTiempoSituacionCalle(
+        caso?.tiempoEnCalle ?? caso?.tiempo_en_calle
+    );
 
     const [formData, setFormData] = useState({
         // I-III. Datos Generales y Calle
@@ -340,8 +767,10 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                                     : true,
         detalleSinDoc:      nna?.detalleSinDoc    || '',
         fechaNacimiento:    nna?.fechaNacimiento  ? new Date(nna.fechaNacimiento).toISOString().split('T')[0] : '',
-        // Fecha en que se inicia/termina de aplicar la entrevista del Formato 4 (no es la fecha de nacimiento del NNA)
-        fechaInicioAplicacion: '',
+        // Fecha en que se inicia/termina de aplicar la entrevista del Formato 4 (no es la fecha de nacimiento del NNA).
+        // Las pone el sistema, no el educador: el inicio es hoy —el día en que se
+        // empieza a llenar— y el fin se sella al finalizar la ficha.
+        fechaInicioAplicacion: getTodayLocal(),
         fechaFinAplicacion:    '',
         edad:               nna?.edad        ? String(nna.edad) : '',
         unidadEdad:         nna?.unidadEdad  || 'ANIOS',
@@ -357,12 +786,12 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
         actividadEconomica: caso?.actividadRealizada   || '',
         situacionCalleDetalle: {
             perfil: perfilCalle,
-            tiempo: { cantidad: '', unidad: 'MESES' },
+            tiempo: tiempoSituacionDesdeInscripcion,
             explotacionSexual: null as boolean | null,
             ingresoSemanal: '',
             usoDinero: { gastosFamiliares: false, gastosPropios: false, entregaOtraPersona: false },
-            horarios:  { manana: false, tarde: false, noche: false },
-            frecuencia: { diario: false, interdiario: false, finesSemana: false, temporadas: false },
+            horarios:  { ...HORARIOS_VACIOS },
+            frecuencia: { ...FRECUENCIA_VACIA },
             motivo: '',
             modalidadTrabajo: { puestoFijo: false, ambulante: false, recorre: false },
             actividad: '',
@@ -439,7 +868,16 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
         materialVivienda:    '',
         numeroAmbientes:     '',
         propiedadVivienda:   '',
-        serviciosBasicos:    { agua: false, luz: false, desague: false, otros: false },
+        serviciosBasicos: {
+            agua: false,
+            detalleAgua: '',
+            luz: false,
+            detalleLuz: '',
+            desague: false,
+            detalleDesague: '',
+            otros: false,
+            detalleOtros: '',
+        },
         viviendaSisfoh:      '',
         duermeCama:          '',
         lugarPernocte:        nna?.lugarPernocte    || '',
@@ -474,7 +912,7 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
         eduMotivoNoEstudia: nna?.detalleNoEstudia || '',
 
         // VII. Salud
-        afiliadoSIS:              nna?.afiliadoSIS        || 'NO',
+        afiliadoSIS:              nna?.afiliadoSIS        || '',
         afiliadoOtroSeguro:       nna?.afiliadoOtroSeguro || '',
         detalleOtroSeguro:        nna?.detalleOtroSeguro  || '',
 
@@ -539,7 +977,7 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
         interesesDeportivos:          false,
         interesesArtisticos:          false,
         actividadesFamilia:           false,
-        recreacionActividadFamilia:   'NO',
+        recreacionActividadFamilia:   '',
         recreacionInteresDeporte:     '',
         recreacionInteresArte:        '',
         recreacionParticipaInstitucion: 'NO',
@@ -550,6 +988,45 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
         necesidades: [] as Need[]
     });
 
+    const esMenorDeTres = useMemo(() => {
+        const fechaNacimiento = formData.fechaNacimiento;
+        const fechaReferencia = formData.fechaInicioAplicacion || getTodayLocal();
+
+        if (fechaNacimiento) {
+            const [birthYear, birthMonth, birthDay] = fechaNacimiento.split('-').map(Number);
+            const [refYear, refMonth, refDay] = fechaReferencia.split('-').map(Number);
+            if ([birthYear, birthMonth, birthDay, refYear, refMonth, refDay].every(Number.isFinite)) {
+                const cumpleTres = new Date(birthYear + 3, birthMonth - 1, birthDay);
+                const referencia = new Date(refYear, refMonth - 1, refDay);
+                return referencia < cumpleTres;
+            }
+        }
+
+        if (String(formData.edad ?? '').trim() === '') return false;
+        const edad = Number(formData.edad);
+        if (!Number.isFinite(edad) || edad < 0) return false;
+        const unidad = String(formData.unidadEdad || 'ANIOS').toUpperCase();
+        if (unidad.includes('DIA')) return edad < 1095;
+        if (unidad.includes('MES')) return edad < 36;
+        return edad < 3;
+    }, [formData.fechaNacimiento, formData.fechaInicioAplicacion, formData.edad, formData.unidadEdad]);
+
+    const actualizarSituacionEducativa = (situacion: string) => {
+        setFormData(prev => {
+            if (['SI', 'PROCESO'].includes(situacion)) {
+                return { ...prev, eduEstudia: situacion, eduMotivoNoEstudia: '' };
+            }
+            return {
+                ...prev,
+                ...EDUCACION_DEPENDIENTE_VACIA,
+                eduEstudia: situacion,
+                eduMotivoNoEstudia: prev.eduMotivoNoEstudia === MOTIVO_PRIMERA_INFANCIA
+                    ? ''
+                    : prev.eduMotivoNoEstudia,
+            };
+        });
+    };
+
     // --- MODALES ---
     const [showFamilyModal, setShowFamilyModal] = useState(false);
     const [editingFamilyIndex, setEditingFamilyIndex] = useState<number | null>(null);
@@ -559,11 +1036,46 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
         vinTutUsu: '1', lenMatApo: '10', lenMatEspApo: '', autIdeEtApo: '7', autIdeEtEspApo: '', tipoDiscapApo: '6', certDiscapApo: '99', viveCon: '', telefono: ''
     });
 
+    // Detección de hermanos al registrar un integrante de la familia.
+    const [deteccionHermanos, setDeteccionHermanos] = useState<DeteccionHermanos | null>(null);
+
     const [showNeedModal, setShowNeedModal] = useState(false);
     const [editingNeedIndex, setEditingNeedIndex] = useState<number | null>(null);
     const [currentNeed, setCurrentNeed] = useState<Need>({
-        categoria: 'SALUD', descripcion: '', faseI: '', faseII: '', faseIII: ''
+        categoria: 'SALUD', faseI: '', faseII: '', faseIII: '', acciones: []
     });
+    const [activeNeedPhase, setActiveNeedPhase] = useState<NeedPhase>('faseI');
+    const [listeningActionKey, setListeningActionKey] = useState<string | null>(null);
+    const speechRecognitionRef = useRef<any>(null);
+
+    const suggestedNeeds = useMemo(() => {
+        const suggestions: Array<{ categoria: string; motivo: string }> = [];
+        const add = (categoria: string, motivo: string) => suggestions.push({ categoria, motivo });
+        const sinDocumento = String(formData.tipoDoc) === '7';
+        const sinSeguro = formData.afiliadoSIS === 'NO' && formData.afiliadoOtroSeguro === 'NO';
+        const presentaAlertaSalud = formData.enfermedadCronica
+            || formData.tieneDiscapacidad
+            || formData.problemaPsicologico
+            || formData.consumeSustancias
+            || Object.values(formData.problemasSaludTipo).some(Boolean);
+
+        if (sinDocumento) add('IDENTIFICACIÓN', 'No cuenta con un número de documento registrado.');
+        if (sinSeguro || presentaAlertaSalud) add('SALUD', sinSeguro
+            ? 'No registra afiliación a un seguro de salud.'
+            : 'Se identificó una condición que requiere atención o seguimiento en salud.');
+        if (!esMenorDeTres && formData.eduEstudia === 'NO') add('EDUCACIÓN', 'Actualmente no se encuentra estudiando.');
+        if (!formData.recibeTresAlimentos || !formData.aparentaBienAlimentado) add('ALIMENTACIÓN', 'Se identificó una alerta en alimentación o nutrición.');
+        if (formData.violenciaCorrectiva || formData.victimaAbusoSexual) add('VIOLENCIA', 'Se identificaron indicadores que requieren atención frente a violencia.');
+        if (formData.violenciaCorrectiva) add('PAUTAS DE CRIANZA', 'Se requiere fortalecer pautas de crianza sin violencia.');
+        if (formData.tiempoParaJugar === false) add('RECREATIVAS', 'Se identificó que el NNA no dispone de tiempo para jugar o realizar actividades recreativas.');
+
+        const registradas = new Set(formData.necesidades.map(need => need.categoria));
+        return suggestions.filter(item => !registradas.has(item.categoria));
+    }, [formData, esMenorDeTres]);
+
+    useEffect(() => () => {
+        speechRecognitionRef.current?.stop?.();
+    }, []);
 
     // --- ESTADO DE ACTIVIDADES EN CALLE (Trasladado de F03) ---
     const [actividadesCalle, setActividadesCalle] = useState<any[]>(() => {
@@ -628,6 +1140,87 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
     }, [actividadesCalle]);
 
     const horasMensualesCalculadas = Number((horasSemanalesCalculadas * 4.28).toFixed(1));
+    const tiempoCalculadoActividades = useMemo(
+        () => calcularTiempoDesdeActividades(actividadesCalle),
+        [actividadesCalle]
+    );
+    const tiempoGuardadoDiagnostico = useMemo(
+        () => getTiempoGuardadoDiagnostico(initialData),
+        [initialData]
+    );
+    const tiempoEditadoManualmenteRef = useRef(false);
+    const horariosEditadosManualmenteRef = useRef(false);
+    const horariosCalculadosActividades = useMemo(
+        () => calcularHorariosDesdeActividades(actividadesCalle),
+        [actividadesCalle]
+    );
+    const horariosGuardadosDiagnostico = useMemo(
+        () => getHorariosGuardadosDiagnostico(initialData),
+        [initialData]
+    );
+    const frecuenciaEditadaManualmenteRef = useRef(false);
+    const frecuenciaCalculadaActividades = useMemo(
+        () => calcularFrecuenciaDesdeActividades(actividadesCalle),
+        [actividadesCalle]
+    );
+    const frecuenciaGuardadaDiagnostico = useMemo(
+        () => getFrecuenciaGuardadaDiagnostico(initialData),
+        [initialData]
+    );
+    const actividadEditadaManualmenteRef = useRef(false);
+    const actividadCalculadaActividades = useMemo(
+        () => calcularActividadDesdeActividades(actividadesCalle),
+        [actividadesCalle]
+    );
+    const actividadGuardadaDiagnostico = useMemo(
+        () => getActividadGuardadaDiagnostico(initialData),
+        [initialData]
+    );
+
+    useEffect(() => {
+        // Una modificación manual o un valor ya guardado en F04 siempre tiene prioridad.
+        if (!tiempoCalculadoActividades || tiempoGuardadoDiagnostico || tiempoEditadoManualmenteRef.current) return;
+        setFormData(prev => ({
+            ...prev,
+            situacionCalleDetalle: {
+                ...prev.situacionCalleDetalle,
+                tiempo: tiempoCalculadoActividades,
+            },
+        }));
+    }, [tiempoCalculadoActividades, tiempoGuardadoDiagnostico]);
+
+    useEffect(() => {
+        if (horariosGuardadosDiagnostico || horariosEditadosManualmenteRef.current) return;
+        setFormData(prev => ({
+            ...prev,
+            situacionCalleDetalle: {
+                ...prev.situacionCalleDetalle,
+                horarios: horariosCalculadosActividades,
+            },
+        }));
+    }, [horariosCalculadosActividades, horariosGuardadosDiagnostico]);
+
+    useEffect(() => {
+        if (frecuenciaGuardadaDiagnostico || frecuenciaEditadaManualmenteRef.current) return;
+        setFormData(prev => ({
+            ...prev,
+            situacionCalleDetalle: {
+                ...prev.situacionCalleDetalle,
+                frecuencia: frecuenciaCalculadaActividades,
+            },
+        }));
+    }, [frecuenciaCalculadaActividades, frecuenciaGuardadaDiagnostico]);
+
+    useEffect(() => {
+        if (actividadGuardadaDiagnostico || actividadEditadaManualmenteRef.current) return;
+        setFormData(prev => ({
+            ...prev,
+            situacionCalleDetalle: {
+                ...prev.situacionCalleDetalle,
+                actividad: actividadCalculadaActividades,
+            },
+        }));
+    }, [actividadCalculadaActividades, actividadGuardadaDiagnostico]);
 
     const riesgoCalculado = useMemo(() => {
         if (horasSemanalesCalculadas === 0) return { color: 'border-slate-200 text-slate-500 bg-slate-50', etiqueta: 'Sin Actividad', desc: 'No se han registrado horas.' };
@@ -667,6 +1260,33 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                     ...extra,
                     ...cleanInitialData
                 };
+                const tiempoDetalleGuardado = mergedData.situacionCalleDetalle?.tiempo;
+                const tiempoColumnaGuardado = parseTiempoSituacionCalle(
+                    initialData.tiempo_en_calle ?? initialData.tiempoEnCalle
+                );
+                const tiempoDiagnostico = String(tiempoDetalleGuardado?.cantidad ?? '').trim()
+                    ? tiempoDetalleGuardado
+                    : tiempoColumnaGuardado.cantidad
+                        ? tiempoColumnaGuardado
+                        : prev.situacionCalleDetalle.tiempo;
+                const horariosDetalleGuardados = mergedData.situacionCalleDetalle?.horarios;
+                const horariosDiagnostico = horariosDetalleGuardados
+                    && Object.prototype.hasOwnProperty.call(horariosDetalleGuardados, 'madrugada')
+                    ? horariosDetalleGuardados
+                    : prev.situacionCalleDetalle.horarios;
+                const frecuenciaDetalleGuardada = mergedData.situacionCalleDetalle?.frecuencia;
+                const frecuenciaDiagnostico = frecuenciaDetalleGuardada
+                    && Object.values(frecuenciaDetalleGuardada).some(Boolean)
+                    ? frecuenciaDetalleGuardada
+                    : prev.situacionCalleDetalle.frecuencia;
+                const actividadDetalleGuardada = String(
+                    mergedData.situacionCalleDetalle?.actividad
+                    ?? initialData.actividad_calle
+                    ?? initialData.actividadCalle
+                    ?? ''
+                ).trim();
+                const actividadDiagnostico = actividadDetalleGuardada
+                    || prev.situacionCalleDetalle.actividad;
 
                 // Normalizadores de códigos y formatos de F03 a F04
                 const normCode = (val: any): string => {
@@ -814,10 +1434,30 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                     situacionCalleDetalle: {
                         ...prev.situacionCalleDetalle,
                         ...(mergedData.situacionCalleDetalle || {}),
+                        tiempo: {
+                            ...prev.situacionCalleDetalle.tiempo,
+                            ...tiempoDiagnostico,
+                        },
+                        horarios: {
+                            ...prev.situacionCalleDetalle.horarios,
+                            ...horariosDiagnostico,
+                        },
+                        frecuencia: {
+                            ...prev.situacionCalleDetalle.frecuencia,
+                            ...frecuenciaDiagnostico,
+                        },
+                        actividad: actividadDiagnostico,
                         usoDinero: {
                             ...prev.situacionCalleDetalle.usoDinero,
                             ...(mergedData.situacionCalleDetalle?.usoDinero || {})
                         }
+                    },
+
+                    // Mantener compatibilidad con fichas anteriores que solo
+                    // guardaban los cuatro indicadores booleanos de servicios.
+                    serviciosBasicos: {
+                        ...prev.serviciosBasicos,
+                        ...(mergedData.serviciosBasicos || {}),
                     },
 
                     // higieneAdecuada pasó de booleano a SI/NO/A_VECES. Si el registro guardado
@@ -894,6 +1534,19 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                         ? mergedData.eduMotivoNoEstudia
                         : nna?.detalleNoEstudia || '',
 
+                    // Las fichas anteriores guardaban una columna "Descripción".
+                    // Si no tenían acción en Fase I, conservar ese texto como acción inicial.
+                    necesidades: Array.isArray(mergedData.necesidades)
+                        ? mergedData.necesidades.map((need: any, index: number) => ({
+                            categoria: need.categoria || '',
+                            descripcion: need.descripcion || '',
+                            faseI: need.faseI || need.descripcion || '',
+                            faseII: need.faseII || '',
+                            faseIII: need.faseIII || '',
+                            acciones: normalizeNeedActions(need, index),
+                        }))
+                        : prev.necesidades,
+
                     familiares: mappedFamiliares,
                 };
             });
@@ -912,10 +1565,108 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
         }
     }, [initialData]);
 
+    // Debe ejecutarse después de la precarga de initialData para que una ficha
+    // antigua no reponga respuestas educativas que ya no aplican por la edad.
+    useEffect(() => {
+        setFormData(prev => {
+            if (esMenorDeTres) {
+                return {
+                    ...prev,
+                    ...EDUCACION_DEPENDIENTE_VACIA,
+                    eduEstudia: 'NO_APLICA',
+                    eduMotivoNoEstudia: MOTIVO_PRIMERA_INFANCIA,
+                };
+            }
+            if (prev.eduEstudia === 'NO_APLICA' && prev.eduMotivoNoEstudia === MOTIVO_PRIMERA_INFANCIA) {
+                return { ...prev, eduEstudia: '', eduMotivoNoEstudia: '' };
+            }
+            return prev;
+        });
+    }, [esMenorDeTres, initialData]);
+
     // --- HANDLERS ---
+    const scrollToFormTop = () => {
+        requestAnimationFrame(() => {
+            document.getElementById('f04-form-top')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+    };
+
+    const validarGeneralCalle = () => {
+        const errores: string[] = [];
+        const detalle = formData.situacionCalleDetalle;
+        const perfilSeleccionado = Object.values(detalle.perfil).some(Boolean);
+
+        if (!formData.apellidoPaterno.trim()) errores.push('Primer apellido');
+        if (!formData.nombres.trim()) errores.push('Nombres');
+        if (!formData.sexo) errores.push('Sexo');
+        if (!formData.fechaNacimiento && !formData.edad) errores.push('Fecha de nacimiento o edad estimada');
+        if (!formData.tipoDoc) errores.push('Tipo de documento');
+        if (formData.tipoDoc && formData.tipoDoc !== '7' && !formData.numeroDoc.trim()) errores.push('Número de documento');
+        if (formData.tipoDoc === '7' && !formData.detalleSinDoc.trim()) errores.push('Motivo por el que no tiene documento');
+        if (!perfilSeleccionado) errores.push('Perfil o situación de calle');
+        setGeneralErrors(errores);
+
+        if (errores.length > 0) {
+            setActiveTab('GENERAL');
+            scrollToFormTop();
+            return false;
+        }
+        return true;
+    };
+
+    const handleOpenSaveConfirm = () => {
+        if (validarGeneralCalle()) setShowSaveConfirm(true);
+    };
+
+    const handlePreviousSection = () => {
+        const currentIndex = FORM_TABS.findIndex(tab => tab.id === activeTab);
+        if (currentIndex <= 0) return;
+        setActiveTab(FORM_TABS[currentIndex - 1].id);
+        scrollToFormTop();
+    };
+
+    const handleNextSection = () => {
+        const currentIndex = FORM_TABS.findIndex(tab => tab.id === activeTab);
+        if (activeTab === 'GENERAL' && !validarGeneralCalle()) return;
+        if (currentIndex >= FORM_TABS.length - 1) {
+            handleOpenSaveConfirm();
+            return;
+        }
+        setActiveTab(FORM_TABS[currentIndex + 1].id);
+        scrollToFormTop();
+    };
+
+    const prepararFechasAplicacion = (esBorrador: boolean) => {
+        const hoy = getTodayLocal();
+        const fechaInicioAplicacion = formData.fechaInicioAplicacion || hoy;
+        const fechaFinAplicacion = esBorrador
+            ? formData.fechaFinAplicacion
+            : (formData.fechaFinAplicacion || hoy);
+
+        let error = '';
+        if (fechaInicioAplicacion > hoy || fechaFinAplicacion > hoy) {
+            error = 'Las fechas de aplicación no pueden ser posteriores a la fecha actual.';
+        } else if (fechaFinAplicacion && fechaInicioAplicacion > fechaFinAplicacion) {
+            error = 'La fecha de inicio de aplicación no puede ser posterior a la fecha de fin.';
+        }
+
+        return { fechaInicioAplicacion, fechaFinAplicacion, error };
+    };
+
     const handleSaveDraft = async () => {
         setLoading(true);
         try {
+            const fechas = prepararFechasAplicacion(true);
+            if (fechas.error) {
+                setResultModal({ type: 'error', title: 'Fechas no válidas', message: fechas.error });
+                return;
+            }
+            setFormData(prev => ({
+                ...prev,
+                fechaInicioAplicacion: fechas.fechaInicioAplicacion,
+                fechaFinAplicacion: fechas.fechaFinAplicacion,
+            }));
+
             const token = getToken();
             const isEdit = !!(initialData && initialData.id);
             const method = isEdit ? 'PUT' : 'POST';
@@ -925,6 +1676,8 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
 
             const payload = {
                 ...formData,
+                fechaInicioAplicacion: fechas.fechaInicioAplicacion,
+                fechaFinAplicacion: fechas.fechaFinAplicacion,
                 actividadesCalle: actividadesCalle,
                 nnaId: nna.id,
                 casoId: caso?.id,
@@ -955,8 +1708,20 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
     };
 
     const handleSave = async () => {
+        if (!validarGeneralCalle()) return;
         setLoading(true);
         try {
+            const fechas = prepararFechasAplicacion(false);
+            if (fechas.error) {
+                setResultModal({ type: 'error', title: 'Fechas no válidas', message: fechas.error });
+                return;
+            }
+            setFormData(prev => ({
+                ...prev,
+                fechaInicioAplicacion: fechas.fechaInicioAplicacion,
+                fechaFinAplicacion: fechas.fechaFinAplicacion,
+            }));
+
             const token = getToken();
             const isEdit = !!(initialData && initialData.id);
             const method = isEdit ? 'PUT' : 'POST';
@@ -966,6 +1731,8 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
 
             const payload = {
                 ...formData,
+                fechaInicioAplicacion: fechas.fechaInicioAplicacion,
+                fechaFinAplicacion: fechas.fechaFinAplicacion,
                 actividadesCalle: actividadesCalle,
                 nnaId: nna.id,
                 casoId: caso?.id,
@@ -1021,6 +1788,32 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
         }
     };
 
+    /**
+     * Pregunta al backend si el familiar recién registrado permite deducir un
+     * hermano: por parentesco "Hermano/a" o por el DNI del padre o madre.
+     * Si el hermano no está registrado, el aviso lo indica — sin ficha propia
+     * no tiene caso que mencionar en el informe situacional.
+     */
+    const verificarHermanos = async (familiar: any) => {
+        if (!nna?.id) return;
+        try {
+            const res = await detectarHermanos(nna.id, {
+                parentesco: familiar.vinTutUsu || familiar.parentesco,
+                nombres: [familiar.nomApeTutApo || familiar.nombres,
+                          familiar.priApeTutApo || familiar.primerApellido,
+                          familiar.segApeTutApo || familiar.segundoApellido]
+                         .filter(Boolean).join(' ').trim(),
+                dni: familiar.nroDocTutApo || familiar.dni,
+            });
+            if (res.candidatos.length > 0 || res.requiereRegistro) {
+                setDeteccionHermanos(res);
+            }
+        } catch (err) {
+            // La detección es una ayuda: si falla, no debe frenar el registro.
+            console.error('No se pudo verificar hermanos', err);
+        }
+    };
+
     const handleSaveFamily = () => {
         let finalFamiliar = { ...currentFamily };
         const isTutor = finalFamiliar.esTutorPrincipal === 'true' || finalFamiliar.esTutorPrincipal === true;
@@ -1069,17 +1862,37 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
             familiares: newFam 
         });
         setShowFamilyModal(false);
+
+        // Si el integrante recién guardado permite deducir un hermano, se
+        // consulta y se le pregunta al educador. Nunca se vincula solo.
+        verificarHermanos(finalFamiliar);
     };
 
-    const handleAddNeed = () => {
+    const handleAddNeed = (categoria?: string) => {
+        const categoriasRegistradas = new Set(formData.necesidades.map(need => need.categoria));
+        const categoriaInicial = categoria && !categoriasRegistradas.has(categoria)
+            ? categoria
+            : NEED_CATEGORIES.find(item => !categoriasRegistradas.has(item.value))?.value || '';
         setEditingNeedIndex(null);
-        setCurrentNeed({ categoria: 'SALUD', descripcion: '', faseI: '', faseII: '', faseIII: '' });
+        setCurrentNeed({ categoria: categoriaInicial, faseI: '', faseII: '', faseIII: '', acciones: [] });
+        setActiveNeedPhase('faseI');
         setShowNeedModal(true);
     };
 
     const handleEditNeed = (index: number) => {
         setEditingNeedIndex(index);
-        setCurrentNeed(formData.necesidades[index]);
+        const need = formData.necesidades[index];
+        const acciones = normalizeNeedActions(need, index);
+        setCurrentNeed({
+            ...need,
+            faseI: need.faseI || need.descripcion || '',
+            faseII: need.faseII || '',
+            faseIII: need.faseIII || '',
+            acciones,
+        });
+        const tieneFaseI = acciones.some(action => action.fasesActivas.includes('faseI'));
+        const tieneFaseII = acciones.some(action => action.fasesActivas.includes('faseII'));
+        setActiveNeedPhase(!tieneFaseI ? 'faseI' : !tieneFaseII ? 'faseII' : 'faseIII');
         setShowNeedModal(true);
     };
 
@@ -1092,14 +1905,174 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
     };
 
     const handleSaveNeed = () => {
+        const categoriaDuplicada = formData.necesidades.some((need, index) =>
+            need.categoria === currentNeed.categoria && index !== editingNeedIndex
+        );
+        if (!currentNeed.categoria || categoriaDuplicada) return;
+
+        const acciones = (currentNeed.acciones || []).filter(action => action.fasesActivas.length > 0);
+        const summarizePhase = (phase: NeedPhase) => acciones
+            .filter(action => action.fasesActivas.includes(phase) && action[phase].trim())
+            .map(action => action[phase].trim() === action.titulo.trim()
+                ? action[phase].trim()
+                : `${action.titulo}: ${action[phase].trim()}`)
+            .join('\n');
         const newNeeds = [...formData.necesidades];
+        const normalizedNeed: Need = {
+            categoria: currentNeed.categoria,
+            faseI: summarizePhase('faseI'),
+            faseII: summarizePhase('faseII'),
+            faseIII: summarizePhase('faseIII'),
+            acciones,
+        };
         if (editingNeedIndex !== null) {
-            newNeeds[editingNeedIndex] = currentNeed;
+            newNeeds[editingNeedIndex] = normalizedNeed;
         } else {
-            newNeeds.push(currentNeed);
+            newNeeds.push(normalizedNeed);
         }
         setFormData({ ...formData, necesidades: newNeeds });
         setShowNeedModal(false);
+    };
+
+    const addInitialNeedFlow = (flow: NeedActionFlow) => {
+        setCurrentNeed(prev => {
+            const acciones = [...(prev.acciones || [])];
+            const existingIndex = acciones.findIndex(action => action.flowId === flow.id);
+            if (existingIndex >= 0) {
+                const existing = acciones[existingIndex];
+                if (existing.faseI.includes(flow.faseI)) return prev;
+                acciones[existingIndex] = {
+                    ...existing,
+                    faseI: existing.faseI.trim() ? `${existing.faseI.trim()}\n${flow.faseI}` : flow.faseI,
+                    fasesActivas: existing.fasesActivas.includes('faseI') ? existing.fasesActivas : [...existing.fasesActivas, 'faseI'],
+                };
+            } else {
+                acciones.push({
+                    id: createNeedActionId(),
+                    flowId: flow.id,
+                    titulo: flow.titulo,
+                    faseI: flow.faseI,
+                    faseII: '',
+                    faseIII: '',
+                    fasesActivas: ['faseI'],
+                });
+            }
+            return { ...prev, acciones };
+        });
+        setActiveNeedPhase('faseI');
+    };
+
+    const applyNeedFlowSuggestion = (actionId: string, targetPhase: NeedPhase, suggestion: string) => {
+        setCurrentNeed(prev => ({
+            ...prev,
+            acciones: (prev.acciones || []).map(action => {
+                if (action.id !== actionId || action[targetPhase].includes(suggestion)) return action;
+                const currentText = action[targetPhase].trim();
+                return {
+                    ...action,
+                    [targetPhase]: currentText ? `${currentText}\n${suggestion}` : suggestion,
+                    fasesActivas: action.fasesActivas.includes(targetPhase)
+                        ? action.fasesActivas
+                        : [...action.fasesActivas, targetPhase],
+                };
+            }),
+        }));
+        setActiveNeedPhase(targetPhase);
+    };
+
+    const continueCustomNeedAction = (actionId: string, targetPhase: NeedPhase) => {
+        setCurrentNeed(prev => ({
+            ...prev,
+            acciones: (prev.acciones || []).map(action => {
+                if (action.id !== actionId) return action;
+                const continuation = `Continuar con la gestión: ${action.titulo}.`;
+                return {
+                    ...action,
+                    [targetPhase]: action[targetPhase].trim() || continuation,
+                    fasesActivas: action.fasesActivas.includes(targetPhase)
+                        ? action.fasesActivas
+                        : [...action.fasesActivas, targetPhase],
+                };
+            }),
+        }));
+        setActiveNeedPhase(targetPhase);
+    };
+
+    const addCustomNeedAction = (targetPhase: NeedPhase = activeNeedPhase) => {
+        setCurrentNeed(prev => ({
+            ...prev,
+            acciones: [
+                ...(prev.acciones || []),
+                {
+                    id: createNeedActionId(),
+                    titulo: 'Acción personalizada',
+                    faseI: '', faseII: '', faseIII: '',
+                    fasesActivas: [targetPhase],
+                },
+            ],
+        }));
+    };
+
+    const updateNeedActionText = (actionId: string, phase: NeedPhase, value: string) => {
+        setCurrentNeed(prev => ({
+            ...prev,
+            acciones: (prev.acciones || []).map(action => action.id === actionId
+                ? {
+                    ...action,
+                    [phase]: value,
+                    fasesActivas: value.trim()
+                        ? action.fasesActivas.includes(phase) ? action.fasesActivas : [...action.fasesActivas, phase]
+                        : action.fasesActivas.filter(item => item !== phase),
+                }
+                : action),
+        }));
+    };
+
+    const updateNeedActionTitle = (actionId: string, titulo: string) => {
+        setCurrentNeed(prev => ({
+            ...prev,
+            acciones: (prev.acciones || []).map(action => action.id === actionId
+                ? { ...action, titulo }
+                : action),
+        }));
+    };
+
+    const removeNeedAction = (actionId: string) => {
+        setCurrentNeed(prev => ({
+            ...prev,
+            acciones: (prev.acciones || []).filter(action => action.id !== actionId),
+        }));
+    };
+
+    const toggleVoiceDictation = (actionId: string, phase: NeedPhase) => {
+        const actionKey = `${actionId}:${phase}`;
+        if (listeningActionKey === actionKey) {
+            speechRecognitionRef.current?.stop?.();
+            return;
+        }
+
+        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        if (!SpeechRecognition) return;
+
+        speechRecognitionRef.current?.stop?.();
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'es-PE';
+        recognition.interimResults = false;
+        recognition.continuous = false;
+        recognition.onresult = (event: any) => {
+            const transcript = String(event.results?.[0]?.[0]?.transcript || '').trim();
+            if (!transcript) return;
+            setCurrentNeed(prev => ({ ...prev, acciones: (prev.acciones || []).map(action => {
+                if (action.id !== actionId) return action;
+                const currentText = action[phase].trim();
+                return { ...action, [phase]: currentText ? `${currentText} ${transcript}` : transcript };
+            }) }));
+        };
+        recognition.onend = () => setListeningActionKey(null);
+        recognition.onerror = () => setListeningActionKey(null);
+        speechRecognitionRef.current = recognition;
+        setListeningActionKey(actionKey);
+        recognition.start();
     };
 
     // --- HELPER ESTILOS ---
@@ -1119,7 +2092,7 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
         <div className="bg-bg print:bg-white min-h-screen p-6 print:p-0">
 
             {/* ===== VISTA WEB (INTERACTIVA) - Solo visible en pantalla ===== */}
-            <div className="max-w-7xl mx-auto print:hidden">
+            <div id="f04-form-top" className="max-w-7xl mx-auto print:hidden">
 
                 {/* Header con acciones */}
                 <div className="bg-surface border-b border-border px-4 md:px-6 py-4 rounded-t-[8px] shadow-1">
@@ -1137,17 +2110,18 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                                 <Clock size={16} /> Borrador
                             </button>
                             <button
-                                onClick={() => setShowSaveConfirm(true)}
+                                onClick={handleOpenSaveConfirm}
                                 disabled={loading}
                                 className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-primary text-primary-fg px-3.5 py-2 rounded-[6px] text-[13px] font-bold hover:bg-primary/90 transition-colors disabled:opacity-60"
                             >
                                 <Save size={16} /> Guardar
                             </button>
                             <button
-                                onClick={() => window.print()}
+                                onClick={() => onClose?.()}
+                                disabled={loading}
                                 className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-surface border border-border-strong text-fg px-3.5 py-2 rounded-[6px] text-[13px] font-bold hover:bg-surface-muted transition-colors"
                             >
-                                <Printer size={16} /> Imprimir
+                                <X size={16} /> Cancelar
                             </button>
                         </div>
                     </div>
@@ -1156,16 +2130,13 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                 {/* TABS DE NAVEGACIÓN */}
                 <div className="bg-surface px-4 pt-0 border-x border-border overflow-hidden">
                     <div className="flex overflow-x-auto whitespace-nowrap gap-1 py-1 scrollbar-none">
-                        {[
-                            { id: 'GENERAL',    label: 'I-III. General / Calle',       icon: User },
-                            { id: 'FAMILIA',    label: 'IV-V. Familia / Vivienda',     icon: Users },
-                            { id: 'EDUCACION',  label: 'VI. Educación',                icon: GraduationCap },
-                            { id: 'SALUD',      label: 'VII-VIII. Salud / Recreación', icon: HeartPulse },
-                            { id: 'NECESIDADES',label: 'IX. Necesidades',              icon: Target }
-                        ].map((tab) => (
+                        {FORM_TABS.map((tab) => (
                             <button
                                 key={tab.id}
-                                onClick={() => setActiveTab(tab.id as any)}
+                                onClick={() => {
+                                    setActiveTab(tab.id);
+                                    scrollToFormTop();
+                                }}
                                 className={`
                                     flex items-center gap-1.5 px-4 py-3 border-b-2 text-[12px] font-bold uppercase tracking-wide transition-all
                                     ${activeTab === tab.id
@@ -1183,6 +2154,20 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                 {/* Contenido del formulario */}
                 <div className="bg-surface rounded-b-[8px] shadow-1 p-6 space-y-6 border-t border-border">
 
+                    {activeTab === 'GENERAL' && generalErrors.length > 0 && (
+                        <div className="rounded-[8px] border border-danger/30 bg-danger-soft px-4 py-3" role="alert">
+                            <div className="flex items-start gap-2">
+                                <AlertCircle size={16} className="text-danger shrink-0 mt-0.5" />
+                                <div>
+                                    <p className="text-[12px] font-bold text-danger">Complete los campos obligatorios para continuar:</p>
+                                    <ul className="mt-1 list-disc pl-4 text-[11px] text-fg-2 columns-1 md:columns-2">
+                                        {generalErrors.map(error => <li key={error}>{error}</li>)}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {/* I. DATOS GENERALES */}
                     <div className={`bg-surface rounded-[8px] border border-border overflow-hidden ${activeTab === 'GENERAL' ? '' : 'hidden'}`}>
                         <div className="bg-surface-muted border-b border-border px-4 py-2">
@@ -1193,7 +2178,7 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                         <div className="p-4 grid grid-cols-12 gap-x-6 gap-y-4">
                             {/* Fila 1: Nombres y Apellidos separados */}
                             <div className="col-span-12 md:col-span-4">
-                                <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Primer Apellido</label>
+                                <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Primer Apellido <span className="text-danger">*</span></label>
                                 <input
                                     type="text"
                                     className="w-full px-3 py-2 border border-border rounded-[6px] text-xs bg-surface text-fg font-medium focus:ring-2 focus:ring-primary/40 focus:border-primary outline-none"
@@ -1211,7 +2196,7 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                                 />
                             </div>
                             <div className="col-span-12 md:col-span-4">
-                                <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Nombres</label>
+                                <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Nombres <span className="text-danger">*</span></label>
                                 <input
                                     type="text"
                                     className="w-full px-3 py-2 border border-border rounded-[6px] text-xs bg-surface text-fg font-medium focus:ring-2 focus:ring-primary/40 focus:border-primary outline-none"
@@ -1225,7 +2210,7 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                                 <p className="text-[10px] font-bold text-fg-muted uppercase mb-3">Documento de Identidad</p>
                                 <div className="grid grid-cols-12 gap-x-6 gap-y-4">
                                     <div className="col-span-12 md:col-span-4">
-                                        <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Tipo Documento</label>
+                                        <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Tipo Documento <span className="text-danger">*</span></label>
                                         <select
                                             className="w-full px-3 py-2 border border-border rounded-[6px] text-xs bg-surface text-fg font-medium focus:ring-2 focus:ring-primary/40 focus:border-primary outline-none"
                                             value={formData.tipoDoc}
@@ -1247,7 +2232,7 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                                     </div>
 
                                     <div className="col-span-12 md:col-span-4">
-                                        <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Nº de Documento / DNI</label>
+                                        <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Nº de Documento / DNI {formData.tipoDoc !== '7' && <span className="text-danger">*</span>}</label>
                                         <input
                                             type="text"
                                             className="w-full px-3 py-2 border border-border rounded-[6px] text-xs bg-surface text-fg font-medium focus:ring-2 focus:ring-primary/40 focus:border-primary outline-none"
@@ -1274,7 +2259,7 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                                     </div>
 
                                     <div className="col-span-12">
-                                        <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">¿Por qué? (En caso no tenga documento de identidad)</label>
+                                        <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">¿Por qué? (En caso no tenga documento de identidad) {formData.tipoDoc === '7' && <span className="text-danger">*</span>}</label>
                                         <input
                                             type="text"
                                             className="w-full px-3 py-2 border border-border rounded-[6px] text-xs bg-surface text-fg font-medium focus:ring-2 focus:ring-primary/40 focus:border-primary outline-none"
@@ -1288,7 +2273,7 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
 
                             {/* Fila 2: Sexo, Fecha de Nacimiento, Edad / Tiempo y Teléfono (25% | col-span-3 c/u) */}
                             <div className="col-span-12 md:col-span-3">
-                                <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Sexo</label>
+                                <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Sexo <span className="text-danger">*</span></label>
                                 <select
                                     className="w-full px-3 py-2 border border-border rounded-[6px] text-xs bg-surface text-fg font-medium focus:ring-2 focus:ring-primary/40 focus:border-primary outline-none"
                                     value={formData.sexo}
@@ -1302,7 +2287,7 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                             </div>
 
                             <div className="col-span-12 md:col-span-3">
-                                <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Fecha Nacimiento</label>
+                                <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Fecha Nacimiento {!formData.edad && <span className="text-danger">*</span>}</label>
                                 <input
                                     type="date"
                                     className="w-full px-3 py-2 border border-border rounded-[6px] text-xs bg-surface text-fg font-medium focus:ring-2 focus:ring-primary/40 focus:border-primary outline-none"
@@ -1336,7 +2321,7 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                             </div>
 
                             <div className="col-span-12 md:col-span-3">
-                                <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Edad / Tiempo</label>
+                                <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Edad / Tiempo {!formData.fechaNacimiento && <span className="text-danger">*</span>}</label>
                                 <div className="flex -space-x-px">
                                     <input
                                         type="number"
@@ -1501,19 +2486,30 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                                         <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Fecha de Inicio de Aplicación</label>
                                         <input
                                             type="date"
-                                            className="w-full px-3 py-2 border border-border rounded-[6px] text-xs bg-surface text-fg font-medium focus:ring-2 focus:ring-primary/40 focus:border-primary outline-none"
+                                            className="w-full px-3 py-2 border border-border rounded-[6px] text-xs bg-surface-muted text-fg font-medium outline-none cursor-default"
                                             value={formData.fechaInicioAplicacion}
-                                            onChange={(e) => setFormData({ ...formData, fechaInicioAplicacion: e.target.value })}
+                                            readOnly
+                                            disabled
                                         />
+                                        <p className="text-[10px] text-fg-muted mt-1 flex items-center gap-1">
+                                            <Lock size={9} /> La registra el sistema: día en que se empieza a aplicar la ficha.
+                                        </p>
                                     </div>
                                     <div className="col-span-12 md:col-span-6">
                                         <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Fecha de Fin de Aplicación</label>
                                         <input
                                             type="date"
-                                            className="w-full px-3 py-2 border border-border rounded-[6px] text-xs bg-surface text-fg font-medium focus:ring-2 focus:ring-primary/40 focus:border-primary outline-none"
+                                            className="w-full px-3 py-2 border border-border rounded-[6px] text-xs bg-surface-muted text-fg font-medium outline-none cursor-default"
                                             value={formData.fechaFinAplicacion}
-                                            onChange={(e) => setFormData({ ...formData, fechaFinAplicacion: e.target.value })}
+                                            readOnly
+                                            disabled
                                         />
+                                        <p className="text-[10px] text-fg-muted mt-1 flex items-center gap-1">
+                                            <Lock size={9} />
+                                            {formData.fechaFinAplicacion
+                                                ? 'La registró el sistema al finalizar la ficha.'
+                                                : 'Se sella sola cuando finalices la ficha. Mientras sea borrador queda en blanco.'}
+                                        </p>
                                     </div>
                                 </div>
                             </div>
@@ -1531,7 +2527,7 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
 
                             {/* Perfil */}
                             <div className="col-span-12">
-                                <label className="block text-[10px] font-bold text-fg-muted uppercase mb-2">Perfil del Usuario/a</label>
+                                <label className="block text-[10px] font-bold text-fg-muted uppercase mb-2">Perfil del Usuario/a <span className="text-danger">*</span></label>
                                 <div className="flex flex-wrap gap-3">
                                     <label className="flex items-center gap-2 px-3 py-2 border border-border rounded-[6px] bg-surface-muted/60 cursor-pointer hover:bg-surface-muted">
                                         <input 
@@ -1657,18 +2653,124 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                                         placeholder="Cant."
                                         className="w-20 px-3 py-2 border border-border rounded-[6px] text-xs focus:ring-2 focus:ring-primary/40 focus:border-primary"
                                         value={formData.situacionCalleDetalle.tiempo.cantidad}
-                                        onChange={e => setFormData({ ...formData, situacionCalleDetalle: { ...formData.situacionCalleDetalle, tiempo: { ...formData.situacionCalleDetalle.tiempo, cantidad: e.target.value } } })}
+                                        onChange={e => {
+                                            tiempoEditadoManualmenteRef.current = true;
+                                            setFormData({ ...formData, situacionCalleDetalle: { ...formData.situacionCalleDetalle, tiempo: { ...formData.situacionCalleDetalle.tiempo, cantidad: e.target.value } } });
+                                        }}
                                     />
                                     <select
                                         className="flex-1 px-3 py-2 border border-border rounded-[6px] text-xs bg-surface focus:ring-2 focus:ring-primary/40 focus:border-primary"
                                         value={formData.situacionCalleDetalle.tiempo.unidad}
-                                        onChange={e => setFormData({ ...formData, situacionCalleDetalle: { ...formData.situacionCalleDetalle, tiempo: { ...formData.situacionCalleDetalle.tiempo, unidad: e.target.value } } })}
+                                        onChange={e => {
+                                            tiempoEditadoManualmenteRef.current = true;
+                                            setFormData({ ...formData, situacionCalleDetalle: { ...formData.situacionCalleDetalle, tiempo: { ...formData.situacionCalleDetalle.tiempo, unidad: e.target.value as TiempoSituacionCalle['unidad'] } } });
+                                        }}
                                     >
                                         <option value="SEMANAS">SEMANAS</option>
                                         <option value="MESES">MESES</option>
                                         <option value="AÑOS">AÑOS</option>
                                     </select>
                                 </div>
+                                <p className="text-[10px] text-fg-muted mt-1">
+                                    Calculado con la actividad de mayor antigüedad trasladada desde la ficha de inscripción. Puedes modificarlo; el valor guardado aquí tendrá prioridad.
+                                </p>
+                            </div>
+
+                            <div className="col-span-12 md:col-span-4">
+                                <label className="block text-[10px] font-bold text-fg-muted uppercase mb-2">Horarios en Situación de Calle</label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {([
+                                        ['manana', 'Mañana'],
+                                        ['tarde', 'Tarde'],
+                                        ['noche', 'Noche'],
+                                        ['madrugada', 'Madrugada'],
+                                    ] as Array<[keyof HorariosSituacionCalle, string]>).map(([key, label]) => (
+                                        <label key={key} className="flex items-center gap-2 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={formData.situacionCalleDetalle.horarios[key]}
+                                                onChange={(e) => {
+                                                    horariosEditadosManualmenteRef.current = true;
+                                                    setFormData({
+                                                        ...formData,
+                                                        situacionCalleDetalle: {
+                                                            ...formData.situacionCalleDetalle,
+                                                            horarios: {
+                                                                ...formData.situacionCalleDetalle.horarios,
+                                                                [key]: e.target.checked,
+                                                            },
+                                                        },
+                                                    });
+                                                }}
+                                                className="rounded text-primary"
+                                            />
+                                            <span className="text-xs text-fg-2">{label}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                                <p className="text-[10px] text-fg-muted mt-1">
+                                    Calculado según los rangos horarios de las actividades. Puedes modificar las marcas.
+                                </p>
+                            </div>
+
+                            <div className="col-span-12 md:col-span-4">
+                                <label className="block text-[10px] font-bold text-fg-muted uppercase mb-2">Frecuencia en Calle</label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {([
+                                        ['diario', 'Diario'],
+                                        ['interdiario', 'Interdiario'],
+                                        ['finesSemana', 'Fines de semana'],
+                                        ['temporadas', 'Temporadas'],
+                                    ] as Array<[keyof FrecuenciaSituacionCalle, string]>).map(([key, label]) => (
+                                        <label key={key} className="flex items-center gap-2 cursor-pointer">
+                                            <input
+                                                type="radio"
+                                                name="frecuenciaSituacionCalle"
+                                                checked={formData.situacionCalleDetalle.frecuencia[key]}
+                                                onChange={() => {
+                                                    frecuenciaEditadaManualmenteRef.current = true;
+                                                    setFormData({
+                                                        ...formData,
+                                                        situacionCalleDetalle: {
+                                                            ...formData.situacionCalleDetalle,
+                                                            frecuencia: {
+                                                                ...FRECUENCIA_VACIA,
+                                                                [key]: true,
+                                                            },
+                                                        },
+                                                    });
+                                                }}
+                                                className="text-primary"
+                                            />
+                                            <span className="text-xs text-fg-2">{label}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                                <p className="text-[10px] text-fg-muted mt-1">
+                                    Diario, interdiario y fines de semana se calculan desde las agendas. Temporadas se selecciona manualmente.
+                                </p>
+                            </div>
+
+                            <div className="col-span-12">
+                                <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Actividad que realiza en calle</label>
+                                <textarea
+                                    className="w-full px-3 py-2 border border-border rounded-[6px] text-xs focus:ring-2 focus:ring-primary/40 focus:border-primary min-h-[64px]"
+                                    placeholder="Se completará con las actividades desglosadas..."
+                                    value={formData.situacionCalleDetalle.actividad}
+                                    onChange={(e) => {
+                                        actividadEditadaManualmenteRef.current = true;
+                                        setFormData({
+                                            ...formData,
+                                            situacionCalleDetalle: {
+                                                ...formData.situacionCalleDetalle,
+                                                actividad: e.target.value,
+                                            },
+                                        });
+                                    }}
+                                />
+                                <p className="text-[10px] text-fg-muted mt-1">
+                                    Se consolida automáticamente desde las actividades desglosadas, sin repetir nombres. Puedes modificar el resultado.
+                                </p>
                             </div>
 
                             <div className="col-span-12 md:col-span-4">
@@ -2253,14 +3355,14 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                         <div className="border border-purple-100 rounded-xl bg-purple-50/30 p-5 mt-2 group hover:border-purple-200 transition-all">
                             <div className="flex justify-between items-center mb-4 pb-2 border-b border-purple-100/50">
                                 <h4 className="text-sm font-black text-purple-900 uppercase flex items-center gap-2">
-                                    <Users size={16} className="text-purple-700" /> Familiar o Tutor Responsable del NNA
+                                    <Users size={16} className="text-purple-700" /> Datos de la Familia
                                 </h4>
                                 <button
                                     type="button"
                                     onClick={handleAddFamily}
                                     className="px-3.5 py-1.5 bg-purple-700 text-white rounded-lg text-xs font-bold hover:bg-purple-800 transition-all flex items-center gap-1 shadow-md shadow-purple-200"
                                 >
-                                    <Plus size={13} /> Agregar Familiar Responsable
+                                    <Plus size={13} /> Agregar Familiar
                                 </button>
                             </div>
 
@@ -2501,23 +3603,175 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                             {/* Fila 2: Servicios Básicos */}
                             <div className="col-span-12 md:col-span-4">
                                 <label className="block text-[10px] font-bold text-fg-muted uppercase mb-2">Servicios Básicos</label>
-                                <div className="space-y-2 bg-primary-soft/20 p-3 rounded-[6px] border border-primary/20">
-                                    <label className="flex items-center gap-2 cursor-pointer hover:bg-primary-soft/40 p-1 rounded transition-colors">
-                                        <input type="checkbox" checked={formData.serviciosBasicos.agua} onChange={(e) => setFormData({ ...formData, serviciosBasicos: { ...formData.serviciosBasicos, agua: e.target.checked } })} className="rounded text-primary focus:ring-primary/40" />
-                                        <span className="font-medium text-fg-2">Agua</span>
-                                    </label>
-                                    <label className="flex items-center gap-2 cursor-pointer hover:bg-primary-soft/40 p-1 rounded transition-colors">
-                                        <input type="checkbox" checked={formData.serviciosBasicos.luz} onChange={(e) => setFormData({ ...formData, serviciosBasicos: { ...formData.serviciosBasicos, luz: e.target.checked } })} className="rounded text-primary focus:ring-primary/40" />
-                                        <span className="font-medium text-fg-2">Luz</span>
-                                    </label>
-                                    <label className="flex items-center gap-2 cursor-pointer hover:bg-primary-soft/40 p-1 rounded transition-colors">
-                                        <input type="checkbox" checked={formData.serviciosBasicos.desague} onChange={(e) => setFormData({ ...formData, serviciosBasicos: { ...formData.serviciosBasicos, desague: e.target.checked } })} className="rounded text-primary focus:ring-primary/40" />
-                                        <span className="font-medium text-fg-2">Desagüe</span>
-                                    </label>
-                                    <label className="flex items-center gap-2 cursor-pointer hover:bg-primary-soft/40 p-1 rounded transition-colors">
-                                        <input type="checkbox" checked={formData.serviciosBasicos.otros} onChange={(e) => setFormData({ ...formData, serviciosBasicos: { ...formData.serviciosBasicos, otros: e.target.checked } })} className="rounded text-primary focus:ring-primary/40" />
-                                        <span className="font-medium text-fg-2">Otros</span>
-                                    </label>
+                                <div className="space-y-3 bg-primary-soft/20 p-3 rounded-[6px] border border-primary/20">
+                                    <div>
+                                        <label className="flex items-center gap-2 cursor-pointer hover:bg-primary-soft/40 p-1 rounded transition-colors">
+                                            <input
+                                                type="checkbox"
+                                                checked={formData.serviciosBasicos.agua}
+                                                onChange={(e) => {
+                                                    const checked = e.target.checked;
+                                                    setFormData(prev => ({
+                                                        ...prev,
+                                                        serviciosBasicos: {
+                                                            ...prev.serviciosBasicos,
+                                                            agua: checked,
+                                                            detalleAgua: checked ? prev.serviciosBasicos.detalleAgua : '',
+                                                        },
+                                                    }));
+                                                }}
+                                                className="rounded text-primary focus:ring-primary/40"
+                                            />
+                                            <span className="font-medium text-fg-2">Agua</span>
+                                        </label>
+                                        {formData.serviciosBasicos.agua && (
+                                            <div className="ml-7 mt-1 flex flex-col gap-1.5 text-[11px] text-fg-2" role="radiogroup" aria-label="Tipo de servicio de agua">
+                                                {[
+                                                    { value: 'PROPIO_CASA', label: 'Propio de la casa' },
+                                                    { value: 'COMPRA_CISTERNA', label: 'Se compra (cisterna)' },
+                                                ].map(option => (
+                                                    <label key={option.value} className="flex items-center gap-2 cursor-pointer">
+                                                        <input
+                                                            type="radio"
+                                                            name="detalle-servicio-agua"
+                                                            value={option.value}
+                                                            checked={formData.serviciosBasicos.detalleAgua === option.value}
+                                                            onChange={(e) => setFormData(prev => ({
+                                                                ...prev,
+                                                                serviciosBasicos: { ...prev.serviciosBasicos, detalleAgua: e.target.value },
+                                                            }))}
+                                                            className="text-primary focus:ring-primary/40"
+                                                        />
+                                                        {option.label}
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div>
+                                        <label className="flex items-center gap-2 cursor-pointer hover:bg-primary-soft/40 p-1 rounded transition-colors">
+                                            <input
+                                                type="checkbox"
+                                                checked={formData.serviciosBasicos.luz}
+                                                onChange={(e) => {
+                                                    const checked = e.target.checked;
+                                                    setFormData(prev => ({
+                                                        ...prev,
+                                                        serviciosBasicos: {
+                                                            ...prev.serviciosBasicos,
+                                                            luz: checked,
+                                                            detalleLuz: checked ? prev.serviciosBasicos.detalleLuz : '',
+                                                        },
+                                                    }));
+                                                }}
+                                                className="rounded text-primary focus:ring-primary/40"
+                                            />
+                                            <span className="font-medium text-fg-2">Luz</span>
+                                        </label>
+                                        {formData.serviciosBasicos.luz && (
+                                            <div className="ml-7 mt-1 flex flex-col gap-1.5 text-[11px] text-fg-2" role="radiogroup" aria-label="Tipo de servicio de luz">
+                                                {[
+                                                    { value: 'PROPIO_CASA', label: 'Propio de la casa' },
+                                                    { value: 'ALQUILADA', label: 'Se alquila' },
+                                                ].map(option => (
+                                                    <label key={option.value} className="flex items-center gap-2 cursor-pointer">
+                                                        <input
+                                                            type="radio"
+                                                            name="detalle-servicio-luz"
+                                                            value={option.value}
+                                                            checked={formData.serviciosBasicos.detalleLuz === option.value}
+                                                            onChange={(e) => setFormData(prev => ({
+                                                                ...prev,
+                                                                serviciosBasicos: { ...prev.serviciosBasicos, detalleLuz: e.target.value },
+                                                            }))}
+                                                            className="text-primary focus:ring-primary/40"
+                                                        />
+                                                        {option.label}
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div>
+                                        <label className="flex items-center gap-2 cursor-pointer hover:bg-primary-soft/40 p-1 rounded transition-colors">
+                                            <input
+                                                type="checkbox"
+                                                checked={formData.serviciosBasicos.desague}
+                                                onChange={(e) => {
+                                                    const checked = e.target.checked;
+                                                    setFormData(prev => ({
+                                                        ...prev,
+                                                        serviciosBasicos: {
+                                                            ...prev.serviciosBasicos,
+                                                            desague: checked,
+                                                            detalleDesague: checked ? prev.serviciosBasicos.detalleDesague : '',
+                                                        },
+                                                    }));
+                                                }}
+                                                className="rounded text-primary focus:ring-primary/40"
+                                            />
+                                            <span className="font-medium text-fg-2">Desagüe</span>
+                                        </label>
+                                        {formData.serviciosBasicos.desague && (
+                                            <div className="ml-7 mt-1 flex flex-col gap-1.5 text-[11px] text-fg-2" role="radiogroup" aria-label="Tipo de servicio de desagüe">
+                                                {[
+                                                    { value: 'RED_PUBLICA', label: 'Red pública' },
+                                                    { value: 'SILO', label: 'Silo' },
+                                                ].map(option => (
+                                                    <label key={option.value} className="flex items-center gap-2 cursor-pointer">
+                                                        <input
+                                                            type="radio"
+                                                            name="detalle-servicio-desague"
+                                                            value={option.value}
+                                                            checked={formData.serviciosBasicos.detalleDesague === option.value}
+                                                            onChange={(e) => setFormData(prev => ({
+                                                                ...prev,
+                                                                serviciosBasicos: { ...prev.serviciosBasicos, detalleDesague: e.target.value },
+                                                            }))}
+                                                            className="text-primary focus:ring-primary/40"
+                                                        />
+                                                        {option.label}
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div>
+                                        <label className="flex items-center gap-2 cursor-pointer hover:bg-primary-soft/40 p-1 rounded transition-colors">
+                                            <input
+                                                type="checkbox"
+                                                checked={formData.serviciosBasicos.otros}
+                                                onChange={(e) => {
+                                                    const checked = e.target.checked;
+                                                    setFormData(prev => ({
+                                                        ...prev,
+                                                        serviciosBasicos: {
+                                                            ...prev.serviciosBasicos,
+                                                            otros: checked,
+                                                            detalleOtros: checked ? prev.serviciosBasicos.detalleOtros : '',
+                                                        },
+                                                    }));
+                                                }}
+                                                className="rounded text-primary focus:ring-primary/40"
+                                            />
+                                            <span className="font-medium text-fg-2">Otros</span>
+                                        </label>
+                                        {formData.serviciosBasicos.otros && (
+                                            <input
+                                                type="text"
+                                                value={formData.serviciosBasicos.detalleOtros}
+                                                onChange={(e) => setFormData(prev => ({
+                                                    ...prev,
+                                                    serviciosBasicos: { ...prev.serviciosBasicos, detalleOtros: e.target.value },
+                                                }))}
+                                                placeholder="Especifique el servicio"
+                                                className="ml-7 mt-1 w-[calc(100%-1.75rem)] rounded-[6px] border border-border bg-surface px-2.5 py-1.5 text-[11px] text-fg focus:border-primary focus:ring-2 focus:ring-primary/30 outline-none"
+                                            />
+                                        )}
+                                    </div>
                                 </div>
                             </div>
 
@@ -2596,7 +3850,8 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                                 <SelectField
                                     label="¿Estudia Actualmente? / Situación de Matrícula"
                                     value={formData.eduEstudia}
-                                    onChange={(e) => setFormData({ ...formData, eduEstudia: e.target.value })}
+                                    onChange={(e) => actualizarSituacionEducativa(e.target.value)}
+                                    disabled={esMenorDeTres}
                                     options={parametros?.OPCIONES_MATRICULA_2026 || [
                                         { value: 'SI', label: '1. Sí (cuenta con ficha de matrícula)' },
                                         { value: 'NO', label: '2. No (no se encuentra matriculado)' },
@@ -2605,6 +3860,15 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                                     ]}
                                 />
                             </div>
+
+                            {esMenorDeTres && (
+                                <div className="flex items-start gap-2.5 rounded-xl border border-info/25 bg-info-soft/60 px-4 py-3">
+                                    <AlertCircle size={15} className="text-info shrink-0 mt-0.5" />
+                                    <p className="text-[11px] font-medium leading-relaxed text-fg-2">
+                                        No aplica: menor de 3 años. La situación educativa y el motivo fueron determinados automáticamente según la edad del NNA.
+                                    </p>
+                                </div>
+                            )}
 
                             {['SI', 'PROCESO'].includes(formData.eduEstudia) ? (
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-scaleUp">
@@ -2696,18 +3960,20 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                                         ]}
                                     />
                                 </div>
-                            ) : (
+                            ) : ['NO', 'NO_APLICA'].includes(formData.eduEstudia) ? (
                                 <div className="bg-red-50/50 p-4 rounded-xl border border-red-100 animate-scaleUp">
                                     <InputField
                                         label="¿Por qué no estudia?"
                                         value={formData.eduMotivoNoEstudia}
                                         onChange={(e) => setFormData({ ...formData, eduMotivoNoEstudia: e.target.value })}
                                         placeholder="Motivo de deserción..."
+                                        disabled={esMenorDeTres}
                                     />
                                 </div>
-                            )}
+                            ) : null}
 
                             {/* Atraso y Problemas — cada campo con su propia variable y su propio componente */}
+                            {['SI', 'PROCESO'].includes(formData.eduEstudia) && (
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-4 items-start">
                                 <ToggleSiNo
                                     label="Atraso Escolar"
@@ -2785,6 +4051,7 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                                     onChange={(v) => setFormData({ ...formData, tutorConversaDocente: v })}
                                 />
                             </div>
+                            )}
                         </div>
                     </div>
 
@@ -3024,7 +4291,7 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                                         onChange={(v) => setFormData({ ...formData, normasHigieneComer: v })}
                                     />
                                     <Toggle3
-                                        label="Cabello/Uñas Recortadas y Limpias"
+                                        label="Mantiene el Cabello/Uñas Recortadas y Limpias"
                                         value={formData.cabelloUnasLimpias}
                                         onChange={(v) => setFormData({ ...formData, cabelloUnasLimpias: v })}
                                     />
@@ -3230,12 +4497,42 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                                 IX. Necesidades del NNA y Plan de Acción
                             </h3>
                             <button
-                                onClick={handleAddNeed}
+                                onClick={() => handleAddNeed()}
+                                disabled={formData.necesidades.length >= NEED_CATEGORIES.length}
                                 className="flex items-center gap-2 bg-primary text-primary-fg px-4 py-2 rounded-[6px] hover:bg-primary/90 transition-colors text-sm font-bold"
                             >
                                 <Plus size={16} /> Agregar Necesidad
                             </button>
                         </div>
+
+                        {suggestedNeeds.length > 0 && (
+                            <div className="mb-4 rounded-[8px] border border-primary/20 bg-primary-soft/40 p-4">
+                                <div className="mb-3 flex items-start gap-2">
+                                    <Sparkles size={18} className="mt-0.5 shrink-0 text-primary" />
+                                    <div>
+                                        <p className="text-sm font-bold text-fg">Necesidades sugeridas según el diagnóstico</p>
+                                        <p className="text-xs text-fg-muted">Revise la evidencia y confirme únicamente las que correspondan.</p>
+                                    </div>
+                                </div>
+                                <div className="grid gap-2 md:grid-cols-2">
+                                    {suggestedNeeds.map(item => (
+                                        <div key={item.categoria} className="flex items-center justify-between gap-3 rounded-[6px] border border-border bg-surface p-3">
+                                            <div className="min-w-0">
+                                                <p className="text-xs font-black text-primary">{item.categoria}</p>
+                                                <p className="text-xs text-fg-muted">{item.motivo}</p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleAddNeed(item.categoria)}
+                                                className="shrink-0 rounded-[6px] border border-primary px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary hover:text-primary-fg"
+                                            >
+                                                Revisar
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         {formData.necesidades.length > 0 ? (
                             <div className="border border-border rounded-[6px] overflow-hidden">
@@ -3243,11 +4540,10 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                                     <thead className="bg-surface-muted text-xs">
                                         <tr>
                                             <th className="px-3 py-2 text-left" style={{ width: '5%' }}>N°</th>
-                                            <th className="px-3 py-2 text-left" style={{ width: '15%' }}>Categoría</th>
-                                            <th className="px-3 py-2 text-left" style={{ width: '20%' }}>Descripción</th>
-                                            <th className="px-3 py-2 text-left" style={{ width: '17%' }}>Fase I</th>
-                                            <th className="px-3 py-2 text-left" style={{ width: '17%' }}>Fase II</th>
-                                            <th className="px-3 py-2 text-left" style={{ width: '17%' }}>Fase III</th>
+                                            <th className="px-3 py-2 text-left" style={{ width: '20%' }}>Categoría</th>
+                                            <th className="px-3 py-2 text-left" style={{ width: '22%' }}>Fase I</th>
+                                            <th className="px-3 py-2 text-left" style={{ width: '22%' }}>Fase II</th>
+                                            <th className="px-3 py-2 text-left" style={{ width: '22%' }}>Fase III</th>
                                             <th className="px-3 py-2 text-center" style={{ width: '9%' }}>Acciones</th>
                                         </tr>
                                     </thead>
@@ -3260,10 +4556,9 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                                                         {necesidad.categoria}
                                                     </span>
                                                 </td>
-                                                <td className="px-3 py-2 text-xs">{necesidad.descripcion}</td>
-                                                <td className="px-3 py-2 text-xs text-fg-muted">{necesidad.faseI || '-'}</td>
-                                                <td className="px-3 py-2 text-xs text-fg-muted">{necesidad.faseII || '-'}</td>
-                                                <td className="px-3 py-2 text-xs text-fg-muted">{necesidad.faseIII || '-'}</td>
+                                                <td className="px-3 py-2 text-xs text-fg-muted"><NeedPhaseItems value={necesidad.faseI} /></td>
+                                                <td className="px-3 py-2 text-xs text-fg-muted"><NeedPhaseItems value={necesidad.faseII} /></td>
+                                                <td className="px-3 py-2 text-xs text-fg-muted"><NeedPhaseItems value={necesidad.faseIII} /></td>
                                                 <td className="px-3 py-2">
                                                     <div className="flex gap-2 justify-center">
                                                         <button
@@ -3292,7 +4587,7 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                                 <p className="text-fg-muted text-sm mb-3">No hay necesidades registradas</p>
                                 <p className="text-xs text-fg-muted mb-4">Agrega las necesidades identificadas del NNA y el plan de acción por fases</p>
                                 <button
-                                    onClick={handleAddNeed}
+                                    onClick={() => handleAddNeed()}
                                     className="text-primary text-sm font-bold hover:text-primary/80"
                                 >
                                     + Agregar la primera necesidad
@@ -3305,9 +4600,9 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
 
             </div>
 
-            {/* BOTONES INFERIORES - Duplicado del header para facilitar guardado al final del formulario */}
+            {/* Navegación guiada y acciones generales */}
             <div className="max-w-7xl mx-auto print:hidden px-4 pb-6 pt-2">
-                <div className="flex justify-end">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                     <div className="flex flex-wrap gap-2">
                         <button
                             onClick={() => setShowDraftConfirm(true)}
@@ -3317,21 +4612,54 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                             <Clock size={16} /> Borrador
                         </button>
                         <button
-                            onClick={() => setShowSaveConfirm(true)}
+                            onClick={() => onClose?.()}
                             disabled={loading}
-                            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-primary text-primary-fg px-3.5 py-2 rounded-[6px] text-[13px] font-bold hover:bg-primary/90 transition-colors disabled:opacity-60"
+                            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-surface border border-border-strong text-fg px-3.5 py-2 rounded-[6px] text-[13px] font-bold hover:bg-surface-muted transition-colors disabled:opacity-60"
                         >
-                            <Save size={16} /> Guardar
+                            <X size={16} /> Cancelar
                         </button>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <span className="mr-1 text-[11px] font-semibold text-fg-muted whitespace-nowrap">
+                            Sección {activeTabIndex + 1} de {FORM_TABS.length}
+                        </span>
                         <button
-                            onClick={() => window.print()}
-                            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-surface border border-border-strong text-fg px-3.5 py-2 rounded-[6px] text-[13px] font-bold hover:bg-surface-muted transition-colors"
+                            onClick={handlePreviousSection}
+                            disabled={loading || activeTabIndex === 0}
+                            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-surface border border-border-strong text-fg px-3.5 py-2 rounded-[6px] text-[13px] font-bold hover:bg-surface-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                         >
-                            <Printer size={16} /> Imprimir
+                            <ArrowLeft size={16} /> Atrás
                         </button>
+                        {activeTabIndex === FORM_TABS.length - 1 ? (
+                            <button
+                                onClick={handleOpenSaveConfirm}
+                                disabled={loading}
+                                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-primary text-primary-fg px-3.5 py-2 rounded-[6px] text-[13px] font-bold hover:bg-primary/90 transition-colors disabled:opacity-60"
+                            >
+                                <Save size={16} /> Guardar diagnóstico
+                            </button>
+                        ) : (
+                            <button
+                                onClick={handleNextSection}
+                                disabled={loading}
+                                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-primary text-primary-fg px-3.5 py-2 rounded-[6px] text-[13px] font-bold hover:bg-primary/90 transition-colors disabled:opacity-60"
+                            >
+                                Siguiente <ArrowRight size={16} />
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
+
+            {/* Aviso de posibles hermanos, tras registrar un integrante */}
+            {deteccionHermanos && (
+                <AvisoHermanos
+                    nnaId={nna.id}
+                    deteccion={deteccionHermanos}
+                    onCerrar={() => setDeteccionHermanos(null)}
+                />
+            )}
 
             {/* MODAL PARA AGREGAR/EDITAR FAMILIAR */}
             {
@@ -3342,9 +4670,9 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                             <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-purple-50 rounded-t-2xl">
                                 <div>
                                     <h3 className="text-lg font-black text-purple-900 flex items-center gap-2">
-                                        <Users size={22} className="text-purple-700" /> {editingFamilyIndex !== null ? 'Editar Familiar o Tutor Responsable' : 'Registrar Familiar o Tutor Responsable'}
+                                        <Users size={22} className="text-purple-700" /> {editingFamilyIndex !== null ? 'Editar Familia' : 'Registrar Familia'}
                                     </h3>
-                                    <p className="text-xs text-purple-700 font-medium">Complete todos los datos oficiales del familiar responsable del NNA.</p>
+                                    <p className="text-xs text-purple-700 font-medium">Complete todos los datos del familiar.</p>
                                 </div>
                                 <button
                                     type="button"
@@ -3404,23 +4732,28 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                                             const val = e.target.value;
                                             let calculatedAge = '';
                                             if (val) {
-                                                const birthDate = new Date(val);
+                                                const [year, month, day] = val.split('-').map(Number);
                                                 const today = new Date();
-                                                let age = today.getFullYear() - birthDate.getFullYear();
-                                                const m = today.getMonth() - birthDate.getMonth();
-                                                if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+                                                let age = today.getFullYear() - year;
+                                                const currentMonth = today.getMonth() + 1;
+                                                if (currentMonth < month || (currentMonth === month && today.getDate() < day)) {
                                                     age--;
                                                 }
                                                 calculatedAge = String(age);
                                             }
                                             setCurrentFamily({ ...currentFamily, fechaNacApo: val, edad: calculatedAge });
                                         }}
+                                        max={getTodayLocal()}
                                     />
                                     <InputField
-                                        label="Nacionalidad"
-                                        value={currentFamily.nacionalidadApo || ''}
-                                        onChange={(e) => setCurrentFamily({ ...currentFamily, nacionalidadApo: e.target.value.toUpperCase() })}
-                                        placeholder="PERUANA"
+                                        type="number"
+                                        label="Edad"
+                                        value={currentFamily.edad || ''}
+                                        onChange={(e) => setCurrentFamily({ ...currentFamily, edad: e.target.value })}
+                                        placeholder="Se calcula automáticamente"
+                                        min="0"
+                                        max="120"
+                                        required
                                     />
                                     <SelectField
                                         label="Tipo Documento"
@@ -3451,6 +4784,32 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                                         }}
                                         options={opcionesVinculo}
                                     />
+                                    <SelectField
+                                        label="Estado Civil"
+                                        value={currentFamily.estadoCivil || ''}
+                                        onChange={(e) => setCurrentFamily({ ...currentFamily, estadoCivil: e.target.value })}
+                                        options={[
+                                            { value: 'SOLTERO(A)', label: 'SOLTERO(A)' },
+                                            { value: 'CASADO(A)', label: 'CASADO(A)' },
+                                            { value: 'CONVIVIENTE', label: 'CONVIVIENTE' },
+                                            { value: 'DIVORCIADO(A)', label: 'DIVORCIADO(A)' },
+                                            { value: 'VIUDO(A)', label: 'VIUDO(A)' },
+                                        ]}
+                                    />
+                                    <SelectField
+                                        label="Grado de Instrucción"
+                                        value={currentFamily.gradoInstruccion || ''}
+                                        onChange={(e) => setCurrentFamily({ ...currentFamily, gradoInstruccion: e.target.value })}
+                                        options={[
+                                            { value: 'SIN_INSTRUCCION', label: 'SIN INSTRUCCIÓN' },
+                                            { value: 'PRIMARIA_INCOMPLETA', label: 'PRIMARIA INCOMPLETA' },
+                                            { value: 'PRIMARIA_COMPLETA', label: 'PRIMARIA COMPLETA' },
+                                            { value: 'SECUNDARIA_INCOMPLETA', label: 'SECUNDARIA INCOMPLETA' },
+                                            { value: 'SECUNDARIA_COMPLETA', label: 'SECUNDARIA COMPLETA' },
+                                            { value: 'SUPERIOR_INCOMPLETA', label: 'SUPERIOR INCOMPLETA' },
+                                            { value: 'SUPERIOR_COMPLETA', label: 'SUPERIOR COMPLETA' },
+                                        ]}
+                                    />
                                     <InputField
                                         label="Teléfono de Contacto"
                                         value={currentFamily.telefono || ''}
@@ -3463,69 +4822,6 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                                         onChange={(e) => setCurrentFamily({ ...currentFamily, ocupacion: e.target.value })}
                                         placeholder="Ej. Independiente, Comerciante..."
                                     />
-                                    <SelectField
-                                        label="¿Vive con el NNA?"
-                                        value={currentFamily.viveCon || ''}
-                                        onChange={(e) => setCurrentFamily({ ...currentFamily, viveCon: e.target.value })}
-                                        options={[
-                                            { value: 'SI', label: 'Sí' },
-                                            { value: 'NO', label: 'No' }
-                                        ]}
-                                    />
-                                    <SelectField
-                                        label="Lengua Materna"
-                                        value={currentFamily.lenMatApo || ''}
-                                        onChange={(e) => setCurrentFamily({ ...currentFamily, lenMatApo: e.target.value })}
-                                        options={opcionesLengua}
-                                    />
-                                    {['9', '12', 'OTRO'].includes(currentFamily.lenMatApo || '') && (
-                                        <InputField
-                                            label="Especificar Lengua"
-                                            value={currentFamily.lenMatEspApo || ''}
-                                            onChange={(e) => setCurrentFamily({ ...currentFamily, lenMatEspApo: e.target.value })}
-                                            placeholder="Escriba la lengua..."
-                                        />
-                                    )}
-
-                                    <SelectField
-                                        label="Tipo de Discapacidad"
-                                        value={currentFamily.tipoDiscapApo || ''}
-                                        onChange={(e) => setCurrentFamily({ ...currentFamily, tipoDiscapApo: e.target.value })}
-                                        options={opcionesDiscapacidad}
-                                    />
-                                    <SelectField
-                                        label="¿Certificado CONADIS?"
-                                        value={currentFamily.certDiscapApo || ''}
-                                        onChange={(e) => setCurrentFamily({ ...currentFamily, certDiscapApo: e.target.value })}
-                                        options={opcionesCertificado}
-                                    />
-                                    <InputField
-                                        type="number"
-                                        label="Edad"
-                                        value={currentFamily.edad || ''}
-                                        onChange={(e) => setCurrentFamily({ ...currentFamily, edad: e.target.value })}
-                                        placeholder="Ej. 35"
-                                        min="0"
-                                        max="120"
-                                        required
-                                    />
-
-                                    {/* ¿Es Tutor Principal? */}
-                                    <div className="md:col-span-3 bg-purple-50/50 p-4 rounded-xl border border-purple-100 flex items-center justify-between mt-2">
-                                        <div className="flex flex-col">
-                                            <span className="text-xs font-black text-purple-900">¿Es el Tutor / Apoderado Principal del NNA?</span>
-                                            <span className="text-[10px] text-purple-700 font-medium">Solo un familiar puede ser el tutor principal para efectos del Diagnóstico.</span>
-                                        </div>
-                                        <label className="relative inline-flex items-center cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={currentFamily.esTutorPrincipal === 'true' || currentFamily.esTutorPrincipal === true}
-                                                onChange={(e) => setCurrentFamily({ ...currentFamily, esTutorPrincipal: e.target.checked ? 'true' : 'false' })}
-                                                className="hidden peer"
-                                            />
-                                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-700"></div>
-                                        </label>
-                                    </div>
                                 </div>
                             </div>
 
@@ -3555,8 +4851,8 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
             {/* MODAL PARA AGREGAR/EDITAR NECESIDAD */}
             {
                 showNeedModal && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-                        <div className="bg-surface rounded-[12px] shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-[1px] p-4">
+                        <div className="bg-surface rounded-[12px] shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto">
                             {/* Header del Modal */}
                             <div className="flex items-center justify-between p-6 border-b border-border">
                                 <h3 className="text-xl font-bold text-fg">
@@ -3571,85 +4867,186 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                             </div>
 
                             {/* Contenido del Modal */}
-                            <div className="p-6 space-y-4">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-bold text-fg-2 mb-2">
-                                            Categoría <span className="text-danger">*</span>
-                                        </label>
-                                        <select
-                                            className="w-full px-4 py-2 border border-border rounded-[6px] focus:ring-2 focus:ring-primary/40 focus:border-primary"
-                                            value={currentNeed.categoria}
-                                            onChange={(e) => setCurrentNeed({ ...currentNeed, categoria: e.target.value })}
-                                        >
-                                            <option value="">Seleccionar...</option>
-                                            <option value="SALUD">Salud</option>
-                                            <option value="IDENTIFICACIÓN">Identificación</option>
-                                            <option value="ALIMENTACIÓN">Alimentación</option>
-                                            <option value="VIVIENDA">Vivienda</option>
-                                            <option value="EDUCACIÓN">Educación</option>
-                                            <option value="LEGAL">Legal</option>
-                                            <option value="PAUTAS DE CRIANZA">Pautas de Crianza</option>
-                                            <option value="VIOLENCIA">Violencia - Física y Psicológica</option>
-                                            <option value="RECREATIVAS">Recreativas</option>
-                                            <option value="OTRA">Otra</option>
-                                        </select>
+                            <div className="p-6 space-y-5">
+                                <div>
+                                    <label className="block text-sm font-bold text-fg-2 mb-2">
+                                        Categoría <span className="text-danger">*</span>
+                                    </label>
+                                    <select
+                                        className="w-full px-4 py-2 border border-border rounded-[6px] focus:ring-2 focus:ring-primary/40 focus:border-primary"
+                                        value={currentNeed.categoria}
+                                        disabled={editingNeedIndex !== null}
+                                        onChange={(e) => setCurrentNeed({ ...currentNeed, categoria: e.target.value, acciones: [], faseI: '', faseII: '', faseIII: '' })}
+                                    >
+                                        <option value="">Seleccionar...</option>
+                                        {NEED_CATEGORIES.map(item => {
+                                            const usedByAnother = formData.necesidades.some((need, index) =>
+                                                need.categoria === item.value && index !== editingNeedIndex
+                                            );
+                                            return (
+                                                <option key={item.value} value={item.value} disabled={usedByAnother}>
+                                                    {item.label}{usedByAnother ? ' — ya registrada' : ''}
+                                                </option>
+                                            );
+                                        })}
+                                    </select>
+                                    <p className="mt-1.5 text-xs text-fg-muted">Cada categoría se registra una sola vez y continúa en las fases siguientes.</p>
+                                </div>
+
+                                <div className="rounded-[8px] border border-primary/25 bg-primary-soft/30 p-4">
+                                    <div className="mb-3 flex items-center gap-2">
+                                        <Sparkles size={17} className="text-primary" />
+                                        <div>
+                                            <p className="text-sm font-bold text-fg">Acciones sugeridas para {activeNeedPhase === 'faseI' ? 'Fase I' : activeNeedPhase === 'faseII' ? 'Fase II' : 'Fase III'}</p>
+                                            <p className="text-xs text-fg-muted">
+                                                {activeNeedPhase === 'faseI'
+                                                    ? 'Seleccione una acción inicial para crear su línea de intervención.'
+                                                    : 'Las opciones corresponden a las acciones registradas en la fase anterior y completarán la misma fila.'}
+                                            </p>
+                                        </div>
                                     </div>
 
-                                    <div>
-                                        <label className="block text-sm font-bold text-fg-2 mb-2">
-                                            Descripción <span className="text-danger">*</span>
-                                        </label>
-                                        <input
-                                            type="text"
-                                            className="w-full px-4 py-2 border border-border rounded-[6px] focus:ring-2 focus:ring-primary/40 focus:border-primary"
-                                            value={currentNeed.descripcion}
-                                            onChange={(e) => setCurrentNeed({ ...currentNeed, descripcion: e.target.value })}
-                                            placeholder="Describa brevemente la necesidad..."
-                                        />
+                                    {activeNeedPhase === 'faseI' ? (
+                                        (NEED_ACTION_FLOWS[currentNeed.categoria] || []).length > 0 ? (
+                                            <div className="flex flex-wrap gap-2">
+                                                {NEED_ACTION_FLOWS[currentNeed.categoria].map(flow => (
+                                                    <button type="button" key={flow.id} onClick={() => addInitialNeedFlow(flow)} className="rounded-full border border-primary/25 bg-surface px-3 py-1.5 text-left text-xs text-fg-2 hover:border-primary hover:text-primary">
+                                                        <Plus size={12} className="mr-1 inline" />{flow.faseI}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <button type="button" onClick={() => addCustomNeedAction('faseI')} className="rounded-[6px] border border-dashed border-primary/40 bg-surface px-3 py-2 text-xs font-bold text-primary">
+                                                <Plus size={12} className="mr-1 inline" /> Agregar acción personalizada
+                                            </button>
+                                        )
+                                    ) : (() => {
+                                        const previousPhase: NeedPhase = activeNeedPhase === 'faseII' ? 'faseI' : 'faseII';
+                                        const previousActions = (currentNeed.acciones || []).filter(action => action[previousPhase].trim());
+                                        if (previousActions.length === 0) {
+                                            return <p className="rounded-[6px] border border-dashed border-border bg-surface p-3 text-xs text-fg-muted">Primero registre una acción en {previousPhase === 'faseI' ? 'Fase I' : 'Fase II'} para mostrar sus continuaciones correspondientes.</p>;
+                                        }
+                                        return (
+                                            <div className="space-y-3">
+                                                {previousActions.map(action => {
+                                                    const flow = (NEED_ACTION_FLOWS[currentNeed.categoria] || []).find(item => item.id === action.flowId);
+                                                    const suggestions: string[] = activeNeedPhase === 'faseII'
+                                                        ? flow?.faseII || []
+                                                        : flow?.faseIII || [];
+                                                    return (
+                                                        <div key={`${activeNeedPhase}-${action.id}`} className="rounded-[7px] border border-primary/15 bg-surface p-3">
+                                                            <div className="mb-2 flex items-start gap-2">
+                                                                <ArrowRight size={15} className="mt-0.5 shrink-0 text-primary" />
+                                                                <div>
+                                                                    <p className="text-xs font-black text-fg">Continuación de: {action.titulo}</p>
+                                                                    <p className="text-[11px] text-fg-muted">{action[previousPhase]}</p>
+                                                                </div>
+                                                            </div>
+                                                            {suggestions.length > 0 ? (
+                                                                <div className="flex flex-wrap gap-2">
+                                                                    {suggestions.map(suggestion => (
+                                                                        <button type="button" key={suggestion} onClick={() => applyNeedFlowSuggestion(action.id, activeNeedPhase, suggestion)} className="rounded-full border border-primary/25 bg-primary-soft/30 px-3 py-1.5 text-left text-xs text-fg-2 hover:border-primary hover:text-primary">
+                                                                            <Plus size={12} className="mr-1 inline" />{suggestion}
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
+                                                            ) : (
+                                                                <button type="button" onClick={() => continueCustomNeedAction(action.id, activeNeedPhase)} className="rounded-[6px] border border-primary/30 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary hover:text-primary-fg">
+                                                                    Vincular y continuar esta gestión
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+
+                                <div>
+                                    <div className="mb-3 flex items-center justify-between gap-3">
+                                        <div>
+                                            <h4 className="text-sm font-black text-fg">Secuencia de acciones por fases</h4>
+                                            <p className="text-xs text-fg-muted">Todas las fases se muestran juntas. Seleccione una columna para indicar dónde se agregará la siguiente sugerencia.</p>
+                                        </div>
+                                        <button type="button" onClick={() => addCustomNeedAction()} className="rounded-[6px] border border-primary px-3 py-2 text-xs font-bold text-primary hover:bg-primary hover:text-primary-fg">
+                                            <Plus size={14} className="mr-1 inline" /> Otra acción
+                                        </button>
+                                    </div>
+
+                                    <div className="overflow-x-auto rounded-[8px] border border-border">
+                                        <div className="min-w-[1050px]">
+                                            <div className="grid bg-surface-muted" style={{ gridTemplateColumns: '220px repeat(3, minmax(240px, 1fr)) 48px' }}>
+                                                <div className="flex items-center border-r border-border px-3 py-3 text-xs font-black uppercase text-fg-muted">Gestión / Acción</div>
+                                                {NEED_PHASES.map(phase => (
+                                                    <button
+                                                        type="button"
+                                                        key={phase.key}
+                                                        onClick={() => setActiveNeedPhase(phase.key)}
+                                                        className={`border-r border-border px-3 py-3 text-sm font-black transition-colors ${activeNeedPhase === phase.key ? 'bg-primary text-primary-fg' : 'text-fg-muted hover:bg-surface'}`}
+                                                    >
+                                                        {phase.label}
+                                                        {activeNeedPhase === phase.key && <span className="ml-2 text-[10px] font-bold opacity-80">ACTIVA</span>}
+                                                    </button>
+                                                ))}
+                                                <div />
+                                            </div>
+
+                                            {(currentNeed.acciones || []).map(action => (
+                                                <div key={action.id} className="grid border-t border-border bg-surface" style={{ gridTemplateColumns: '220px repeat(3, minmax(240px, 1fr)) 48px' }}>
+                                                    <div className="border-r border-border p-3">
+                                                        <label className="mb-1 block text-[10px] font-bold uppercase text-fg-muted">Gestión</label>
+                                                        <input
+                                                            type="text"
+                                                            value={action.titulo}
+                                                            onChange={(e) => updateNeedActionTitle(action.id, e.target.value)}
+                                                            placeholder="Nombre de la gestión"
+                                                            className="w-full rounded-[6px] border border-border px-2.5 py-2 text-xs font-bold focus:border-primary focus:ring-2 focus:ring-primary/30"
+                                                        />
+                                                    </div>
+                                                    {NEED_PHASES.map(phase => {
+                                                        const actionKey = `${action.id}:${phase.key}`;
+                                                        return (
+                                                            <div key={phase.key} onClick={() => setActiveNeedPhase(phase.key)} className={`relative border-r border-border p-2 ${activeNeedPhase === phase.key ? 'bg-primary-soft/25' : ''}`}>
+                                                                <textarea
+                                                                    rows={4}
+                                                                    value={action[phase.key]}
+                                                                    onFocus={() => setActiveNeedPhase(phase.key)}
+                                                                    onChange={(e) => updateNeedActionText(action.id, phase.key, e.target.value)}
+                                                                    placeholder={phase.key === 'faseI' ? 'Acción inicial...' : 'Continuación o avance...'}
+                                                                    className="h-full min-h-[96px] w-full resize-y rounded-[6px] border border-border bg-surface px-3 py-2 pr-9 text-xs focus:border-primary focus:ring-2 focus:ring-primary/30"
+                                                                />
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(e) => { e.stopPropagation(); setActiveNeedPhase(phase.key); toggleVoiceDictation(action.id, phase.key); }}
+                                                                    disabled={!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition)}
+                                                                    title={`Dictar acción de ${phase.label}`}
+                                                                    className={`absolute right-4 top-4 rounded-full border bg-surface p-1 disabled:cursor-not-allowed disabled:opacity-30 ${listeningActionKey === actionKey ? 'border-danger text-danger' : 'border-border text-fg-muted hover:border-primary hover:text-primary'}`}
+                                                                >
+                                                                    <Mic size={13} />
+                                                                </button>
+                                                                {listeningActionKey === actionKey && <p className="mt-1 text-[10px] font-bold text-danger">Escuchando…</p>}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                    <div className="flex items-center justify-center p-2">
+                                                        <button type="button" onClick={() => removeNeedAction(action.id)} title="Eliminar gestión" className="rounded-full border border-border p-2 text-fg-muted hover:border-danger hover:text-danger">
+                                                            <Trash2 size={15} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+
+                                            {(currentNeed.acciones || []).length === 0 && (
+                                                <div className="border-t border-border p-7 text-center text-xs text-fg-muted">
+                                                    Seleccione una acción sugerida o agregue una acción personalizada para iniciar la secuencia.
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-3 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-bold text-fg-2 mb-2">
-                                            Fase I - Contacto
-                                        </label>
-                                        <textarea
-                                            className="w-full px-4 py-2 border border-border rounded-[6px] focus:ring-2 focus:ring-primary/40 focus:border-primary"
-                                            rows={4}
-                                            value={currentNeed.faseI}
-                                            onChange={(e) => setCurrentNeed({ ...currentNeed, faseI: e.target.value })}
-                                            placeholder="Acciones a desarrollar en Fase I..."
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-bold text-fg-2 mb-2">
-                                            Fase II - Desarrollo
-                                        </label>
-                                        <textarea
-                                            className="w-full px-4 py-2 border border-border rounded-[6px] focus:ring-2 focus:ring-primary/40 focus:border-primary"
-                                            rows={4}
-                                            value={currentNeed.faseII}
-                                            onChange={(e) => setCurrentNeed({ ...currentNeed, faseII: e.target.value })}
-                                            placeholder="Acciones a desarrollar en Fase II..."
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-bold text-fg-2 mb-2">
-                                            Fase III - Reinserción
-                                        </label>
-                                        <textarea
-                                            className="w-full px-4 py-2 border border-border rounded-[6px] focus:ring-2 focus:ring-primary/40 focus:border-primary"
-                                            rows={4}
-                                            value={currentNeed.faseIII}
-                                            onChange={(e) => setCurrentNeed({ ...currentNeed, faseIII: e.target.value })}
-                                            placeholder="Acciones a desarrollar en Fase III..."
-                                        />
-                                    </div>
-                                </div>
+                                <p className="text-xs text-fg-muted">Las fases representan una proyección. No es necesario completar las tres ni registrar fechas.</p>
                             </div>
 
                             {/* Footer del Modal */}
@@ -3662,7 +5059,7 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                                 </button>
                                 <button
                                     onClick={handleSaveNeed}
-                                    disabled={!currentNeed.categoria || !currentNeed.descripcion}
+                                    disabled={!currentNeed.categoria || !(currentNeed.acciones || []).some(action => action.fasesActivas.some(phase => action[phase].trim()))}
                                     className="px-6 py-2 bg-primary text-primary-fg rounded-[6px] font-bold hover:bg-primary/90 disabled:bg-surface-muted disabled:cursor-not-allowed transition-colors"
                                 >
                                     {editingNeedIndex !== null ? 'Actualizar' : 'Agregar'}
@@ -3679,6 +5076,7 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                 onClose={closeActividadModal}
                 onSave={handleSaveActividad}
                 initialData={actividadModalState.editIndex !== null ? actividadesCalle[actividadModalState.editIndex] : undefined}
+                perfil={perfilActividad}
             />
 
             {/* ===== VISTA IMPRESIÓN (OFICIAL) - Solo visible al imprimir ===== */}
@@ -3759,7 +5157,7 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                         <tr>
                             <td style={tdStyle}>
                                 <span style={labelStyle as any}>Tiempo en Situación de Calle</span>
-                                <b>{formData.tiempoEnCalle || caso?.tiempoEnCalle}</b>
+                                <b>{formatTiempoSituacionCalle(formData.situacionCalleDetalle.tiempo) || formData.tiempoEnCalle || caso?.tiempoEnCalle}</b>
                             </td>
                             <td style={tdStyle} colSpan={3}>
                                 <span style={labelStyle as any}>Punto de Concentración</span>
@@ -3768,8 +5166,26 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                         </tr>
                         <tr>
                             <td style={tdStyle} colSpan={4}>
-                                <span style={labelStyle as any}>Actividad Económica</span>
-                                <b>{formData.actividadEconomica || caso?.actividadRealizada}</b>
+                                <span style={labelStyle as any}>Actividad que realiza en calle</span>
+                                <b>{formData.situacionCalleDetalle.actividad || formData.actividadEconomica || caso?.actividadRealizada}</b>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style={tdStyle} colSpan={4}>
+                                <span style={labelStyle as any}>Horarios en Situación de Calle</span>
+                                Mañana [{formData.situacionCalleDetalle.horarios.manana ? 'X' : ' '}]
+                                {' '}Tarde [{formData.situacionCalleDetalle.horarios.tarde ? 'X' : ' '}]
+                                {' '}Noche [{formData.situacionCalleDetalle.horarios.noche ? 'X' : ' '}]
+                                {' '}Madrugada [{formData.situacionCalleDetalle.horarios.madrugada ? 'X' : ' '}]
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style={tdStyle} colSpan={4}>
+                                <span style={labelStyle as any}>Frecuencia en Calle</span>
+                                Diario [{formData.situacionCalleDetalle.frecuencia.diario ? 'X' : ' '}]
+                                {' '}Interdiario [{formData.situacionCalleDetalle.frecuencia.interdiario ? 'X' : ' '}]
+                                {' '}Fines de semana [{formData.situacionCalleDetalle.frecuencia.finesSemana ? 'X' : ' '}]
+                                {' '}Temporadas [{formData.situacionCalleDetalle.frecuencia.temporadas ? 'X' : ' '}]
                             </td>
                         </tr>
                     </tbody>
@@ -4099,11 +5515,10 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                     <thead>
                         <tr>
                             <th style={{ ...thStyle, width: '5%' }}>N°</th>
-                            <th style={{ ...thStyle, width: '15%' }}>Categoría</th>
-                            <th style={{ ...thStyle, width: '20%' }}>Descripción</th>
-                            <th style={{ ...thStyle, width: '20%' }}>Fase I (Contacto)</th>
-                            <th style={{ ...thStyle, width: '20%' }}>Fase II (Desarrollo)</th>
-                            <th style={{ ...thStyle, width: '20%' }}>Fase III (Reinserción)</th>
+                            <th style={{ ...thStyle, width: '20%' }}>Categoría</th>
+                            <th style={{ ...thStyle, width: '25%' }}>Fase I</th>
+                            <th style={{ ...thStyle, width: '25%' }}>Fase II</th>
+                            <th style={{ ...thStyle, width: '25%' }}>Fase III</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -4112,10 +5527,9 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                                 <tr key={idx}>
                                     <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 'bold' }}>{idx + 1}</td>
                                     <td style={{ ...tdStyle, fontSize: '9px', fontWeight: 'bold' }}>{necesidad.categoria}</td>
-                                    <td style={{ ...tdStyle, fontSize: '9px' }}>{necesidad.descripcion}</td>
-                                    <td style={{ ...tdStyle, fontSize: '8px' }}>{necesidad.faseI || '-'}</td>
-                                    <td style={{ ...tdStyle, fontSize: '8px' }}>{necesidad.faseII || '-'}</td>
-                                    <td style={{ ...tdStyle, fontSize: '8px' }}>{necesidad.faseIII || '-'}</td>
+                                    <td style={{ ...tdStyle, fontSize: '8px' }}><NeedPhaseItems value={necesidad.faseI} /></td>
+                                    <td style={{ ...tdStyle, fontSize: '8px' }}><NeedPhaseItems value={necesidad.faseII} /></td>
+                                    <td style={{ ...tdStyle, fontSize: '8px' }}><NeedPhaseItems value={necesidad.faseIII} /></td>
                                 </tr>
                             ))
                         ) : (
@@ -4123,7 +5537,6 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                             [1, 2, 3].map((i) => (
                                 <tr key={i}>
                                     <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 'bold' }}>{i}</td>
-                                    <td style={tdStyle}>&nbsp;</td>
                                     <td style={tdStyle}>&nbsp;</td>
                                     <td style={tdStyle}>&nbsp;</td>
                                     <td style={tdStyle}>&nbsp;</td>
@@ -4293,9 +5706,9 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
 
                         {/* Texto */}
                         <div className="text-center mb-5">
-                            <h3 className="text-[17px] font-black text-fg mb-1.5">¿Guardar diagnóstico?</h3>
+                            <h3 className="text-[17px] font-black text-fg mb-1.5">¿Desea guardar el diagnóstico?</h3>
                             <p className="text-[13px] text-fg-muted leading-relaxed">
-                                Se guardará el <span className="font-bold text-fg">Diagnóstico Social (F04)</span> del beneficiario:
+                                Al confirmar, se guardará el <span className="font-bold text-fg">Diagnóstico Social (F04)</span> del beneficiario:
                             </p>
                             <p className="text-[13px] font-bold text-primary mt-1 truncate">
                                 {nna?.nombres} {nna?.apellidoPaterno} {nna?.apellidoMaterno}

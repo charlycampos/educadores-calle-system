@@ -38,6 +38,8 @@ export interface NnaPersonalData {
     detalleSinDoc: string;
 
     estudiaActualmente: string | boolean;
+    /** Estado interno del formulario; no se envía al API. */
+    noAplicaEducacionAutomatico?: boolean;
     nivelEducativo: string;
     gradoEstudio: string;
     institucionEducativa: string;
@@ -284,8 +286,28 @@ export interface NnaFormData {
     urgencia_id?: number;
 }
 
+/** Un NNA que se parece al que se está registrando. */
+export interface DuplicateMatch {
+    id: number;
+    nombres: string;
+    apellidoPaterno?: string;
+    apellidoMaterno?: string;
+    tipoDoc?: string;
+    numeroDoc?: string;
+    sexo?: string;
+    fechaNacimiento?: string | null;
+    codigoFicha03?: string | null;
+    /** Para abrir el expediente del NNA encontrado. */
+    carpetaId?: number | null;
+    sede?: string;
+    /** 0-100. Cuanto más alto, más probable que sea la misma persona. */
+    puntaje?: number;
+    /** Por qué aparece: "Mismo documento", "Apellidos en orden invertido"… */
+    motivo?: string;
+}
+
 export interface DuplicateCheckResult {
     status: 'unique' | 'homonym' | 'duplicate';
     message: string;
-    matches?: NnaPersonalData[];
+    matches?: DuplicateMatch[];
 }

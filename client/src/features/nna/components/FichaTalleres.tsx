@@ -201,7 +201,8 @@ export const FichaTalleres = ({ nna }: FichaTalleresProps) => {
                 await addParticipante(taller.id, nna.id);
                 fullTaller = await getTallerById(taller.id);
             }
-            await updateTaller(taller.id, { ...fullTaller, estado: 'EJECUTADO' });
+            // El estado lo deriva el backend de la asistencia registrada.
+            await updateTaller(taller.id, fullTaller, 'ejecucion');
             await loadTalleres();
         } catch (err) {
             console.error(err);
@@ -754,8 +755,16 @@ const DetalleEvaluacion = ({ taller, nna, onBack, onEval, isGeneratingPDF, handl
                     <Formato8Print taller={taller} nna={nna} id="formato-8-print-ficha" />
                     {!taller.esIndividual && (
                         <>
-                            <Formato10Print taller={taller} participantes={taller.participantes} id="formato-10-print-ficha" />
-                            <Formato11Print taller={taller} id="formato-11-print-ficha" />
+                            <Formato10Print
+                                taller={taller}
+                                participantes={(taller.participantes || []).filter((p: any) => p.tipo !== 'FAMILIAR')}
+                                id="formato-10-print-ficha"
+                            />
+                            <Formato11Print
+                                taller={taller}
+                                familiares={(taller.participantes || []).filter((p: any) => p.tipo === 'FAMILIAR')}
+                                id="formato-11-print-ficha"
+                            />
                         </>
                     )}
                 </div>

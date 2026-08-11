@@ -1,15 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
 import { Save, Printer, AlertCircle, Target, Calendar, CheckCircle, CheckCircle2, Loader2, Lock } from 'lucide-react';
-import { createLogros, updateLogros, type ProcesoLogrosPayload } from '../../../api/logros.api';
+import { createLogros, updateLogros, cerrarFase, type ProcesoLogrosPayload } from '../../../api/logros.api';
 import { useAuthStore } from '../../../store/auth.store';
 import { useNnaStore } from '../../../store/nna.store';
+import { EXPEDIENTE_API_URL, INTERVENCION_API_URL } from '../../../config/api';
 
 interface Formato5LogrosProps {
     nna: any;
     caso?: any;
     initialData?: any;
     onClose?: () => void;
-    onSuccess?: (result: any) => void;
+    onSuccess?: (result: any, opts?: { mantenerAbierto?: boolean }) => void;
 }
 
 const ITEMS_FASE_1 = [
@@ -44,11 +45,34 @@ const ITEMS_FASE_3 = [
 type LogroVal = 'SI' | 'NO' | 'PROCESO' | null;
 type LogrosState = Record<string, LogroVal>;
 
+/**
+ * Duración de cada fase según la RDE 069-2021. Es solo referencia visible:
+ * no valida ni bloquea nada. Luis lo pidió así — "puede pasar un poquito más,
+ * es relativo, pero tenemos esa referencia".
+ */
+const MESES_FASE: Record<number, number> = { 1: 3, 2: 15, 3: 6 };
+
+const sumarDias = (iso: string, dias: number): string => {
+    if (!iso) return '';
+    const d = new Date(`${iso}T00:00:00`);
+    d.setDate(d.getDate() + dias);
+    return d.toISOString().split('T')[0];
+};
+
+const sumarMeses = (iso: string, meses: number): string => {
+    if (!iso) return '';
+    const d = new Date(`${iso}T00:00:00`);
+    d.setMonth(d.getMonth() + meses);
+    return d.toISOString().split('T')[0];
+};
+
+
 function buildPayload(
     nna: any, caso: any,
     logros: LogrosState,
     observaciones: Record<number, string>,
-    fechas: Record<number, string>,
+    inicios: Record<number, string>,
+    fines: Record<number, string>,
     educadorResponsable: string | null,
 ): ProcesoLogrosPayload {
     const f = (fase: number, item: number): string | null => logros[`f${fase}_${item}`] || null;
@@ -58,14 +82,20 @@ function buildPayload(
         perfilUsuario: caso?.perfil ?? null,
         fechaIngreso: caso?.fechaApertura ? caso.fechaApertura.split('T')[0] : null,
         educadorResponsable,
-        f1Fecha: fechas[1] || null,
+        f1Fecha: fines[1] || null,   // heredado: se mantiene igual al término
+        f1Inicio: inicios[1] || null,
+        f1Fin: fines[1] || null,
         f1I1: f(1,1), f1I2: f(1,2), f1I3: f(1,3), f1I4: f(1,4), f1I5: f(1,5),
         f1Obs: observaciones[1] || null,
-        f2Fecha: fechas[2] || null,
+        f2Fecha: fines[2] || null,
+        f2Inicio: inicios[2] || null,
+        f2Fin: fines[2] || null,
         f2I1: f(2,1), f2I2: f(2,2), f2I3: f(2,3), f2I4: f(2,4), f2I5: f(2,5),
         f2I6: f(2,6), f2I7: f(2,7), f2I8: f(2,8), f2I9: f(2,9), f2I10: f(2,10),
         f2Obs: observaciones[2] || null,
-        f3Fecha: fechas[3] || null,
+        f3Fecha: fines[3] || null,
+        f3Inicio: inicios[3] || null,
+        f3Fin: fines[3] || null,
         f3I1: f(3,1), f3I2: f(3,2), f3I3: f(3,3), f3I4: f(3,4), f3I5: f(3,5),
         f3Obs: observaciones[3] || null,
     };
@@ -80,7 +110,18 @@ function hydrateFromData(data: any) {
     return {
         logros,
         observaciones: { 1: data.f1_obs || '', 2: data.f2_obs || '', 3: data.f3_obs || '' },
-        fechas: { 1: toDate(data.f1_fecha), 2: toDate(data.f2_fecha), 3: toDate(data.f3_fecha) },
+        inicios: {
+            1: toDate(data.f1_inicio) || toDate(data.fecha_ingreso),
+            2: toDate(data.f2_inicio),
+            3: toDate(data.f3_inicio),
+        },
+        // Los F05 anteriores a la migración 011 solo tenían fecha de evaluación,
+        // que es el mismo dato que el término de la fase.
+        fines: {
+            1: toDate(data.f1_fin) || toDate(data.f1_fecha),
+            2: toDate(data.f2_fin) || toDate(data.f2_fecha),
+            3: toDate(data.f3_fin) || toDate(data.f3_fecha),
+        },
     };
 }
 
@@ -90,30 +131,82 @@ export const Formato5Logros = ({ nna, caso, initialData, onClose, onSuccess }: F
     const [activeFase, setActiveFase]           = useState<1 | 2 | 3>(1);
     const [logros, setLogros]                   = useState<LogrosState>({});
     const [observaciones, setObservaciones]     = useState<Record<number, string>>({ 1: '', 2: '', 3: '' });
-    const [fechas, setFechas]                   = useState<Record<number, string>>({ 1: '', 2: '', 3: '' });
+    const [inicios, setInicios]                 = useState<Record<number, string>>({ 1: '', 2: '', 3: '' });
+    const [fines, setFines]                     = useState<Record<number, string>>({ 1: '', 2: '', 3: '' });
     const [isSaving, setIsSaving]               = useState(false);
     const [saveError, setSaveError]             = useState<string | null>(null);
     const [savedOk, setSavedOk]                 = useState(false);
     const [showSaveConfirm, setShowSaveConfirm] = useState(false);
+    const [isCerrando, setIsCerrando]           = useState(false);
+    const [showCerrarConfirm, setShowCerrarConfirm] = useState(false);
 
     useEffect(() => {
         if (initialData) {
-            const { logros: l, observaciones: o, fechas: f } = hydrateFromData(initialData);
+            const { logros: l, observaciones: o, inicios: ini, fines: fin } = hydrateFromData(initialData);
             setLogros(l);
             setObservaciones(o);
-            setFechas(f);
+            setInicios(ini);
+            setFines(fin);
         }
     }, [initialData]);
 
-    // Fase N se desbloquea si fue oficialmente cerrada (folio en expediente) O si todos sus ítems están en SI en el estado local (en tiempo real)
+    // NINGUNA fase se bloquea. El sistema no impone la secuencia: el educador
+    // entra a la fase que necesite y la cierra cuando decida.
+    //
+    // Antes la fase siguiente exigía tener todos los ítems anteriores en SI, y
+    // eso retenía al NNA — "si se tiene que cumplir todos, entonces nunca
+    // pasaremos de fase" (Luis). El cumplimiento es el resultado de la
+    // evaluación, no un permiso para avanzar.
+    //
+    // Lo único que cambia al cerrar una fase es que queda en solo lectura:
+    // "queda así, ya no volvemos".
     const fase1Cerrada = documents.some(d => d.pdfUrl?.includes('/pdf/fase/1'));
     const fase2Cerrada = documents.some(d => d.pdfUrl?.includes('/pdf/fase/2'));
-    
-    const fase1TodoSi = ITEMS_FASE_1.every(it => logros[`f1_${it.id}`] === 'SI');
-    const fase2TodoSi = ITEMS_FASE_2.every(it => logros[`f2_${it.id}`] === 'SI');
-    
-    const fase2Desbloqueada = fase1Cerrada || fase1TodoSi;
-    const fase3Desbloqueada = fase2Cerrada || fase2TodoSi;
+
+    // Encadenado de fechas. La Fase I arranca en la inscripción del NNA; cada
+    // fase siguiente, el día después del término de la anterior — tal como lo
+    // ejemplificó María del Carmen: "terminó el 30 de agosto la fase 1, la
+    // fase 2 tendría que empezar el primero de septiembre".
+    const fechaInscripcion = caso?.fechaApertura
+        ? String(caso.fechaApertura).split('T')[0]
+        : (inicios[1] || '');
+
+    const inicioFase = {
+        1: fechaInscripcion,
+        2: fines[1] ? sumarDias(fines[1], 1) : '',
+        3: fines[2] ? sumarDias(fines[2], 1) : '',
+    } as Record<number, string>;
+
+    const inicioFaseActual = inicioFase[activeFase] || '';
+    const faseLabel = activeFase === 1 ? 'I' : activeFase === 2 ? 'II' : 'III';
+
+
+    // El inicio no es un campo que el educador escriba: se deriva. Se sincroniza
+    // al estado para que viaje en el payload al guardar.
+    useEffect(() => {
+        setInicios(prev => {
+            const igual = [1, 2, 3].every(n => (prev[n] || '') === (inicioFase[n] || ''));
+            return igual ? prev : { ...prev, ...inicioFase };
+        });
+    }, [fechaInscripcion, fines[1], fines[2]]);
+
+    // El término se propone según el plazo de la fase (3 / 15 / 6 meses) para que
+    // el educador no tenga que calcularlo. Solo se rellena si está vacío: si ya
+    // escribió una fecha, se respeta — los plazos son referenciales y "puede
+    // pasar un poquito más".
+    useEffect(() => {
+        setFines(prev => {
+            const propuesto = { ...prev };
+            let cambio = false;
+            for (const n of [1, 2, 3]) {
+                if (!prev[n] && inicioFase[n]) {
+                    propuesto[n] = sumarMeses(inicioFase[n], MESES_FASE[n]);
+                    cambio = true;
+                }
+            }
+            return cambio ? propuesto : prev;
+        });
+    }, [inicioFase[1], inicioFase[2], inicioFase[3]]);
     const fase3Cerrada = documents.some(d => d.type === 'FICHA DE LOGROS (FORMATO 5)');
 
     // Auto-jump: when opening an existing record, go straight to the first non-archived phase
@@ -132,12 +225,64 @@ export const Formato5Logros = ({ nna, caso, initialData, onClose, onSuccess }: F
         return ITEMS_FASE_3;
     };
 
+    // Basta con un indicador evaluado — con cualquier valor — para poder cerrar.
+    // No se exige que estén cumplidos: un NO o un EN PROCESO también valen.
+    const puedeCerrarFase = getItems(activeFase).some(it => !!logros[`f${activeFase}_${it.id}`]);
+
     const countLogros = (fase: number) => {
         const items = getItems(fase);
         return {
             done:  items.filter(it => logros[`f${fase}_${it.id}`] === 'SI').length,
             total: items.length,
         };
+    };
+
+    /**
+     * Cierra la fase activa: guarda primero (para no perder lo escrito), genera
+     * el PDF de la fase y lo archiva en el expediente. A partir de ahí la fase
+     * queda en solo lectura y se habilita la siguiente.
+     */
+    const handleCerrarFase = async () => {
+        if (!initialData?.id) return;
+        setIsCerrando(true);
+        setSaveError(null);
+        try {
+            const authUser = useAuthStore.getState().user;
+            const educadorResponsable = authUser?.nombreCompleto || authUser?.nombre || null;
+            await updateLogros(
+                initialData.id,
+                buildPayload(nna, caso, logros, observaciones, inicios, fines, educadorResponsable)
+            );
+
+            const resultado = await cerrarFase(initialData.id, activeFase);
+
+            const casoId = caso?.id ?? initialData?.caso_id;
+            if (!casoId) throw new Error('El F05 no tiene caso asociado; no se puede archivar en el expediente.');
+
+            const token = useAuthStore.getState().token || '';
+            const folioRes = await fetch(`${EXPEDIENTE_API_URL}/expediente/caso/${casoId}/folio`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({
+                    tipo_documento: `F05-FASE-${activeFase}`,
+                    titulo: `FICHA DE LOGROS F05 — FASE ${faseLabel} — ${resultado.codigo_f05}`,
+                    archivo_url: `${INTERVENCION_API_URL}/proceso-logros/${initialData.id}/pdf/fase/${activeFase}`,
+                    contenido_hash: `${resultado.codigo_f05}-F${activeFase}`.substring(0, 40),
+                }),
+            });
+            if (!folioRes.ok) throw new Error('El PDF se generó, pero no pudo registrarse en el Expediente Digital.');
+
+            setShowCerrarConfirm(false);
+            // Cerrar la fase NO debe sacar al educador del formulario: tiene que
+            // poder ver lo que quedó archivado. El padre recarga los datos y nos
+            // deja abiertos en la misma fase, ya en solo lectura.
+            onSuccess?.(resultado, { mantenerAbierto: true });
+        } catch (err: any) {
+            setSaveError(err.message || `Error al cerrar la Fase ${faseLabel}`);
+            setShowCerrarConfirm(false);
+        } finally {
+            setIsCerrando(false);
+        }
     };
 
     const handleSave = async () => {
@@ -147,7 +292,7 @@ export const Formato5Logros = ({ nna, caso, initialData, onClose, onSuccess }: F
         try {
             const authUser = useAuthStore.getState().user;
             const educadorResponsable = authUser?.nombreCompleto || authUser?.nombre || null;
-            const payload = buildPayload(nna, caso, logros, observaciones, fechas, educadorResponsable);
+            const payload = buildPayload(nna, caso, logros, observaciones, inicios, fines, educadorResponsable);
 
                 let result: any;
 
@@ -181,10 +326,18 @@ export const Formato5Logros = ({ nna, caso, initialData, onClose, onSuccess }: F
                     [`f${fase}_${itemId}`]: selected ? null : value
                 }))}
                 disabled={faseCerradaActual}
-                title={faseCerradaActual ? 'Esta fase ya fue cerrada oficialmente' : undefined}
+                title={faseCerradaActual
+                    ? (selected ? `Evaluado como "${label}" — fase cerrada` : 'Fase cerrada, solo lectura')
+                    : undefined}
+                // Con la fase cerrada el botón deja de ser pulsable, pero el que
+                // se marcó conserva su color: lo evaluado tiene que seguir
+                // viéndose ("queda así, ya no volvemos"). Los no elegidos se
+                // atenúan para que se distinga de un vistazo qué se respondió.
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border
                     ${faseCerradaActual
-                        ? 'opacity-60 cursor-not-allowed bg-surface-muted text-fg-muted border-border'
+                        ? selected
+                            ? `${colorClass} cursor-default`
+                            : 'cursor-default bg-surface text-fg-muted/40 border-border/50'
                         : selected
                             ? `${colorClass} ring-2 ring-offset-1 ring-opacity-60`
                             : 'bg-surface text-fg-muted border-border hover:bg-surface-muted'
@@ -230,43 +383,35 @@ export const Formato5Logros = ({ nna, caso, initialData, onClose, onSuccess }: F
                     {faseConfig.map(fc => {
                         const { done, total } = countLogros(fc.id);
                         const isActive = activeFase === fc.id;
-                        const bloqueada = (fc.id === 2 && !fase2Desbloqueada) || (fc.id === 3 && !fase3Desbloqueada);
                         const isCerrada = (fc.id === 1 && fase1Cerrada) || (fc.id === 2 && fase2Cerrada) || (fc.id === 3 && fase3Cerrada);
                         return (
                             <button
                                 key={fc.id}
-                                onClick={() => !bloqueada && setActiveFase(fc.id)}
-                                disabled={bloqueada}
-                                title={bloqueada ? `Completa la Fase ${fc.id === 2 ? 'I' : 'II'} primero` : isCerrada ? 'Fase cerrada oficialmente — solo lectura' : undefined}
+                                onClick={() => setActiveFase(fc.id)}
+                                title={isCerrada ? 'Fase cerrada — solo lectura' : undefined}
                                 className={`flex-1 min-w-[120px] sm:min-w-0 py-3 text-xs sm:text-sm font-bold uppercase tracking-wider transition-colors relative
-                                    ${bloqueada
-                                        ? 'text-fg-muted opacity-40 cursor-not-allowed'
-                                        : isCerrada && !isActive
-                                            ? 'text-success bg-success-soft/30 hover:bg-success-soft/50'
-                                            : isActive
-                                                ? `${fc.color} bg-surface`
-                                                : 'text-fg-muted hover:text-fg-2 hover:bg-border/30'
+                                    ${isCerrada && !isActive
+                                        ? 'text-success bg-success-soft/30 hover:bg-success-soft/50'
+                                        : isActive
+                                            ? `${fc.color} bg-surface`
+                                            : 'text-fg-muted hover:text-fg-2 hover:bg-border/30'
                                     }`}
                             >
                                 <div className="flex flex-col items-center gap-0.5 px-2">
                                     <div className="flex items-center gap-1.5">
-                                        {bloqueada
-                                            ? <Lock size={12} />
-                                            : isCerrada
-                                                ? <CheckCircle2 size={12} className="text-success" />
-                                                : <Target size={14} />}
+                                        {isCerrada
+                                            ? <CheckCircle2 size={12} className="text-success" />
+                                            : <Target size={14} />}
                                         <span>{fc.label}</span>
                                     </div>
                                     <span className="text-[9px] sm:text-[10px] font-normal normal-case opacity-70 block truncate max-w-full">
-                                        {bloqueada ? 'Bloqueada' : isCerrada ? 'Archivada' : fc.sub}
+                                        {isCerrada ? 'Archivada' : fc.sub}
                                     </span>
-                                    {!bloqueada && (
-                                        <span className={`text-[9px] sm:text-[10px] font-bold mt-0.5 ${isCerrada ? 'text-success' : done === total ? 'text-success' : 'text-fg-muted'}`}>
-                                            {isCerrada ? `${total}/${total} — Cerrada` : `${done}/${total} logros`}
-                                        </span>
-                                    )}
+                                    <span className={`text-[9px] sm:text-[10px] font-bold mt-0.5 ${isCerrada || done === total ? 'text-success' : 'text-fg-muted'}`}>
+                                        {isCerrada ? `${done}/${total} — Cerrada` : `${done}/${total} logros`}
+                                    </span>
                                 </div>
-                                {isActive && !bloqueada && <div className={`absolute bottom-0 left-0 right-0 h-0.5 ${fc.bar}`} />}
+                                {isActive && <div className={`absolute bottom-0 left-0 right-0 h-0.5 ${fc.bar}`} />}
                                 {isCerrada && !isActive && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-success opacity-40" />}
                             </button>
                         );
@@ -274,20 +419,46 @@ export const Formato5Logros = ({ nna, caso, initialData, onClose, onSuccess }: F
                 </div>
 
                 <div className="p-4 sm:p-8">
-                    {/* Fecha */}
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6 bg-primary-soft/10 p-4 rounded-[6px] border border-primary/20">
-                        <Calendar className="text-primary shrink-0" size={20} />
-                        <div>
-                            <label className="block text-xs font-bold text-primary uppercase mb-1">
-                                Fecha de Evaluación — Fase {activeFase === 1 ? 'I' : activeFase === 2 ? 'II' : 'III'}
-                            </label>
-                            <input
-                                type="date"
-                                value={fechas[activeFase]}
-                                onChange={e => !faseCerradaActual && setFechas({ ...fechas, [activeFase]: e.target.value })}
-                                disabled={faseCerradaActual}
-                                className={`px-3 py-1.5 border border-primary/30 rounded text-sm text-fg bg-surface focus:ring-2 focus:ring-primary outline-none ${faseCerradaActual ? 'opacity-60 cursor-not-allowed' : ''}`}
-                            />
+                    {/* Periodo de la fase: inicio y término.
+                        El inicio nunca se escribe — la Fase I lo toma de la
+                        inscripción y las siguientes del día posterior al término
+                        de la anterior. Solo el término es editable. */}
+                    <div className="flex flex-col sm:flex-row sm:items-start gap-4 mb-6 bg-primary-soft/10 p-4 rounded-[6px] border border-primary/20">
+                        <Calendar className="text-primary shrink-0 mt-1" size={20} />
+                        <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs font-bold text-primary uppercase mb-1">
+                                    Inicio — Fase {faseLabel}
+                                </label>
+                                <input
+                                    type="date"
+                                    value={inicioFaseActual}
+                                    readOnly
+                                    disabled
+                                    className="w-full px-3 py-1.5 border border-primary/20 rounded text-sm text-fg bg-surface-muted/60 opacity-80 cursor-not-allowed outline-none"
+                                />
+                                <p className="text-[11px] text-fg-muted mt-1 flex items-center gap-1">
+                                    <Lock size={10} />
+                                    {activeFase === 1
+                                        ? 'Fecha de inscripción del usuario'
+                                        : `Día siguiente al término de la Fase ${activeFase === 2 ? 'I' : 'II'}`}
+                                </p>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-primary uppercase mb-1">
+                                    Término — Fase {faseLabel}
+                                </label>
+                                <input
+                                    type="date"
+                                    value={fines[activeFase]}
+                                    onChange={e => !faseCerradaActual && setFines({ ...fines, [activeFase]: e.target.value })}
+                                    disabled={faseCerradaActual}
+                                    className={`w-full px-3 py-1.5 border border-primary/30 rounded text-sm text-fg focus:ring-2 focus:ring-primary outline-none ${faseCerradaActual ? 'bg-surface-muted cursor-default' : 'bg-surface'}`}
+                                />
+                                <p className="text-[11px] text-fg-muted mt-1">
+                                    Calculado a {MESES_FASE[activeFase]} meses · editable si terminó en otra fecha
+                                </p>
+                            </div>
                         </div>
                     </div>
 
@@ -355,7 +526,7 @@ export const Formato5Logros = ({ nna, caso, initialData, onClose, onSuccess }: F
                             onChange={e => !faseCerradaActual && setObservaciones({ ...observaciones, [activeFase]: e.target.value })}
                             disabled={faseCerradaActual}
                             rows={4}
-                            className={`w-full px-4 py-3 border border-border rounded-[8px] focus:ring-2 focus:ring-primary focus:border-transparent outline-none resize-none text-sm bg-surface ${faseCerradaActual ? 'opacity-60 cursor-not-allowed' : ''}`}
+                            className={`w-full px-4 py-3 border border-border rounded-[8px] focus:ring-2 focus:ring-primary focus:border-transparent outline-none resize-none text-sm ${faseCerradaActual ? 'bg-surface-muted cursor-default' : 'bg-surface'}`}
                             placeholder={faseCerradaActual ? 'Fase cerrada oficialmente — solo lectura' : 'Observaciones, dificultades encontradas o logros específicos...'}
                         />
                     </div>
@@ -396,6 +567,22 @@ export const Formato5Logros = ({ nna, caso, initialData, onClose, onSuccess }: F
                         >
                             <Printer size={16} /> Imprimir
                         </button>
+                        {/* Cerrar la fase desde aquí: el educador está trabajando en el
+                            formulario, y antes tenía que salir a la lista para poder
+                            avanzar a la fase siguiente. */}
+                        {initialData?.id && !faseCerradaActual && (
+                            <button
+                                onClick={() => setShowCerrarConfirm(true)}
+                                disabled={!puedeCerrarFase || isCerrando}
+                                title={puedeCerrarFase
+                                    ? `Cierra la Fase ${faseLabel} y habilita la siguiente`
+                                    : 'Marca al menos un indicador para poder cerrar la fase'}
+                                className="flex items-center gap-2 bg-warning text-white font-bold px-5 py-2 rounded-[6px] shadow hover:bg-warning/90 transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {isCerrando ? <Loader2 size={16} className="animate-spin" /> : <Lock size={16} />}
+                                {isCerrando ? 'Cerrando...' : `Cerrar Fase ${faseLabel}`}
+                            </button>
+                        )}
                         <button
                             onClick={() => setShowSaveConfirm(true)}
                             disabled={isSaving}
@@ -475,6 +662,59 @@ export const Formato5Logros = ({ nna, caso, initialData, onClose, onSuccess }: F
                                         {initialData?.id ? 'Sí, actualizar' : 'Sí, guardar'}
                                     </>
                                 )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* ── Confirmación de cierre de fase ── */}
+        {showCerrarConfirm && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                <div className="bg-surface rounded-2xl shadow-2xl border border-border w-full max-w-md overflow-hidden">
+                    <div className="h-1.5 bg-warning" />
+                    <div className="p-7">
+                        <div className="flex justify-center mb-5">
+                            <div className="w-16 h-16 rounded-full bg-warning-soft flex items-center justify-center">
+                                <Lock size={26} className="text-warning" />
+                            </div>
+                        </div>
+
+                        <div className="text-center mb-5">
+                            <h3 className="text-[17px] font-black text-fg mb-1.5">
+                                ¿Cerrar la Fase {faseLabel}?
+                            </h3>
+                            <p className="text-[13px] text-fg-muted leading-relaxed">
+                                Se archivará en el expediente digital tal como está y quedará en
+                                solo lectura. Se habilitará la fase siguiente.
+                            </p>
+                        </div>
+
+                        <div className="flex items-start gap-2.5 bg-warning-soft/60 border border-warning/20 rounded-xl px-4 py-3 mb-6">
+                            <AlertCircle size={14} className="text-warning shrink-0 mt-0.5" />
+                            <p className="text-[11px] text-fg-2 font-medium leading-relaxed">
+                                Los indicadores se archivan con el valor que tengan ahora — sí, no o
+                                en proceso. No hace falta que estén cumplidos.
+                            </p>
+                        </div>
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowCerrarConfirm(false)}
+                                disabled={isCerrando}
+                                className="flex-1 px-4 py-2.5 rounded-xl border border-border text-fg font-semibold text-[13px] hover:bg-surface-muted transition-colors disabled:opacity-50"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleCerrarFase}
+                                disabled={isCerrando}
+                                className="flex-1 px-4 py-2.5 rounded-xl bg-warning text-white font-bold text-[13px] hover:bg-warning/90 transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
+                            >
+                                {isCerrando
+                                    ? <><Loader2 size={14} className="animate-spin" /> Cerrando...</>
+                                    : <><Lock size={14} /> Sí, cerrar fase</>}
                             </button>
                         </div>
                     </div>

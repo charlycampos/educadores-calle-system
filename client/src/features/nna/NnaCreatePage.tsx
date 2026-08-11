@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useForm, useFieldArray, useWatch, FormProvider } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useNnaStore } from '../../store/nna.store';
@@ -10,6 +10,9 @@ import { DISCAPACIDADES_CONADIS } from '../../data/ubigeo';
 import { ActividadesCalleSection } from './components/ActividadesCalleSection';
 import { DuplicateDrawer } from './components/DuplicateDrawer';
 import { FamiliarModal } from './components/FamiliarModal';
+import { AvisoHermanos } from './components/AvisoHermanos';
+import { detectarHermanos } from '../../api/hermanos.api';
+import type { DeteccionHermanos } from '../../api/hermanos.api';
 import { DatosGeneralesSection } from './components/DatosGeneralesSection';
 import { DatosPersonalesSection } from './components/DatosPersonalesSection';
 import { DatosPerfilSection } from './components/DatosPerfilSection';
@@ -575,6 +578,8 @@ export const NnaCreatePage = () => {
     const [showDuplicateDrawer, setShowDuplicateDrawer] = useState(false);
     const [duplicateCheckResults, setDuplicateCheckResults] = useState<DuplicateCheckResult | null>(null);
     const [currentNnaIndexForDuplicate, setCurrentNnaIndexForDuplicate] = useState<number>(0);
+    // Aviso de posibles hermanos, tras registrar un integrante de la familia.
+    const [deteccionHermanos, setDeteccionHermanos] = useState<(DeteccionHermanos & { nnaId: number }) | null>(null);
     const [showTutorModal, setShowTutorModal] = useState(false);
     const [editingFamiliarIndex, setEditingFamiliarIndex] = useState<number | null>(null);
     const [isCheckingDuplicates, setIsCheckingDuplicates] = useState<boolean>(false);
@@ -663,6 +668,36 @@ export const NnaCreatePage = () => {
         replaceFamiliares(updatedList);
         setShowTutorModal(false);
         setEditingFamiliarIndex(null);
+
+        // Si el integrante permite deducir un hermano, se consulta y se le
+        // pregunta al educador. Solo aplica en edición: en un registro nuevo
+        // el NNA todavía no tiene id contra el cual vincular.
+        verificarHermanos(finalFamiliar);
+    };
+
+    /**
+     * Busca hermanos a partir del familiar recién registrado: por parentesco
+     * "Hermano/a" o por el DNI del padre o madre. Si el hermano no está en el
+     * sistema, el aviso indica que necesita su propia ficha — el informe
+     * situacional los menciona con sus respectivos casos.
+     */
+    const verificarHermanos = async (finalFamiliar: FamiliarFormDataItem) => {
+        const nnaId = (selectedExpediente as any)?.[0]?.id;
+        if (!nnaId) return;
+        try {
+            const res = await detectarHermanos(nnaId, {
+                parentesco: finalFamiliar.vinTutUsu,
+                nombres: [finalFamiliar.nomApeTutApo, finalFamiliar.priApeTutApo, finalFamiliar.segApeTutApo]
+                    .filter(Boolean).join(' ').trim(),
+                dni: finalFamiliar.nroDocTutApo,
+            });
+            if (res.candidatos.length > 0 || res.requiereRegistro) {
+                setDeteccionHermanos({ ...res, nnaId } as any);
+            }
+        } catch (err) {
+            // Es una ayuda: si falla, no debe frenar el registro.
+            console.error('No se pudo verificar hermanos', err);
+        }
     };
 
     const sections = [
@@ -1346,10 +1381,13 @@ export const NnaCreatePage = () => {
         const apellidoMaternoNna = (nna.apellidoMaterno || '').trim();
         const nombresNna = (nna.nombres || '').trim();
 
-        // Evitar validaciones vacías molestas al salir del campo
-        if (!numeroDocNna && !apellidoPaternoNna) {
+        // Se busca con cualquier dato disponible: antes se exigía documento o
+        // apellido paterno, y con solo el nombre y el apellido materno no
+        // encontraba nada.
+        const fechaNacNna = (nna.fechaNacimiento || '').trim();
+        if (!numeroDocNna && !apellidoPaternoNna && !apellidoMaternoNna && !nombresNna) {
             if (isManual) {
-                showAlert("Falta información", "Por favor ingrese al menos el documento o el apellido paterno del NNA para verificar.", "warning");
+                showAlert("Falta información", "Ingresa al menos un nombre, un apellido o el documento para buscar coincidencias.", "warning");
             }
             return;
         }
@@ -1360,7 +1398,10 @@ export const NnaCreatePage = () => {
                 nombres: nombresNna,
                 apellidoPaterno: apellidoPaternoNna,
                 apellidoMaterno: apellidoMaternoNna,
-                numeroDoc: numeroDocNna
+                numeroDoc: numeroDocNna,
+                fechaNacimiento: fechaNacNna,
+                // En edición, el NNA no debe aparecer como duplicado de sí mismo.
+                excluirId: (nna as any)?.id,
             });
 
             setCurrentNnaIndexForDuplicate(index);
@@ -1385,9 +1426,32 @@ export const NnaCreatePage = () => {
         }
     };
 
+    // Registro con documento repetido ya revisado y confirmado por el educador.
+    const duplicadoConfirmadoRef = useRef(false);
+
     const onSubmit = async (data: NnaFormData, esBorrador: boolean = false) => {
         setSubmitting(true);
-        
+
+        // Un NNA registrado dos veces con el mismo documento es casi siempre un
+        // error, y en un padrón nacional cuesta deshacerlo. No se bloquea el
+        // registro — puede haber razones — pero no se crea sin haberlo visto.
+        const hayDocRepetido = !isEditMode
+            && duplicateCheckResults?.status === 'duplicate'
+            && (duplicateCheckResults.matches || []).some(m => (m.puntaje ?? 0) >= 100);
+
+        if (hayDocRepetido && !duplicadoConfirmadoRef.current) {
+            setSubmitting(false);
+            setShowDuplicateDrawer(true);
+            showAlert(
+                "Ya existe un NNA con ese documento",
+                "Revisa las coincidencias del panel. Si es la misma persona, continúa en su expediente. "
+                + "Si de verdad son personas distintas, vuelve a guardar para confirmar.",
+                "warning",
+                () => { duplicadoConfirmadoRef.current = true; }
+            );
+            return;
+        }
+
         if (!esBorrador) {
             // Strict check of all mandatory fields for final registration
             if (!data.perfil?.trim()) {
@@ -1459,7 +1523,11 @@ export const NnaCreatePage = () => {
                         return;
                     }
                 }
-                if (nna.tipoDoc === "7" && !nna.detalleSinDoc?.trim()) {
+                const detalleSinDocumento = nna.detalleSinDoc?.trim() || '';
+                if (
+                    nna.tipoDoc === "7" &&
+                    (!detalleSinDocumento || /^Otro:\s*$/i.test(detalleSinDocumento))
+                ) {
                     showAlert("Campo Requerido", `Debe especificar el detalle o motivo de la falta de documento${label}.`, "warning");
                     setSubmitting(false);
                     return;
@@ -1525,7 +1593,7 @@ export const NnaCreatePage = () => {
 
         const mappedNnas: NnaPayloadItem[] = nnasWithBackup.map((nna) => {
             const tienePartida = nna.tienePartidaNacimiento === "true";
-            const tieneDiscapacidad = nna.tieneDiscapacidad === true;
+            const tieneDiscapacidad = toBoolean(nna.tieneDiscapacidad);
             
             // Mapeo correcto de las opciones de matrícula a código número para la base de datos
             let estudiaActualmenteVal = 0;
@@ -1981,6 +2049,15 @@ export const NnaCreatePage = () => {
                 onSave={(activity) => handleAddActivityToNna(currentNnaIndexForDuplicate, activity)}
                 initialData={editingActivityIndex !== null ? (watch(`nnas.${currentNnaIndexForDuplicate}.actividadesTiempoLibreLista`) || [])[editingActivityIndex] : undefined}
             />
+
+            {/* Aviso de posibles hermanos */}
+            {deteccionHermanos && (
+                <AvisoHermanos
+                    nnaId={deteccionHermanos.nnaId}
+                    deteccion={deteccionHermanos}
+                    onCerrar={() => setDeteccionHermanos(null)}
+                />
+            )}
 
             {/* MODAL DETALLES DEL TUTOR / APODERADO */}
             <FamiliarModal

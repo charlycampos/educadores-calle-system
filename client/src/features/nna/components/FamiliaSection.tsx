@@ -224,7 +224,7 @@ export const FamiliaSection: React.FC<FamiliaSectionProps> = ({
                     <div className="border border-purple-100 rounded-xl bg-purple-50/30 p-5 mt-6 group hover:border-purple-200 transition-all">
                         <div className="flex justify-between items-center mb-4 pb-2 border-b border-purple-100/50">
                             <h4 className="text-sm font-black text-purple-900 uppercase flex items-center gap-2">
-                                <Users size={16} className="text-purple-700" /> Familiar o Tutor Responsable del NNA
+                                <Users size={16} className="text-purple-700" /> Datos de la Familia
                             </h4>
                             <button
                                 type="button"

@@ -1,22 +1,17 @@
 /**
  * SEC · TalleresPage rediseñado
- * - Tokens consolidados (sin blue-600, emerald-100, amber-100, purple-50, etc.)
- * - Button/Badge/Input unificados
- * - Header sin logo duplicado
- * - Tab bar limpia con tokens
- * - Cards de taller: sin gradientes, sin colored shadows
- * - Modal de evaluación con header limpio
- * - Sin alert() — errores en UI
- * - Empty state con CTA
- * Nota: la lógica de negocio (PDF, participantes, etc.) no se toca.
+ * - Tokens consolidados
+ * - Carga automática de participantes desde "Resumen de Caso" (NNA + Tutores)
+ * - Captura híbrida de firmas (Digital Pad en pantalla + Subida de Foto/PDF)
+ * - Sincronización automática de asistencias con el expediente del NNA
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
     Presentation, Plus, X, Edit, FileText, LayoutGrid, List as ListIcon,
     Calendar as CalendarIcon, Clock, Users, MapPin, CheckCircle2,
     Search, UserPlus, Save, BookOpen, AlertTriangle, Lightbulb, StickyNote,
-    FileDown, Loader2
+    FileDown, Loader2, Upload, PenTool, Image as ImageIcon, Sparkles, Check
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -34,6 +29,33 @@ import { Formato11Print } from '../nna/components/Formato11Print';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { EmptyState } from '../../components/ui/EmptyState';
+
+const TEMAS_PREDEFINIDOS = [
+    {
+        nombre: 'Taller de Habilidades Socioemocionales y Resiliencia',
+        dirigidoA: 'Niños y niñas',
+        objetivo: 'Fortalecer el autoconocimiento, regulación emocional y habilidades de afrontamiento en NNA.',
+        inicioActividad: 'Dinámica de rompehielo "El ovillo de lana" para integración del grupo.',
+        procesoActividad: 'Juego de roles sobre resolución de conflictos y árbol de fortalezas personales.',
+        cierreActividad: 'Reflexión grupal, compromisos individuales y entrega de refrigerio.'
+    },
+    {
+        nombre: 'Taller de Crianza Positiva y Prevención de Violencia',
+        dirigidoA: 'Padres y apoderados',
+        objetivo: 'Brindar herramientas de comunicación asertiva y pautas de disciplina sin violencia.',
+        inicioActividad: 'Bienvenida y lluvia de ideas sobre los retos de la crianza actual.',
+        procesoActividad: 'Análisis de casos prácticos y técnicas de manejo de estrés parental.',
+        cierreActividad: 'Acuerdos de convivencia familiar y evaluación de la sesión.'
+    },
+    {
+        nombre: 'Taller de Prevención de Riesgos en Calle y Cuidado Personal',
+        dirigidoA: 'Adolescentes',
+        objetivo: 'Sensibilizar sobre factores de riesgo en entorno de calle y estrategias de autocuidado.',
+        inicioActividad: 'Presentación de video disparador sobre toma de decisiones.',
+        procesoActividad: 'Trabajo en subgrupos identificando zonas de riesgo y redes de apoyo.',
+        cierreActividad: 'Elaboración del mapa de seguridad personal y compromisos.'
+    }
+];
 
 const estadoTone = (estado: string): 'success' | 'info' | 'warning' | 'neutral' => {
     if (estado === 'EVALUADO')   return 'success';
@@ -352,11 +374,42 @@ export const TalleresPage = () => {
                                 </div>
                             </div>
 
-                            {/* Esquema metodológico */}
+                            {/* Esquema metodológico con selector de plantillas predefinidas */}
                             <div className="border-t border-dashed border-border pt-6">
-                                <h3 className="text-[14px] font-semibold text-fg mb-4 flex items-center gap-2">
-                                    <BookOpen size={15} className="text-fg-muted" /> Esquema metodológico
-                                </h3>
+                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+                                    <h3 className="text-[14px] font-semibold text-fg flex items-center gap-2">
+                                        <BookOpen size={15} className="text-fg-muted" /> Esquema metodológico
+                                    </h3>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[12px] text-fg-muted flex items-center gap-1">
+                                            <Sparkles size={13} className="text-warning" /> Cargar plantilla rápida:
+                                        </span>
+                                        <select
+                                            onChange={(e) => {
+                                                const idx = Number(e.target.value);
+                                                if (!isNaN(idx) && TEMAS_PREDEFINIDOS[idx]) {
+                                                    const t = TEMAS_PREDEFINIDOS[idx];
+                                                    setCurrentTaller({
+                                                        ...currentTaller,
+                                                        nombre: t.nombre,
+                                                        dirigidoA: t.dirigidoA,
+                                                        objetivo: t.objetivo,
+                                                        inicioActividad: t.inicioActividad,
+                                                        procesoActividad: t.procesoActividad,
+                                                        cierreActividad: t.cierreActividad
+                                                    });
+                                                }
+                                            }}
+                                            defaultValue=""
+                                            className="text-[12px] bg-surface border border-border rounded-md px-2.5 py-1 text-fg outline-none focus:border-primary"
+                                        >
+                                            <option value="" disabled>Seleccionar tema predefinido…</option>
+                                            {TEMAS_PREDEFINIDOS.map((t, idx) => (
+                                                <option key={idx} value={idx}>{t.nombre}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     {[
                                         { key: 'inicioActividad',   label: 'Inicio',   color: 'bg-success-soft text-success' },
@@ -392,13 +445,47 @@ export const TalleresPage = () => {
                             </div>
 
                             <div className="flex flex-col md:flex-row gap-6">
-                                {/* Buscador */}
+                                {/* Buscador y Acción rápida de Resumen de Caso */}
                                 <div className="w-full md:w-1/3 space-y-3">
+                                    <div className="bg-primary-soft/30 border border-primary/20 rounded-lg p-4 space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <label className="text-micro text-primary font-bold block flex items-center gap-1.5">
+                                                <Sparkles size={14} /> Resumen del Caso (Sede)
+                                            </label>
+                                        </div>
+                                        <p className="text-[12px] text-fg-secondary leading-normal">
+                                            Carga automáticamente los NNA y Tutores registrados en el sistema sin escribir nombres.
+                                        </p>
+                                        <Button
+                                            size="sm"
+                                            block
+                                            variant="secondary"
+                                            iconLeft={<UserPlus size={14} />}
+                                            onClick={async () => {
+                                                if (!currentTaller?.id) {
+                                                    setFormError('Guarda la planificación antes de cargar participantes.');
+                                                    return;
+                                                }
+                                                // Agregar todos los NNA activos que no estén en la lista
+                                                for (const nna of nnas) {
+                                                    if (!currentTaller.participantes?.some(p => p.nnaId === nna.id)) {
+                                                        try { await addParticipante(currentTaller.id, nna.id); } catch {}
+                                                    }
+                                                }
+                                                const updated = await getTallerById(currentTaller.id);
+                                                setCurrentTaller(updated);
+                                                setTalleres(prev => prev.map(t => t.id === updated.id ? updated : t));
+                                            }}
+                                        >
+                                            Cargar todos desde Resumen
+                                        </Button>
+                                    </div>
+
                                     <div className="bg-surface border border-border rounded-lg p-4">
-                                        <label className="text-micro text-fg-muted block mb-2">Agregar participante</label>
+                                        <label className="text-micro text-fg-muted block mb-2">Buscar individualmente</label>
                                         <div className="relative">
                                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-muted" size={14} />
-                                            <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Buscar NNA…"
+                                            <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Buscar NNA por nombre…"
                                                 className="w-full pl-9 p-2 bg-surface-muted border border-border rounded-md text-body text-fg focus:border-primary outline-none transition-shadow" />
                                         </div>
                                         {searchTerm && (
@@ -416,8 +503,9 @@ export const TalleresPage = () => {
                                             </div>
                                         )}
                                     </div>
-                                    <div className="bg-primary-soft border border-primary/20 rounded-lg px-4 py-3 text-[13px] text-primary font-medium flex items-center gap-2">
-                                        <Users size={14} /> Lista: {currentTaller.participantes?.length ?? 0} participantes
+                                    <div className="bg-primary-soft border border-primary/20 rounded-lg px-4 py-3 text-[13px] text-primary font-medium flex items-center justify-between">
+                                        <span className="flex items-center gap-2"><Users size={14} /> Lista de Asistencia</span>
+                                        <span className="font-bold bg-primary text-primary-fg px-2 py-0.5 rounded-full text-[11px]">{currentTaller.participantes?.length ?? 0}</span>
                                     </div>
                                 </div>
 

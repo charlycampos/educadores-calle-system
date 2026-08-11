@@ -4,7 +4,10 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Request, HTTPException, status, BackgroundTasks
 from fastapi.responses import FileResponse
 from src.domain.entities.diagnostico import DiagnosticoSocialCreate
-from src.infrastructure.db.repositories.oracle_diagnostico_repository import OracleDiagnosticoRepository
+from src.infrastructure.db.repositories.oracle_diagnostico_repository import (
+    DiagnosticoSocialAlreadyExistsError,
+    OracleDiagnosticoRepository,
+)
 from src.domain.use_cases.diagnostico_use_case import DiagnosticoUseCase
 from src.infrastructure.http.middleware.jwt_middleware import get_current_user
 
@@ -100,7 +103,13 @@ async def guardar_diagnostico(
 ):
     from src.infrastructure.services.expediente_service import trigger_apertura_expediente
     use_case = DiagnosticoUseCase(repo)
-    result = await use_case.guardar_diagnostico(nna_id, data)
+    try:
+        result = await use_case.guardar_diagnostico(nna_id, data)
+    except DiagnosticoSocialAlreadyExistsError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="El NNA ya cuenta con una Ficha de Diagnóstico Social F04. Continúe o edite la ficha existente.",
+        ) from exc
     diag_id = result.get("id")
     if diag_id and not _es_borrador(data):
         background_tasks.add_task(trigger_f04_pdf_generation, diag_id)

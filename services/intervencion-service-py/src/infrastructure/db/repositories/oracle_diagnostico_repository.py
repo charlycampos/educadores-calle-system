@@ -2,9 +2,13 @@ import inspect
 import oracledb
 import json
 import uuid
-from datetime import datetime
+from datetime import datetime, date
 from src.infrastructure.db.connection import get_pool
 from src.domain.entities.diagnostico import DiagnosticoSocialCreate
+
+class DiagnosticoSocialAlreadyExistsError(ValueError):
+    """El NNA ya cuenta con su única Ficha de Diagnóstico Social F04."""
+
 
 class OracleDiagnosticoRepository:
 
@@ -26,6 +30,19 @@ class OracleDiagnosticoRepository:
             try:
                 fecha = datetime.strptime(datos_extra['fechaNacimiento'], '%Y-%m-%d').date()
                 fields['FECHA_NACIMIENTO'] = fecha
+                # NNA.EDAD NO se toca cuando hay fecha de nacimiento: esa
+                # columna guarda la edad **con la que el NNA ingresó** al
+                # servicio, que es un dato histórico y no se recupera si se
+                # pisa. La edad actual se calcula desde la fecha cada vez que
+                # hace falta; no se almacena.
+            except Exception:
+                pass
+        elif datos_extra.get('edad'):
+            # Sin fecha de nacimiento la edad es el único dato que hay, y en el
+            # diagnóstico el educador la está precisando: ahí sí se corrige.
+            try:
+                fields['EDAD'] = int(str(datos_extra['edad']).strip())
+                fields['UNIDAD_EDAD'] = str(datos_extra.get('unidadEdad') or 'ANIOS')
             except Exception:
                 pass
 
@@ -71,6 +88,18 @@ class OracleDiagnosticoRepository:
         pool = get_pool()
         async with pool.acquire() as conn:
             async with conn.cursor() as cur:
+                # El F04 es una ficha única por NNA. Tanto un borrador como una
+                # ficha completa deben actualizarse; nunca se crea una segunda.
+                await cur.execute(
+                    "SELECT MIN(ID) FROM DIAGNOSTICO_SOCIAL WHERE NNA_ID = :1",
+                    [nna_id]
+                )
+                existing_row = await cur.fetchone()
+                if existing_row and existing_row[0]:
+                    raise DiagnosticoSocialAlreadyExistsError(
+                        f"El NNA ya cuenta con el Diagnóstico Social F04 ID {existing_row[0]}."
+                    )
+
                 # Resolve active case's sede_id
                 await cur.execute(
                     "SELECT SEDE_ID FROM NNA_CASO WHERE NNA_ID = :1 ORDER BY ID DESC",
@@ -137,12 +166,19 @@ class OracleDiagnosticoRepository:
 
                 consumo_val = None if data.consumo_sustancias is None else (1 if data.consumo_sustancias else 0)
 
-                await cur.execute(sql, [
-                    codigo_f04, nna_id, data.situacion_calle, data.tiempo_en_calle, data.motivo_ingreso, data.lugar_pernota,
-                    data.actividad_calle, consumo_val, data.nombre_tutor, data.dni_tutor,
-                    data.direccion_tutor, data.telefono_tutor, datos_extra_str,
-                    id_var, created_var, updated_var
-                ])
+                try:
+                    await cur.execute(sql, [
+                        codigo_f04, nna_id, data.situacion_calle, data.tiempo_en_calle, data.motivo_ingreso, data.lugar_pernota,
+                        data.actividad_calle, consumo_val, data.nombre_tutor, data.dni_tutor,
+                        data.direccion_tutor, data.telefono_tutor, datos_extra_str,
+                        id_var, created_var, updated_var
+                    ])
+                except oracledb.IntegrityError as exc:
+                    if "UQ_DIAGNOSTICO_SOCIAL_NNA" in str(exc):
+                        raise DiagnosticoSocialAlreadyExistsError(
+                            "El NNA ya cuenta con un Diagnóstico Social F04."
+                        ) from exc
+                    raise
                 await self._sync_nna_datos_basicos(cur, nna_id, data.datos_extra)
                 await conn.commit()
                 

@@ -4,10 +4,14 @@ import { toast } from '../../../components/ui/Toast';
 import { getDownloadToken } from '../../../utils/auth';
 import { EXPEDIENTE_API_URL } from '../../../config/api';
 import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, FileText, AlertCircle, RefreshCw, Eye } from 'lucide-react';
+import { Plus, Edit, Trash2, FileText, AlertCircle, RefreshCw, Eye, FileDown, Upload } from 'lucide-react';
+import { descargarWord, subirInformeFirmado } from '../../../api/informe-situacional.api';
+import { useNnaStore } from '../../../store/nna.store';
 
 interface InformeSituacionalListProps {
     casoId: number;
+    /** Para refrescar el expediente digital tras archivar el informe firmado. */
+    nna?: any;
     nnaFullName?: string;
     onNuevoInforme: () => void;
     onEditarInforme: () => void;
@@ -15,13 +19,40 @@ interface InformeSituacionalListProps {
 
 export const InformeSituacionalList = ({
     casoId,
+    nna,
     nnaFullName,
     onNuevoInforme,
     onEditarInforme,
 }: InformeSituacionalListProps) => {
     const [informe, setInforme] = useState<any | null>(null);
+    const [subiendo, setSubiendo] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+
+    /**
+     * El informe firmado se archiva como folio propio en el expediente de cada
+     * NNA que cubre. No reemplaza al PDF que genera el sistema: son dos
+     * documentos distintos y el expediente foliado no pisa nada.
+     */
+    const handleSubirFirmado = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const archivo = e.target.files?.[0];
+        e.target.value = '';   // permite volver a elegir el mismo archivo
+        if (!archivo) return;
+
+        setSubiendo(true);
+        try {
+            const titulo = `Informe Situacional firmado ${informe?.codigo_informe || ''}`.trim();
+            const r = await subirInformeFirmado(archivo, [casoId], titulo);
+            if (nna?.id) await useNnaStore.getState().loadDocuments(nna.id, nna);
+            toast.success(
+                `Informe firmado archivado (${r.paginas} ${r.paginas === 1 ? 'página' : 'páginas'}).`
+            );
+        } catch (err: any) {
+            toast.error(err.message || 'No se pudo archivar el informe firmado');
+        } finally {
+            setSubiendo(false);
+        }
+    };
 
     const fetchInforme = async () => {
         if (!casoId) return;
@@ -141,6 +172,7 @@ export const InformeSituacionalList = ({
                                         <td className="px-4 py-3 text-right">
                                             <div className="flex justify-end gap-1.5">
                                                 {informe.estado === 'FINALIZADO' ? (
+                                                    <>
                                                     <button
                                                         onClick={async () => {
                                                             const token = await getDownloadToken();
@@ -151,6 +183,27 @@ export const InformeSituacionalList = ({
                                                     >
                                                         <Eye size={15} />
                                                     </button>
+                                                    <button
+                                                        onClick={() => descargarWord(casoId, informe.id)}
+                                                        className="p-1.5 text-fg-muted hover:text-primary hover:bg-primary-soft rounded-[4px] transition-colors"
+                                                        title="Descargar Word para el SGD"
+                                                    >
+                                                        <FileDown size={15} />
+                                                    </button>
+                                                    <label
+                                                        className={`p-1.5 rounded-[4px] transition-colors cursor-pointer ${subiendo ? 'text-fg-muted/40' : 'text-fg-muted hover:text-primary hover:bg-primary-soft'}`}
+                                                        title="Subir el informe firmado al Expediente Digital"
+                                                    >
+                                                        <Upload size={15} />
+                                                        <input
+                                                            type="file"
+                                                            accept="application/pdf,image/*"
+                                                            className="hidden"
+                                                            disabled={subiendo}
+                                                            onChange={handleSubirFirmado}
+                                                        />
+                                                    </label>
+                                                    </>
                                                 ) : (
                                                     <>
                                                         <button

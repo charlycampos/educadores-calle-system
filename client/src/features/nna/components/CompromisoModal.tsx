@@ -66,6 +66,7 @@ export const CompromisoModal = ({ isOpen, onClose, nna }: CompromisoModalProps) 
 
     const nnaName = `${nna.nombres} ${nna.apellidoPaterno} ${nna.apellidoMaterno || ''}`.trim();
     const nnaDni = nna.numeroDoc || '---';
+    const casoActivo = nna.casos?.find((caso: any) => caso.estado !== 'CERRADO') || nna.casos?.[0];
 
     // Canvas helper functions
     const clearCanvas = (canvas: HTMLCanvasElement | null, drawLine: boolean) => {
@@ -167,7 +168,7 @@ export const CompromisoModal = ({ isOpen, onClose, nna }: CompromisoModalProps) 
         }
         setIsSaving(true);
         try {
-            await uploadPhysicalDocument(nna.id, uploadFile, 'COMPROMISO DEL NNA Y/O APODERADO (FORMATO 09)');
+            await uploadPhysicalDocument(nna.id, uploadFile, 'COMPROMISO DEL NNA Y/O APODERADO (FORMATO 09)', casoActivo?.id);
             toast.success('Documento de compromiso físico subido y foliado exitosamente.');
             await fetchExpediente(nna.id);
             onClose();
@@ -241,7 +242,7 @@ export const CompromisoModal = ({ isOpen, onClose, nna }: CompromisoModalProps) 
                 const pdfBlob = pdf.output('blob');
                 const pdfFile = new File([pdfBlob], `F09_Compromiso_Digital_${nna.nombres.replace(/\s+/g, '_')}.pdf`, { type: 'application/pdf' });
                 
-                await uploadPhysicalDocument(nna.id, pdfFile, 'COMPROMISO DEL NNA Y/O APODERADO (FORMATO 09)');
+                await uploadPhysicalDocument(nna.id, pdfFile, 'COMPROMISO DEL NNA Y/O APODERADO (FORMATO 09)', casoActivo?.id);
                 toast.success('Compromiso digital guardado y foliado en el expediente.');
                 await fetchExpediente(nna.id);
                 onClose();

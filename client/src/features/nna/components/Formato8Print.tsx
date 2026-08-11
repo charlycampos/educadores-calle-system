@@ -1,3 +1,4 @@
+import { marcaDirigido } from '../../../utils/formatos';
 interface Formato8Props {
     taller: any;
     nna: any;
@@ -87,13 +88,13 @@ export const Formato8Print = ({ taller, nna, id = 'formato-8-print' }: Formato8P
                             <div style={{ ...headerStyle, border: 'none', borderBottom: '1px solid black' }}>2. DIRIGIDO A:</div>
                             <div style={{ display: 'flex', padding: '10px' }}>
                                 <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
-                                    <span style={checkboxBox}>{taller.dirigidoA === 'Niños y niñas' ? 'X' : ''}</span> Niños y niñas
+                                    <span style={checkboxBox}>{marcaDirigido(taller.dirigidoA, 'NN') ? 'X' : ''}</span> Niños y niñas
                                 </div>
                                 <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
-                                    <span style={checkboxBox}>{taller.dirigidoA === 'Adolescentes' ? 'X' : ''}</span> Adolescentes
+                                    <span style={checkboxBox}>{marcaDirigido(taller.dirigidoA, 'ADOLESCENTES') ? 'X' : ''}</span> Adolescentes
                                 </div>
                                 <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
-                                    <span style={checkboxBox}>{taller.dirigidoA === 'Padres de Familia' ? 'X' : ''}</span> Padres de Familia
+                                    <span style={checkboxBox}>{marcaDirigido(taller.dirigidoA, 'FAMILIA') ? 'X' : ''}</span> Padres de Familia
                                 </div>
                             </div>
                         </td>

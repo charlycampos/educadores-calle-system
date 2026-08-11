@@ -19,6 +19,10 @@ import {
     Clock, // Forced recompile for HMR
     FolderOpen,
 } from 'lucide-react';
+import {
+    TIPO_DOC_MAP, SEXO_MAP, TIPO_DISCAPACIDAD_MAP,
+    MODALIDAD_ESTUDIO_MAP, GRADO_ESTUDIO_MAP, NIVEL_EDUCATIVO_MAP,
+} from '../../../data/catalogos-sec';
 interface ResumenCasoProps {
     nna: any;
     caso: any;
@@ -122,126 +126,6 @@ const AlertChip = ({ text, type = 'warning' }: { text: string; type?: 'warning' 
 };
 
 // Dictionaries for numerical values/keys to Spanish text translation
-const TIPO_DOC_MAP: Record<string, string> = {
-    '1': 'DNI',
-    '2': 'SIN_DOC',
-    '3': 'PARTIDA_NACIMIENTO',
-    '4': 'CE',
-    'DNI': 'DNI',
-    'SIN_DOC': 'Sin Documento',
-    'PARTIDA_NACIMIENTO': 'Partida de Nacimiento',
-    'CE': 'Carné de Extranjería',
-};
-
-const SEXO_MAP: Record<string, string> = {
-    '1': 'Hombre',
-    '2': 'Mujer',
-    'HOMBRE': 'Hombre',
-    'MUJER': 'Mujer',
-};
-
-const TIPO_DISCAPACIDAD_MAP: Record<string, string> = {
-    '1': 'Motriz o física',
-    '2': 'Sensorial',
-    '3': 'Cognitivo-intelectual',
-    '4': 'Psicosocial o psíquica',
-    '5': 'Otros (especificar)',
-    '1: Motriz o física': 'Motriz o física',
-    '2: Sensorial': 'Sensorial',
-    '3: Cognitivo-intelectual': 'Cognitivo-intelectual',
-    '4: Psicosocial o psíquica': 'Psicosocial o psíquica',
-    '5: Otros (especificar)': 'Otros (especificar)',
-};
-
-const MODALIDAD_ESTUDIO_MAP: Record<string, string> = {
-    '1': 'Básica / Regular (EBR)',
-    '2': 'Alternativa (EBA)',
-    '3': 'Especial (EBE)',
-    '4': 'Superior Técnica',
-    '5': 'Superior Universitaria',
-    '6': 'CETPRO',
-    '1: Básica / regular': 'Básica / Regular (EBR)',
-    '2: Alternativa (EBA)': 'Alternativa (EBA)',
-    '3: Especial': 'Especial (EBE)',
-    '4: Superior Técnica': 'Superior Técnica',
-    '5: Superior Universitaria': 'Superior Universitaria',
-    '6: CETPRO': 'CETPRO',
-    'EBR': 'Básica / Regular (EBR)',
-    'EBA': 'Alternativa (EBA)',
-    'EBE': 'Especial (EBE)',
-};
-
-const GRADO_ESTUDIO_MAP: Record<string, string> = {
-    '1': 'Inicial',
-    '2': '1ro primaria',
-    '3': '2do primaria',
-    '4': '3ro primaria',
-    '5': '4to primaria',
-    '6': '5to primaria',
-    '7': '6to primaria',
-    '8': '1ro secundaria',
-    '9': '2do secundaria',
-    '10': '3ro secundaria',
-    '11': '4to secundaria',
-    '12': '5to secundaria',
-    '13': 'Ciclo I (EBA)',
-    '14': 'Ciclo II (EBA)',
-    '15': 'Ciclo III (EBA)',
-    '16': 'Ciclo IV (EBA)',
-    '17': 'Ciclo V (EBA)',
-    '18': 'Ciclo VI (EBA)',
-    '19': 'Ciclo VII (EBA)',
-    '20': 'Ciclo VIII (EBA)',
-    '21': 'Ciclo IX (EBA)',
-    '22': 'Ciclo X (EBA)',
-    '99': 'No aplica / No sabe',
-    '1: Inicial': 'Inicial',
-    '2: 1ro prim': '1ro primaria',
-    '3: 2do prim': '2do primaria',
-    '4: 3ro prim': '3ro primaria',
-    '5: 4to prim': '4to primaria',
-    '6: 5to prim': '5to primaria',
-    '7: 6to prim': '6to primaria',
-    '8: 1ro sec': '1ro secundaria',
-    '9: 2do sec': '2do secundaria',
-    '10: 3ro sec': '3ro secundaria',
-    '11: 4to sec': '4to secundaria',
-    '12: 5to sec': '5to secundaria',
-    '13: Ciclo I': 'Ciclo I (EBA)',
-    '14: Ciclo II': 'Ciclo II (EBA)',
-    '15: Ciclo III': 'Ciclo III (EBA)',
-    '16: Ciclo IV': 'Ciclo IV (EBA)',
-    '17: Ciclo V': 'Ciclo V (EBA)',
-    '18: Ciclo VI': 'Ciclo VI (EBA)',
-    '19: Ciclo VII': 'Ciclo VII (EBA)',
-    '20: Ciclo VIII': 'Ciclo VIII (EBA)',
-    '21: Ciclo IX': 'Ciclo IX (EBA)',
-    '22: Ciclo X': 'Ciclo X (EBA)',
-    '99: No aplica / No sabe': 'No aplica / No sabe',
-};
-
-const NIVEL_EDUCATIVO_MAP: Record<string, string> = {
-    '1': 'Sin Instrucción',
-    '2': 'Inicial',
-    '3': 'Primaria Completa',
-    '4': 'Primaria Incompleta',
-    '5': 'Secundaria Completa',
-    '6': 'Secundaria Incompleta',
-    '7': 'EBE (Esp. Básica)',
-    '8': 'Superior',
-    '1: Sin nivel': 'Sin nivel',
-    '2: Inicial': 'Inicial',
-    '3: Primaria Incompleta': 'Primaria Incompleta',
-    '4: Primaria Completa': 'Primaria Completa',
-    '5: Secundaria Incompleta': 'Secundaria Incompleta',
-    '6: Secundaria Completa': 'Secundaria Completa',
-    '7: Superior No Universitaria Incompleta': 'Superior No Univ. Incompleta',
-    '8: Superior No Universitaria Completa': 'Superior No Univ. Completa',
-    '9: Superior Universitario Incompleto': 'Superior Univ. Incompleto',
-    '10: Superior Universitario Completo': 'Superior Univ. Completo',
-    '11: Básica Especial': 'Básica Especial',
-};
-
 const TabAtendidos = ({ nnaActual, familia }: { nnaActual: any; familia: any[] }) => {
     return (
         <div className="space-y-4">

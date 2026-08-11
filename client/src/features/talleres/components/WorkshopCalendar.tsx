@@ -82,6 +82,11 @@ export const WorkshopCalendar = ({ talleres, onSelectTaller, onNewTaller }: Work
                 </div>
             </div>
 
+            {/* En el celular las 7 columnas quedan de ~50px e ilegibles; con
+                scroll horizontal el mes se recorre y cada día conserva su ancho. */}
+            <div className="overflow-x-auto">
+            <div className="min-w-[640px]">
+
             {/* Días de la semana */}
             <div className="grid grid-cols-7 border-b border-gray-100 bg-gray-50">
                 {DAYS.map(day => (
@@ -166,6 +171,9 @@ export const WorkshopCalendar = ({ talleres, onSelectTaller, onNewTaller }: Work
                         </div>
                     );
                 })}
+            </div>
+
+            </div>
             </div>
 
             {/* Footer con leyenda y totales */}

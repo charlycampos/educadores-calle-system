@@ -111,32 +111,37 @@ def generate_f09_pdf(informe_data: dict, nna_data: dict, output_path: str) -> st
     story.append(t_antec)
     story.append(Spacer(1, 10))
     
-    # 4. Estrategias (Sección III)
-    story.append(sec_header("III. Estrategias de Acercamiento"))
-    story.append(Spacer(1, 4))
-    t_estrat = Table([[B(informe_data.get("estrategias"))]], colWidths=[540])
-    t_estrat.setStyle(TableStyle([
+    # Secciones III a VIII, alineadas con el modelo oficial y con el Word.
+    ESTILO_BLOQUE = TableStyle([
         ('BOX', (0,0), (-1,-1), 0.5, BORDER),
         ('BACKGROUND', (0,0), (-1,-1), BG_LIGHT),
         ('TOPPADDING', (0,0), (-1,-1), 8),
         ('BOTTOMPADDING', (0,0), (-1,-1), 8),
         ('LEFTPADDING', (0,0), (-1,-1), 10),
         ('RIGHTPADDING', (0,0), (-1,-1), 10),
-    ]))
-    story.append(t_estrat)
-    story.append(Spacer(1, 10))
-    
-    # 5. Análisis de Situación (Sección IV)
-    story.append(sec_header("IV. Análisis de la Situación"))
+    ])
+
+    def bloque(titulo, contenido):
+        story.append(sec_header(titulo))
+        story.append(Spacer(1, 4))
+        t = Table([[B(contenido)]], colWidths=[540])
+        t.setStyle(ESTILO_BLOQUE)
+        story.append(t)
+        story.append(Spacer(1, 10))
+
+    bloque("III. Acciones Realizadas", informe_data.get("estrategias"))
+    bloque("IV. Situación Familiar", informe_data.get("situacion_familiar"))
+    bloque("V. Indicadores de Vulnerabilidad", informe_data.get("indicadores_vulnerab"))
+
+    # VI. El PII va dentro del informe, una fila por fase.
+    story.append(sec_header("VI. Plan de Intervención Individual"))
     story.append(Spacer(1, 4))
-    
-    analisis_data = [
-        [L("4.1 SITUACIÓN DE SALUD:"), B(informe_data.get("situacion_salud"))],
-        [L("4.2 SITUACIÓN EDUCATIVA:"), B(informe_data.get("situacion_educativa"))],
-        [L("4.3 SITUACIÓN FAMILIAR Y SOCIAL:"), B(informe_data.get("situacion_familiar"))],
+    pii_data = [
+        [L(f"FASE {n} ({meses} MESES):"), B(informe_data.get(f"pii_fase{n}"))]
+        for n, meses in ((1, 3), (2, 15), (3, 6))
     ]
-    t_analisis = Table(analisis_data, colWidths=[150, 390])
-    t_analisis.setStyle(TableStyle([
+    t_pii = Table(pii_data, colWidths=[130, 410])
+    t_pii.setStyle(TableStyle([
         ('GRID', (0,0), (-1,-1), 0.5, BORDER),
         ('BACKGROUND', (0,0), (0,-1), BG_LIGHT),
         ('VALIGN', (0,0), (-1,-1), 'TOP'),
@@ -145,27 +150,15 @@ def generate_f09_pdf(informe_data: dict, nna_data: dict, output_path: str) -> st
         ('LEFTPADDING', (0,0), (-1,-1), 8),
         ('RIGHTPADDING', (0,0), (-1,-1), 8),
     ]))
-    story.append(t_analisis)
+    story.append(t_pii)
     story.append(Spacer(1, 10))
-    
-    # 6. Conclusiones y Recomendaciones (Sección V)
-    story.append(sec_header("V. Conclusiones y Recomendaciones"))
+
+    bloque("VII. Apreciación Profesional", informe_data.get("conclusiones"))
+
+    story.append(sec_header("VIII. Recomendación"))
     story.append(Spacer(1, 4))
-    
-    concl_data = [
-        [L("CONCLUSIONES:"), B(informe_data.get("conclusiones"))],
-        [L("SE RECOMIENDA:"), B(informe_data.get("recomendaciones"))],
-    ]
-    t_concl = Table(concl_data, colWidths=[110, 430])
-    t_concl.setStyle(TableStyle([
-        ('GRID', (0,0), (-1,-1), 0.5, BORDER),
-        ('BACKGROUND', (0,0), (0,-1), BG_LIGHT),
-        ('VALIGN', (0,0), (-1,-1), 'TOP'),
-        ('TOPPADDING', (0,0), (-1,-1), 6),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
-        ('LEFTPADDING', (0,0), (-1,-1), 8),
-        ('RIGHTPADDING', (0,0), (-1,-1), 8),
-    ]))
+    t_concl = Table([[B(informe_data.get("recomendaciones"))]], colWidths=[540])
+    t_concl.setStyle(ESTILO_BLOQUE)
     story.append(t_concl)
     story.append(Spacer(1, 35))
     

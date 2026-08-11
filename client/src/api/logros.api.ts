@@ -12,17 +12,23 @@ export interface ProcesoLogrosPayload {
     perfilUsuario?: string | null;
     fechaIngreso?: string | null;
     educadorResponsable?: string | null;
-    f1Fecha?: string | null;
+    f1Fecha?: string | null;   // heredado: se mantiene igual al término
+    f1Inicio?: string | null;
+    f1Fin?: string | null;
     f1I1?: string | null; f1I2?: string | null; f1I3?: string | null;
     f1I4?: string | null; f1I5?: string | null;
     f1Obs?: string | null;
-    f2Fecha?: string | null;
+    f2Fecha?: string | null;   // heredado: se mantiene igual al término
+    f2Inicio?: string | null;
+    f2Fin?: string | null;
     f2I1?: string | null; f2I2?: string | null; f2I3?: string | null;
     f2I4?: string | null; f2I5?: string | null; f2I6?: string | null;
     f2I7?: string | null; f2I8?: string | null; f2I9?: string | null;
     f2I10?: string | null;
     f2Obs?: string | null;
-    f3Fecha?: string | null;
+    f3Fecha?: string | null;   // heredado: se mantiene igual al término
+    f3Inicio?: string | null;
+    f3Fin?: string | null;
     f3I1?: string | null; f3I2?: string | null; f3I3?: string | null;
     f3I4?: string | null; f3I5?: string | null;
     f3Obs?: string | null;

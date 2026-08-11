@@ -1,3 +1,4 @@
+import { esHombre, esMujer } from '../../../utils/formatos';
 import { useRef } from 'react';
 
 interface Formato3Props {
@@ -152,7 +153,7 @@ export const Formato3Print = ({ nna, expediente, caso }: Formato3Props) => {
                             <tr>
                                 <td style={tdStyle}>Sexo</td>
                                 <td style={tdStyle}>
-                                    M [{child.sexo === 'M' ? 'X' : ' '}]  F [{child.sexo === 'F' ? 'X' : ' '}]
+                                    M [{esHombre(child.sexo) ? 'X' : ' '}]  F [{esMujer(child.sexo) ? 'X' : ' '}]
                                 </td>
                                 <td style={tdStyle}>Lugar Nacimiento</td>
                                 <td style={tdStyle}>{f03.departamentoNac || '---'} / {f03.provinciaNac || '---'} / {f03.distritoNac || '---'}</td>

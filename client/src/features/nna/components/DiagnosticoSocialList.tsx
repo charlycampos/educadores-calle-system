@@ -2,7 +2,7 @@ import { getToken } from '../../../utils/auth';
 import { confirmar } from '../../../components/ui/ConfirmDialog';
 import { INTERVENCION_API_URL } from '../../../config/api';
 import { useState, useEffect } from 'react';
-import { Plus, Eye, Edit, Trash2, FileText, AlertCircle, RefreshCw } from 'lucide-react';
+import { Plus, Eye, Edit, Trash2, FileText, AlertCircle } from 'lucide-react';
 import { useAuthStore } from '../../../store/auth.store';
 import { PdfViewerModal } from './PdfViewerModal';
 
@@ -27,6 +27,7 @@ export const DiagnosticoSocialList = ({
     const [pdfModalOpen, setPdfModalOpen] = useState(false);
     const [pdfDiagId, setPdfDiagId] = useState<number | null>(null);
     const token = useAuthStore.getState().token;
+    const diagnosticoExistente = diagnosticos[0];
 
     const fetchDiagnosticos = async () => {
         setLoading(true);
@@ -110,19 +111,14 @@ export const DiagnosticoSocialList = ({
                     <p className="text-[12px] text-fg-2 mt-0.5">Formato 4 — Evaluación Sociofamiliar</p>
                 </div>
                 <div className="flex gap-2">
-                    <button
-                        onClick={fetchDiagnosticos}
-                        title="Recargar lista"
-                        className="p-2 text-fg-muted hover:text-primary hover:bg-primary-soft rounded-[6px] transition-colors"
-                    >
-                        <RefreshCw size={16} />
-                    </button>
-                    <button
-                        onClick={onNuevoDiagnostico}
-                        className="flex items-center gap-1.5 bg-primary text-primary-fg px-3 py-1.5 rounded-[6px] text-[13px] font-medium hover:bg-primary/90 transition-colors"
-                    >
-                        <Plus size={15} /> Nuevo Diagnóstico
-                    </button>
+                    {!loading && !error && diagnosticoExistente?.estado === 'BORRADOR' && (
+                        <button
+                            onClick={() => onEditarDiagnostico(diagnosticoExistente.id)}
+                            className="flex items-center gap-1.5 bg-warning-soft text-warning border border-warning/30 px-3 py-1.5 rounded-[6px] text-[13px] font-medium hover:bg-warning/10 transition-colors"
+                        >
+                            <Edit size={15} /> Continuar borrador
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -183,7 +179,7 @@ export const DiagnosticoSocialList = ({
                                             onClick={onNuevoDiagnostico}
                                             className="flex items-center gap-1.5 text-primary bg-primary-soft px-3 py-1.5 rounded-[6px] text-[12px] font-medium border border-primary/20 hover:bg-primary/10 transition-colors"
                                         >
-                                            <Plus size={13} /> Crear Nuevo
+                                            <Plus size={13} /> Registrar Diagnóstico Social
                                         </button>
                                     </div>
                                 </td>

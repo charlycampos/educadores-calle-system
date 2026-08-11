@@ -51,22 +51,87 @@ class NnaMiniResponse(BaseModel):
     apellidoMaterno: Optional[str] = None
     fechaNacimiento: Optional[str] = None
     sexo: Optional[str] = None
+    # Muchos NNA de calle se registran solo con la edad, sin fecha de
+    # nacimiento. Sin estos dos campos el F10 imprimía la columna Edad vacía
+    # para casi todos: Pydantic descarta lo que no está declarado acá, así que
+    # no bastaba con traerlos en la consulta.
+    edad: Optional[int] = None
+    unidadEdad: Optional[str] = None
+
+class FamiliarMiniResponse(BaseModel):
+    """Datos del familiar tomados de NNA_FAMILIAR (ficha F03)."""
+    nombres: str
+    parentesco: Optional[str] = None
+    dni: Optional[str] = None
+    telefono: Optional[str] = None
+    nnaRelacionado: Optional[str] = None   # NNA del taller al que acompaña
 
 class ParticipanteResponse(BaseModel):
     id: int
     tallerId: int
-    nnaId: int
+    tipo: str = "NNA"                      # NNA | FAMILIAR
+    nnaId: Optional[int] = None
+    familiarId: Optional[int] = None
     asistio: bool
     logros: Optional[str] = None
     limitaciones: Optional[str] = None
     sugerencias: Optional[str] = None
     nna: Optional[NnaMiniResponse] = None
+    familiar: Optional[FamiliarMiniResponse] = None
 
     class Config:
         from_attributes = True
 
-class AgregarParticipanteRequest(BaseModel):
+class FamiliarCandidatoResponse(BaseModel):
+    """Familiar sugerido para el taller, derivado de los NNA ya inscritos."""
+    familiarId: int
+    nombres: str
+    parentesco: Optional[str] = None
+    dni: Optional[str] = None
+    telefono: Optional[str] = None
+    viveCon: Optional[str] = None
+    nnaRelacionado: Optional[str] = None   # nombre del NNA por el que aparece
+    yaInscrito: bool = False
+
+class FamiliarDeNnaResponse(BaseModel):
+    """Familiar colgado de un NNA en el árbol de candidatos."""
+    familiarId: int
+    nombres: str
+    parentesco: Optional[str] = None
+    dni: Optional[str] = None
+    yaInscrito: bool = False
+
+class NnaCandidatoResponse(BaseModel):
+    """
+    Un NNA del ámbito del educador con su familia anidada.
+
+    Alimenta el selector único: el educador marca al NNA y, si asistieron,
+    a sus padres — sin escribir ningún nombre.
+    """
     nnaId: int
+    nombres: str
+    apellidoPaterno: Optional[str] = None
+    apellidoMaterno: Optional[str] = None
+    numeroDoc: Optional[str] = None
+    fechaNacimiento: Optional[str] = None
+    sexo: Optional[str] = None
+    carpetaCodigo: Optional[str] = None
+    yaInscrito: bool = False
+    familiares: List[FamiliarDeNnaResponse] = Field(default_factory=list)
+
+class AgregarParticipanteRequest(BaseModel):
+    """Admite un NNA (Formato 10) o un familiar (Formato 11)."""
+    nnaId: Optional[int] = None
+    familiarId: Optional[int] = None
+
+    @property
+    def tipo(self) -> str:
+        return "FAMILIAR" if self.familiarId is not None else "NNA"
+
+class AgregarParticipantesBulkRequest(BaseModel):
+    """Alta masiva: lo que el educador marca con checks en el celular."""
+    nnaIds: List[int] = Field(default_factory=list)
+    familiarIds: List[int] = Field(default_factory=list)
 
 class ActualizarParticipanteRequest(BaseModel):
     asistio: Optional[bool] = None

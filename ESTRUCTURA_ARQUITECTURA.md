@@ -392,6 +392,22 @@ derivacion-service/
 
 Gestiona: Planificación (F07), Ejecución, Asistencia (F10/F11), Evaluación (F08)
 
+> **Nota (08/2026):** el servicio está implementado en Python/FastAPI
+> (`services/talleres-service-py`), no en TypeScript como muestra el árbol de abajo,
+> que corresponde al diseño original.
+>
+> `PARTICIPANTE_TALLER` es ahora **polimórfica**: cada fila es un NNA (Formato 10) o
+> un familiar (Formato 11), distinguidos por la columna `TIPO`. Los familiares se
+> derivan de `NNA_FAMILIAR` a través de la carpeta del NNA, de modo que el educador
+> no digita ningún nombre.
+>
+> La **evidencia del taller** (lista firmada y fotos) no tiene tabla propia: se archiva
+> como folios en `EXP_FOLIO`, uno por participante, marcados con `TALLER_ID`. El folio
+> es la única fuente de verdad y el expediente digital ya los muestra sin cambios.
+>
+> Ver **`CAMBIOS_TALLERES_FAMILIAS.md`** para el detalle, cómo funciona el foliado del
+> expediente digital, los endpoints nuevos y lo que queda pendiente.
+
 ```
 talleres-service/
 ├── src/

@@ -36,4 +36,8 @@ class Folio:
     creado_por_id: int
     fecha_creacion: Optional[datetime]
     usuario_responsable: Optional[str] = None
+    # Taller que originó el folio (evidencia F10/F11 o fotos). NULL si no viene de uno.
+    taller_id: Optional[int] = None
+    # Hojas del documento: el expediente folia acumulando este número.
+    paginas: int = 1
 

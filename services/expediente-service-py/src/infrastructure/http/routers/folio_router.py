@@ -16,6 +16,10 @@ class AgregarFolioRequest(BaseModel):
     titulo: str
     archivo_url: str
     contenido_hash: Optional[str] = None
+    # Taller que originó el folio (evidencia F10/F11 o fotos del taller).
+    taller_id: Optional[int] = None
+    # Hojas del documento. /expediente/upload las cuenta con pypdf.
+    paginas: int = 1
 
 
 @router.get("/caso/{caso_id}")
@@ -34,6 +38,35 @@ async def get_expediente(caso_id: int, user: dict = Depends(get_current_user)):
             "creado_por_id":  f.creado_por_id,
             "fecha_creacion": str(f.fecha_creacion) if f.fecha_creacion else None,
             "nombreResponsable": f.usuario_responsable,
+            "taller_id":      f.taller_id,
+            "paginas":        f.paginas,
+        }
+        for f in folios
+    ]
+
+
+@router.get("/taller/{taller_id}")
+async def get_evidencia_taller(taller_id: int, user: dict = Depends(get_current_user)):
+    """
+    Folios que originó un taller: su evidencia archivada.
+
+    Un mismo archivo genera un folio por participante, así que la lista puede
+    repetir ARCHIVO_URL. El módulo de talleres los agrupa para mostrar
+    "una evidencia archivada en N expedientes".
+    """
+    repo = OracleFolioRepository()
+    folios = await repo.list_by_taller(taller_id)
+    return [
+        {
+            "id":             f.id,
+            "caso_id":        f.caso_id,
+            "numero_folio":   f.numero_folio,
+            "tipo_documento": f.tipo_documento,
+            "titulo":         f.titulo,
+            "archivo_url":    f.archivo_url,
+            "fecha_creacion": str(f.fecha_creacion) if f.fecha_creacion else None,
+            "nombreResponsable": f.usuario_responsable,
+            "paginas":        f.paginas,
         }
         for f in folios
     ]
@@ -57,6 +90,8 @@ async def agregar_folio(
                 archivo_url=body.archivo_url,
                 creado_por_id=user["userId"],
                 contenido_hash=body.contenido_hash,
+                taller_id=body.taller_id,
+                paginas=body.paginas,
             )
         )
         return {
@@ -65,6 +100,7 @@ async def agregar_folio(
             "tipo_documento": folio.tipo_documento,
             "titulo":         folio.titulo,
             "archivo_url":    folio.archivo_url,
+            "taller_id":      folio.taller_id,
         }
     except TipoDocumentoInvalidoError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))

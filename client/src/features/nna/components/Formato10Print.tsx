@@ -1,3 +1,4 @@
+import { esHombre, esMujer, edadDe, marcaDirigido } from '../../../utils/formatos';
 interface Formato10Props {
     taller: any;
     participantes?: any[];
@@ -72,12 +73,12 @@ export const Formato10Print = ({ taller, participantes = [], id = 'formato-10-pr
                             <div style={{ display: 'flex', width: '100%' }}>
                                 <div style={{ flex: 1, padding: '6px', borderRight: '1px solid black', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                     <span style={{ border: '1px solid black', width: '20px', height: '15px', display: 'inline-block', textAlign: 'center', lineHeight: '15px' }}>
-                                        {taller.dirigidoA === 'Niños y niñas' ? 'X' : ''}
+                                        {marcaDirigido(taller.dirigidoA, 'NN', participantes) ? 'X' : ''}
                                     </span> NN
                                 </div>
                                 <div style={{ flex: 1, padding: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                     <span style={{ border: '1px solid black', width: '20px', height: '15px', display: 'inline-block', textAlign: 'center', lineHeight: '15px' }}>
-                                        {taller.dirigidoA === 'Adolescentes' ? 'X' : ''}
+                                        {marcaDirigido(taller.dirigidoA, 'ADOLESCENTES', participantes) ? 'X' : ''}
                                     </span> Adolescentes
                                 </div>
                             </div>
@@ -101,8 +102,7 @@ export const Formato10Print = ({ taller, participantes = [], id = 'formato-10-pr
                 <tbody>
                     {displayRows.map((row, index) => {
                         const nna = row.nna || {};
-                        const age = nna.fechaNacimiento ?
-                            new Date().getFullYear() - new Date(nna.fechaNacimiento).getFullYear() : '';
+                        const age = edadDe(nna);
 
                         return (
                             <tr key={index} style={{ height: '28px' }}>
@@ -111,8 +111,8 @@ export const Formato10Print = ({ taller, participantes = [], id = 'formato-10-pr
                                     {nna.apellidoPaterno ? `${nna.apellidoPaterno} ${nna.apellidoMaterno}, ${nna.nombres}` : ''}
                                 </td>
                                 <td style={{ ...cellStyle, textAlign: 'center' }}>{age}</td>
-                                <td style={{ ...cellStyle, textAlign: 'center', fontWeight: 'bold' }}>{nna.sexo === 'M' ? 'X' : ''}</td>
-                                <td style={{ ...cellStyle, textAlign: 'center', fontWeight: 'bold' }}>{nna.sexo === 'F' ? 'X' : ''}</td>
+                                <td style={{ ...cellStyle, textAlign: 'center', fontWeight: 'bold' }}>{esHombre(nna.sexo) ? 'X' : ''}</td>
+                                <td style={{ ...cellStyle, textAlign: 'center', fontWeight: 'bold' }}>{esMujer(nna.sexo) ? 'X' : ''}</td>
                                 <td style={cellStyle}></td>
                             </tr>
                         );

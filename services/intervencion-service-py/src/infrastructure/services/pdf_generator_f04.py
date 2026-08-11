@@ -1,5 +1,6 @@
 import os
 import json
+from html import escape
 from datetime import datetime
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
@@ -279,7 +280,7 @@ def generate_f04_pdf(diag_data: dict, nna_data: dict, output_path: str) -> str:
         tiempo_calle = c(diag_data.get("tiempo_en_calle"))
 
     modal_str = marcas(det.get("modalidadTrabajo"), {"puestoFijo": "Puesto Fijo", "ambulante": "Ambulante", "recorre": "Recorre"})
-    horarios_str   = marcas(det.get("horarios"),   {"manana": "Mañana", "tarde": "Tarde", "noche": "Noche"})
+    horarios_str   = marcas(det.get("horarios"),   {"manana": "Mañana", "tarde": "Tarde", "noche": "Noche", "madrugada": "Madrugada"})
     frecuencia_str = marcas(det.get("frecuencia"), {"diario": "Diario", "interdiario": "Interdiario", "finesSemana": "Fines de semana", "temporadas": "Temporadas"})
     uso_dinero_str = marcas(det.get("usoDinero"),  {"gastosFamiliares": "Gastos familiares", "gastosPropios": "Gastos propios", "entregaOtraPersona": "Entrega a otra persona"})
 
@@ -441,16 +442,23 @@ def generate_f04_pdf(diag_data: dict, nna_data: dict, output_path: str) -> str:
     if expulsado == "SÍ" and c(extra.get("vecesExpulsado"), ""):
         expulsado += f" — {c(extra.get('vecesExpulsado'))} veces"
 
-    sec6 = [
-        [L("¿Estudia? / Matrícula:"), V(tr(extra.get("eduEstudia"), MAP_EDU_ESTUDIA)), L("Nivel Educativo:"),  V(tr(extra.get("eduNivel"), MAP_EDU_NIVEL))],
-        [L("Grado / Año:"),           V(tr(extra.get("eduGrado"), MAP_EDU_GRADO)),     L("Modalidad:"),        V(tr(extra.get("eduModalidad"), MAP_EDU_MODALIDAD))],
-        [L("Institución Ed.:"),       V(extra.get("eduInstitucion")),                  L("Turno:"),            V(c(extra.get("eduTurno")).capitalize())],
-        [L("Tipo de I.E.:"),          V(c(extra.get("eduTipoIE")).capitalize()),       L("Motivo no estudia:"),V(extra.get("eduMotivoNoEstudia"))],
-        [L("Atraso escolar:"),        V(atraso),                                        L("Prob. Aprendizaje:"),V(yesno(extra.get("problemasAprendizaje")))],
-        [L("Prob. Conducta:"),        V(conducta),                                      L("Ha sido expulsado:"),V(expulsado)],
-        [L("Faltas/Tardanzas:"),      V(yesno(extra.get("faltasTardanzas"))),           L("Se duerme en clase:"),V(yesno(extra.get("seDuermeClase")))],
-        [L("Sufre Bullying:"),        V(yesno(extra.get("sufreBullying"))),             L("Tutor conversa c/ docente:"), V(yesno(extra.get("tutorConversaDocente")))],
-    ]
+    situacion_educativa = c(extra.get("eduEstudia"))
+    if situacion_educativa in ("SI", "PROCESO"):
+        sec6 = [
+            [L("¿Estudia? / Matrícula:"), V(tr(situacion_educativa, MAP_EDU_ESTUDIA)), L("Nivel Educativo:"),  V(tr(extra.get("eduNivel"), MAP_EDU_NIVEL))],
+            [L("Grado / Año:"),           V(tr(extra.get("eduGrado"), MAP_EDU_GRADO)),L("Modalidad:"),        V(tr(extra.get("eduModalidad"), MAP_EDU_MODALIDAD))],
+            [L("Institución Ed.:"),       V(extra.get("eduInstitucion")),             L("Turno:"),            V(c(extra.get("eduTurno")).capitalize())],
+            [L("Tipo de I.E.:"),          V(c(extra.get("eduTipoIE")).capitalize()),  L("Motivo no estudia:"),V(extra.get("eduMotivoNoEstudia"))],
+            [L("Atraso escolar:"),        V(atraso),                                   L("Prob. Aprendizaje:"),V(yesno(extra.get("problemasAprendizaje")))],
+            [L("Prob. Conducta:"),        V(conducta),                                 L("Ha sido expulsado:"),V(expulsado)],
+            [L("Faltas/Tardanzas:"),      V(yesno(extra.get("faltasTardanzas"))),      L("Se duerme en clase:"),V(yesno(extra.get("seDuermeClase")))],
+            [L("Sufre Bullying:"),        V(yesno(extra.get("sufreBullying"))),        L("Tutor conversa c/ docente:"), V(yesno(extra.get("tutorConversaDocente")))],
+        ]
+    else:
+        sec6 = [[
+            L("¿Estudia? / Matrícula:"), V(tr(situacion_educativa, MAP_EDU_ESTUDIA)),
+            L("Motivo no estudia:"),     V(extra.get("eduMotivoNoEstudia")),
+        ]]
     story.append(make_table(sec6, [w4, w4, w4, w4]))
     story.append(Spacer(1, 8))
 
@@ -549,20 +557,23 @@ def generate_f04_pdf(diag_data: dict, nna_data: dict, output_path: str) -> str:
         story.append(sec_header("IX. Necesidades Identificadas y Plan de Acción"))
         story.append(Spacer(1, 4))
 
+        def phase_items(value):
+            lines = [line.strip() for line in c(value, "").splitlines() if line.strip()]
+            return Paragraph("<br/>".join(f"- {escape(line)}" for line in lines) if lines else "-", value_style)
+
         nec_rows = []
         for n in necesidades:
             nec_rows.append([
                 Paragraph(c(n.get("categoria")),  value_style),
-                Paragraph(c(n.get("descripcion")), value_style),
-                Paragraph(c(n.get("faseI")),       value_style),
-                Paragraph(c(n.get("faseII")),      value_style),
-                Paragraph(c(n.get("faseIII")),     value_style),
+                phase_items(n.get("faseI") or n.get("descripcion")),
+                phase_items(n.get("faseII")),
+                phase_items(n.get("faseIII")),
             ])
-        c5 = doc.width / 5
+        c4 = doc.width / 4
         story.append(grid_table(
-            ["Categoría", "Descripción", "Fase I", "Fase II", "Fase III"],
+            ["Categoría", "Fase I", "Fase II", "Fase III"],
             nec_rows,
-            [c5 * 0.8, c5 * 1.4, c5, c5 * 0.9, c5 * 0.9],
+            [c4 * 0.8, c4 * 1.1, c4 * 1.1, c4],
         ))
         story.append(Spacer(1, 8))
 

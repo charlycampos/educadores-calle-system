@@ -498,6 +498,11 @@ El equipo de Atención de Urgencia realiza recorridos nocturnos en lugares de ma
 | **F09** | Compromiso del NNA y Apoderado | Fase II — antes de sesiones y talleres |
 | **F10** | Registro de Asistencia de Usuarios | Fase II — en cada actividad grupal con NNA |
 | **F11** | Registro de Asistencia de Hermanos/Padres | Fase II — en actividades grupales con familias |
+
+> **F10 / F11 en el sistema (08/2026):** ambos se emiten **ya llenos** desde el módulo
+> de talleres. Los NNA se marcan desde la lista de la sede y los padres/tutores se
+> obtienen automáticamente de la ficha F03 de esos NNA — el educador solo marca con
+> checks, descarga el PDF y lo hace firmar en campo. Detalle en `CAMBIOS_TALLERES_FAMILIAS.md`.
 | **F12** | Ficha de Seguimiento Familiar — Consejería | Fase III — en cada visita de seguimiento familiar |
 | **F13** | Ficha de Egreso / Retiro | Al finalizar el servicio o al retirar al NNA |
 | **F14** | Autorización de Padres para Eventos | Fase II — cuando el NNA asiste a eventos sin el adulto |

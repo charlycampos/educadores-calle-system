@@ -82,9 +82,9 @@ export const FamiliarModal: React.FC<FamiliarModalProps> = ({
                 <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-purple-50 rounded-t-2xl">
                     <div>
                         <h3 className="text-lg font-black text-purple-900 flex items-center gap-2">
-                            <Users size={22} className="text-purple-700" /> {editingIndex !== null ? 'Editar Familiar o Tutor Responsable' : 'Registrar Familiar o Tutor Responsable'}
+                            <Users size={22} className="text-purple-700" /> {editingIndex !== null ? 'Editar Familia' : 'Registrar Familia'}
                         </h3>
-                        <p className="text-xs text-purple-700 font-medium">Complete todos los datos oficiales del familiar responsable del NNA.</p>
+                        <p className="text-xs text-purple-700 font-medium">Complete todos los datos del familiar.</p>
                     </div>
                     <button
                         type="button"

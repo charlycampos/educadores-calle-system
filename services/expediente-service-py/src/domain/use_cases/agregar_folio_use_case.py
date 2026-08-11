@@ -16,6 +16,8 @@ class AgregarFolioInput:
     archivo_url: str
     creado_por_id: int
     contenido_hash: Optional[str] = None  # SHA-256 del archivo si se provee
+    taller_id: Optional[int] = None       # taller que originó el folio, si aplica
+    paginas: int = 1                      # hojas del documento, para el foliado
 
 
 class TipoDocumentoInvalidoError(Exception):
@@ -42,5 +44,7 @@ class AgregarFolioUseCase:
             archivo_url=input.archivo_url,
             hash_documento=input.contenido_hash,
             creado_por_id=input.creado_por_id,
+            taller_id=input.taller_id,
+            paginas=input.paginas,
         )
         return folio

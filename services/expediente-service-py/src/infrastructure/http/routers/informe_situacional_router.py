@@ -26,6 +26,15 @@ class InformeSituacionalSaveRequest(BaseModel):
     conclusiones: Optional[str] = None
     recomendaciones: Optional[str] = None
     estado: Optional[str] = 'BORRADOR'
+    # Secciones V y VI del modelo oficial
+    indicadores_vulnerab: Optional[str] = None
+    pii_fase1: Optional[str] = None
+    pii_fase2: Optional[str] = None
+    pii_fase3: Optional[str] = None
+    # NNA que cubre el informe (varios cuando son hermanos)
+    nna_ids: Optional[list] = None
+    # Si viene, se actualiza ese informe en vez de crear otro
+    id: Optional[int] = None
 
 
 def _serialize(inf):
@@ -44,6 +53,14 @@ def _serialize(inf):
         "recomendaciones": inf.recomendaciones,
         "creado_por_id": inf.creado_por_id,
         "estado": inf.estado,
+        "codigo_informe": inf.codigo_informe,
+        "indicadores_vulnerab": inf.indicadores_vulnerab,
+        "pii_fase1": inf.pii_fase1,
+        "pii_fase2": inf.pii_fase2,
+        "pii_fase3": inf.pii_fase3,
+        "correlativo": inf.correlativo,
+        "anio": inf.anio,
+        "nna_ids": inf.nna_ids or [],
     }
 
 
@@ -54,6 +71,13 @@ async def get_informe_situacional(caso_id: int, user: dict = Depends(get_current
     if not inf:
         return None
     return _serialize(inf)
+
+
+@router.get("/caso/{caso_id}/lista")
+async def list_informes_situacionales(caso_id: int, user: dict = Depends(get_current_user)):
+    """Todos los informes del caso, del mas reciente al mas antiguo."""
+    repo = OracleInformeSituacionalRepository()
+    return [_serialize(i) for i in await repo.list_by_caso(caso_id)]
 
 
 @router.post("/caso/{caso_id}")
@@ -109,6 +133,67 @@ async def delete_informe_situacional(caso_id: int, user: dict = Depends(get_curr
             detail="No existe informe situacional para eliminar"
         )
     return {"status": "ok", "message": "Informe situacional eliminado"}
+
+
+@router.get("/caso/{caso_id}/word")
+async def exportar_word_informe_situacional(
+    caso_id: int,
+    informe_id: Optional[int] = None,
+    token: Optional[str] = None,
+    user: dict = Depends(verificar_token_descarga),
+):
+    """Word del informe, listo para firmar y tramitar por el SGD.
+
+    Solo para informes FINALIZADOS: un borrador todavía puede cambiar y no
+    debería salir de la institución.
+    """
+    repo = OracleInformeSituacionalRepository()
+    informe = await repo.find_by_id(informe_id) if informe_id else await repo.find_by_caso(caso_id)
+    if not informe:
+        raise HTTPException(status_code=404, detail="No existe informe situacional para este caso")
+    if informe.estado != "FINALIZADO":
+        raise HTTPException(
+            status_code=409,
+            detail="El informe todavía es un borrador. Finalízalo antes de descargar el Word.",
+        )
+
+    try:
+        from src.infrastructure.services.word_generator_f09 import (
+            generate_f09_docx, preparar_nna, fecha_larga,
+        )
+    except ImportError:
+        raise HTTPException(
+            status_code=503,
+            detail="Falta la librería python-docx en el servidor. Instálala con: pip install python-docx",
+        )
+
+    filas = await repo.get_nnas_del_informe(informe.id, caso_id)
+    nnas = [preparar_nna(f) for f in filas]
+    educador = await repo.get_educador(informe.creado_por_id)
+
+    principal = filas[0] if filas else {}
+    datos = _serialize(informe)
+    datos.update({
+        "perfil": await repo.get_perfil_caso(caso_id),
+        "direccion": principal.get("domicilio_actual"),
+        "referencia": principal.get("referencia_domicilio"),
+        "referente": principal.get("nombre_tutor"),
+        "telefono": principal.get("telefono_contacto") or "No cuentan con teléfono",
+        # En el documento la fecha va escrita, no en formato ISO.
+        "fecha_informe": fecha_larga(informe.fecha_informe),
+    })
+
+    repositorio_dir = os.path.abspath("./repositorio_archivos/informes_situacionales")
+    os.makedirs(repositorio_dir, exist_ok=True)
+    ruta = os.path.join(repositorio_dir, f"informe_situacional_{informe.id}.docx")
+    generate_f09_docx(datos, nnas, educador, ruta)
+
+    nombre = f"Informe_Situacional_{(informe.codigo_informe or caso_id)}.docx".replace("/", "-").replace("°", "")
+    return FileResponse(
+        ruta,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        filename=nombre,
+    )
 
 
 @router.get("/caso/{caso_id}/pdf")
