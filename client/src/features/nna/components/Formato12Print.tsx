@@ -1,4 +1,5 @@
 import React from 'react';
+import { etiquetaParentesco } from '../../../utils/parentesco';
 
 interface Formato12Props {
     nna: any;
@@ -115,11 +116,25 @@ export const Formato12Print = ({ nna, ficha, id = 'formato-12-print' }: Formato1
     // Support camelCase, snake_case, and uppercase Oracle keys
     const fZona = ficha.zona || ficha.ZONA || '';
     const fEntrevistado = ficha.entrevistado || ficha.ENTREVISTADO || '';
-    const fParentesco = ficha.parentesco || ficha.PARENTESCO || '';
+    // El parentesco se guarda como código del catálogo; impreso en crudo, la
+    // casilla del formato oficial saldría con un "1".
+    const fParentesco = etiquetaParentesco(ficha.parentesco || ficha.PARENTESCO || '');
     const fLugarSeguimiento = (ficha.lugarSeguimiento || ficha.lugar_seguimiento || ficha.LUGAR_SEGUIMIENTO || 'DOMICILIO') as string;
     const fDireccion = ficha.direccion || ficha.DIRECCION || '';
-    const fFecha = ficha.fecha || ficha.FECHA || '';
-    const fHora = ficha.hora || ficha.HORA || '';
+    /**
+     * La fecha llega de Oracle como marca de tiempo completa
+     * ("2026-08-13T15:35:42.864000") y así se imprimía en la ficha oficial.
+     * Se toma solo la parte de la fecha para no depender de la zona horaria:
+     * `new Date(iso)` sobre una fecha sin hora la corre un día hacia atrás.
+     */
+    const formatearFecha = (valor: string) => {
+        const soloFecha = String(valor).split('T')[0];
+        const [a, m, d] = soloFecha.split('-');
+        return (a && m && d) ? `${d}/${m}/${a}` : valor;
+    };
+
+    const fFecha = formatearFecha(ficha.fecha || ficha.FECHA || '');
+    const fHora = (ficha.hora || ficha.HORA || '').toString().slice(0, 5);
     const fTelefono = ficha.telefono || ficha.TELEFONO || '';
     const fAntecedentes = ficha.antecedentes || ficha.ANTECEDENTES || '';
     const fDescripcion = ficha.descripcion || ficha.DESCRIPCION || '';
@@ -238,11 +253,20 @@ export const Formato12Print = ({ nna, ficha, id = 'formato-12-print' }: Formato1
                 Nota: ficha aplicada en el desarrollo estructurado de consejería a la familia/tutor del usuario/a del servicio
             </div>
 
-            {/* Firmas */}
+            {/* Firmas.
+
+                Cada recuadro deja arriba el espacio del trazo y abajo el nombre,
+                como el Anexo 10. La imagen se inyecta al imprimir: si la ficha
+                se firmó en pantalla lleva el trazo, y si se va a firmar con
+                lapicero sale en blanco — la misma hoja sirve para los dos casos. */}
             <div style={styles.signatureSection}>
                 <div>
                     <div style={styles.signatureBox}>
-                        <div style={{ fontSize: '8pt', fontWeight: 'bold' }}>
+                        <div style={{ height: '48px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: '6px' }}>
+                            <img id={`${id}-firma-entrevistado`} alt="" style={{ maxHeight: '46px', maxWidth: '70%' }} />
+                            <img id={`${id}-huella-entrevistado`} alt="" style={{ maxHeight: '46px', maxWidth: '28%' }} />
+                        </div>
+                        <div style={{ borderTop: '1px solid black', paddingTop: '3px', fontSize: '8pt', fontWeight: 'bold' }}>
                             Nombre y firma del entrevistado
                         </div>
                         <div style={{ fontSize: '8pt', marginTop: '4px' }}>{fNombreEntrevistado}</div>
@@ -250,7 +274,11 @@ export const Formato12Print = ({ nna, ficha, id = 'formato-12-print' }: Formato1
                 </div>
                 <div>
                     <div style={styles.signatureBox}>
-                        <div style={{ fontSize: '8pt', fontWeight: 'bold' }}>
+                        <div style={{ height: '48px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+                            <img id={`${id}-firma-usuario`} alt="" style={{ maxHeight: '46px', maxWidth: '70%' }} />
+                            <img id={`${id}-huella-usuario`} alt="" style={{ maxHeight: '46px', maxWidth: '28%' }} />
+                        </div>
+                        <div style={{ borderTop: '1px solid black', paddingTop: '3px', fontSize: '8pt', fontWeight: 'bold' }}>
                             Nombre y firma del usuario/a
                         </div>
                         <div style={{ fontSize: '8pt', marginTop: '4px' }}>
@@ -260,7 +288,11 @@ export const Formato12Print = ({ nna, ficha, id = 'formato-12-print' }: Formato1
                 </div>
                 <div>
                     <div style={styles.signatureBox}>
-                        <div style={{ fontSize: '8pt', fontWeight: 'bold' }}>
+                        <div style={{ height: '48px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+                            <img id={`${id}-firma-educador`} alt="" style={{ maxHeight: '46px', maxWidth: '100%' }} />
+                            {/* El educador no lleva huellero: firma con su nombre y sello. */}
+                        </div>
+                        <div style={{ borderTop: '1px solid black', paddingTop: '3px', fontSize: '8pt', fontWeight: 'bold' }}>
                             Nombre y firma del / la educador/a
                         </div>
                         <div style={{ fontSize: '8pt', marginTop: '4px' }}>{fNombreEducador}</div>

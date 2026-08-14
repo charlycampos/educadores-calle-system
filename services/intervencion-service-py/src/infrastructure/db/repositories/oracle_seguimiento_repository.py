@@ -14,10 +14,11 @@ class OracleSeguimientoRepository:
                     INSERT INTO SEGUIMIENTO_FAMILIAR (
                         CASO_ID, EDUCADOR_ID, TEMA_TRATADO, ACUERDOS, EVALUACION, PROXIMA_VISITA,
                         FECHA_TERMINO, ZONA, ENTREVISTADO, PARENTESCO, TELEFONO, LUGAR_SEGUIMIENTO,
-                        DIRECCION, HORA, ANTECEDENTES, DESCRIPCION, OBSERVACIONES, NOMBRE_EDUCADOR
+                        DIRECCION, HORA, ANTECEDENTES, DESCRIPCION, OBSERVACIONES, NOMBRE_EDUCADOR,
+                        ESTADO
                     )
-                    VALUES (:1, :2, :3, :4, :5, :6, :7, :8, :9, :10, :11, :12, :13, :14, :15, :16, :17, :18)
-                    RETURNING ID, FECHA, CREATED_AT, UPDATED_AT INTO :19, :20, :21, :22
+                    VALUES (:1, :2, :3, :4, :5, :6, :7, :8, :9, :10, :11, :12, :13, :14, :15, :16, :17, :18, :19)
+                    RETURNING ID, FECHA, CREATED_AT, UPDATED_AT INTO :20, :21, :22, :23
                 """
                 id_var = cur.var(int)
                 fecha_var = cur.var(oracledb.DB_TYPE_TIMESTAMP)
@@ -30,6 +31,7 @@ class OracleSeguimientoRepository:
                     data.zona, data.entrevistado, data.parentesco, data.telefono,
                     data.lugar_seguimiento, data.direccion, data.hora, data.antecedentes,
                     data.descripcion, data.observaciones, data.nombre_educador,
+                    data.estado or "FINALIZADA",
                     id_var, fecha_var, created_var, updated_var
                 ])
                 await conn.commit()
@@ -54,6 +56,7 @@ class OracleSeguimientoRepository:
                     "descripcion": data.descripcion,
                     "observaciones": data.observaciones,
                     "nombre_educador": data.nombre_educador,
+                    "estado": data.estado or "FINALIZADA",
                     "fecha": fecha_var.getvalue()[0],
                     "created_at": created_var.getvalue()[0],
                     "updated_at": updated_var.getvalue()[0]
@@ -70,10 +73,10 @@ class OracleSeguimientoRepository:
                         ENTREVISTADO = :7, PARENTESCO = :8, TELEFONO = :9,
                         LUGAR_SEGUIMIENTO = :10, DIRECCION = :11, HORA = :12,
                         ANTECEDENTES = :13, DESCRIPCION = :14, OBSERVACIONES = :15,
-                        NOMBRE_EDUCADOR = :16, UPDATED_AT = SYSTIMESTAMP
-                    WHERE ID = :17
+                        NOMBRE_EDUCADOR = :16, ESTADO = :17, UPDATED_AT = SYSTIMESTAMP
+                    WHERE ID = :18
                     RETURNING CASO_ID, EDUCADOR_ID, FECHA, CREATED_AT, UPDATED_AT
-                        INTO :18, :19, :20, :21, :22
+                        INTO :19, :20, :21, :22, :23
                 """
                 caso_var    = cur.var(int)
                 educ_var    = cur.var(int)
@@ -87,7 +90,7 @@ class OracleSeguimientoRepository:
                     data.entrevistado, data.parentesco, data.telefono,
                     data.lugar_seguimiento, data.direccion, data.hora,
                     data.antecedentes, data.descripcion, data.observaciones,
-                    data.nombre_educador, seguimiento_id,
+                    data.nombre_educador, data.estado or "FINALIZADA", seguimiento_id,
                     caso_var, educ_var, fecha_var, created_var, updated_var
                 ])
                 await conn.commit()
@@ -112,6 +115,7 @@ class OracleSeguimientoRepository:
                     "descripcion": data.descripcion,
                     "observaciones": data.observaciones,
                     "nombre_educador": data.nombre_educador,
+                    "estado": data.estado or "FINALIZADA",
                     "fecha": fecha_var.getvalue()[0],
                     "created_at": created_var.getvalue()[0],
                     "updated_at": updated_var.getvalue()[0]

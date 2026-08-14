@@ -20,6 +20,10 @@ class SeguimientoFamiliarBase(BaseModel):
     descripcion: Optional[str] = None
     observaciones: Optional[str] = None
     nombre_educador: Optional[str] = None
+    # BORRADOR mientras el educador la va llenando; FINALIZADA al cerrarla.
+    # Por defecto FINALIZADA para no cambiar el comportamiento de las fichas
+    # que ya existían antes de que hubiera borradores.
+    estado: Optional[str] = "FINALIZADA"
 
 class SeguimientoFamiliarCreate(SeguimientoFamiliarBase):
     pass

@@ -1,22 +1,22 @@
 import { getToken } from '../../../utils/auth';
 import { toast } from '../../../components/ui/Toast';
-import React, { useState, useEffect } from 'react';
-import { Plus, Calendar, Users, MapPin, X, Home, ClipboardCheck, Pencil, FolderInput, CheckCheck } from 'lucide-react';
+import React, { Fragment, useState, useEffect } from 'react';
+import { Plus, Users, MapPin, X, ClipboardCheck, Pencil, FolderInput, CheckCheck, FileSignature, Save } from 'lucide-react';
 import { useNnaStore } from '../../../store/nna.store';
-import { INTERVENCION_API_URL, EXPEDIENTE_API_URL } from '../../../config/api';
+import { useAuthStore } from '../../../store/auth.store';
+import { INTERVENCION_API_URL } from '../../../config/api';
+import { etiquetaParentesco, OPCIONES_VINCULO } from '../../../utils/parentesco';
+import { CampoDictado } from '../../../components/ui/CampoDictado';
+import { PanelFirmas } from '../../../components/ui/PanelFirmas';
+import { Formato12Print } from './Formato12Print';
+import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
 
 const LUGAR_OPTIONS = [
     { value: 'DOMICILIO',         label: 'Domicilio',       icon: '🏠' },
     { value: 'TRABAJO',           label: 'Trabajo',          icon: '💼' },
     { value: 'CENTRO_REFERENCIA', label: 'Centro de Ref.',   icon: '🏢' },
     { value: 'CALLE',             label: 'Calle',            icon: '🚶' },
-];
-
-const EVALUACION_OPTIONS = [
-    { value: 'FAVORABLE',    label: 'Favorable',    color: '#10b981', bgSoft: 'rgba(16, 185, 129, 0.1)', description: 'Progreso positivo detectado', icon: '✓' },
-    { value: 'EN_PROCESO',   label: 'En Proceso',   color: '#f59e0b', bgSoft: 'rgba(245, 158, 11, 0.1)', description: 'Visita de seguimiento regular', icon: '⚡' },
-    { value: 'DESFAVORABLE', label: 'Desfavorable', color: '#f43f5e', bgSoft: 'rgba(244, 63, 94, 0.1)', description: 'Retroceso o alertas críticas', icon: '⚠' },
-    { value: 'SIN_CAMBIOS',  label: 'Sin Cambios',  color: '#64748b', bgSoft: 'rgba(100, 116, 139, 0.1)', description: 'Estable sin cambios reportados', icon: '•' },
 ];
 
 const blankFicha = (nna: any) => ({
@@ -32,12 +32,31 @@ const blankFicha = (nna: any) => ({
     descripcion:        '',
     acuerdos:           '',
     observaciones:      '',
-    evaluacion:         'EN_PROCESO',
-    proximaVisita:      '',
-    fechaTermino:       '',
     nombreUsuario:      `${nna?.nombres ?? ''} ${nna?.apellidoPaterno ?? ''}`.trim(),
-    nombreEducador:     'Usuario Actual',
 });
+
+/**
+ * Educador que firma la ficha: el que tiene la sesión abierta.
+ *
+ * Antes era una casilla escribible que llegaba con "Usuario Actual" de relleno,
+ * así que las fichas se guardaban con ese texto literal en el PDF.
+ */
+const educadorDeLaSesion = () => {
+    const u = useAuthStore.getState().user;
+    return u?.nombreCompleto || u?.nombre || '';
+};
+
+/**
+ * Nombre del educador que firma una ficha ya guardada.
+ *
+ * Las fichas anteriores al cambio guardaron el texto de relleno "Usuario Actual"
+ * en vez de un nombre, así que ese valor se descarta y se usa el de la sesión.
+ */
+const educadorDeLaFicha = (ficha: any): string => {
+    const guardado = (ficha?.nombre_educador || ficha?.NOMBRE_EDUCADOR || '').trim();
+    const esRelleno = !guardado || guardado.toLowerCase() === 'usuario actual';
+    return esRelleno ? educadorDeLaSesion() : guardado;
+};
 
 const SectionTitle = ({ children }: { children: React.ReactNode }) => (
     <div className="flex items-center gap-2 mb-3">
@@ -45,6 +64,15 @@ const SectionTitle = ({ children }: { children: React.ReactNode }) => (
         <div className="flex-1 h-px bg-border" />
     </div>
 );
+
+/** Bloque de la fila desplegada; se omite si el campo está vacío. */
+const Detalle = ({ titulo, valor }: { titulo: string; valor?: string }) =>
+    !valor ? null : (
+        <div>
+            <span className="block text-[10px] font-bold uppercase tracking-wider text-fg-muted mb-0.5">{titulo}</span>
+            <p className="text-fg-2 leading-snug whitespace-pre-line">{valor}</p>
+        </div>
+    );
 
 const FormField = ({ label, children }: { label: string; children: React.ReactNode }) => (
     <div>
@@ -54,10 +82,9 @@ const FormField = ({ label, children }: { label: string; children: React.ReactNo
 );
 
 const inputCls = "w-full px-3 py-2 text-[13px] bg-surface border border-border rounded-[6px] text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors";
-const textareaCls = "w-full px-3 py-2 text-[13px] bg-surface border border-border rounded-[6px] text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors resize-none";
 
 export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any }) => {
-    const { registerDocument } = useNnaStore();
+    const { saveFamiliares, fetchExpediente, uploadPhysicalDocument } = useNnaStore();
     const [expandedFichaId, setExpandedFichaId] = useState<any>(null);
     const [isRegistering, setIsRegistering]     = useState(false);
     const [isLoading, setIsLoading]             = useState(false);
@@ -67,6 +94,48 @@ export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any })
     const [currentFicha, setCurrentFicha]       = useState<any>(blankFicha(nna));
     const [editingFicha, setEditingFicha]       = useState<any>(null);
     const [registeredIds, setRegisteredIds]     = useState<Set<number>>(new Set());
+
+    /**
+     * Familia del NNA tal como está en el Resumen del Caso (F03).
+     *
+     * Se lee del expediente ya cargado, no con una consulta nueva: es el mismo
+     * dato que muestra "Otros Miembros de la Familia", así que si el educador
+     * lo corrige ahí, aquí sale corregido.
+     */
+    const familiares: any[] = nna?.familiares ?? [];
+
+    /** Ficha cuyo panel de firmas está abierto. */
+    const [fichaAFirmar, setFichaAFirmar] = useState<any>(null);
+    /**
+     * Ficha que solo se monta fuera de pantalla para capturar su PDF, sin abrir
+     * el panel: es lo que necesita "Registrar en expediente".
+     */
+    const [fichaParaPdf, setFichaParaPdf] = useState<any>(null);
+
+    /** El formato oficial oculto se arma para cualquiera de los dos casos. */
+    const fichaImpresa = fichaAFirmar ?? fichaParaPdf;
+
+    /** Índice del familiar elegido; `null` = la escribe a mano. */
+    const [familiarSel, setFamiliarSel]                 = useState<number | null>(null);
+    const [registrarEnFamilia, setRegistrarEnFamilia]   = useState(false);
+
+    /** Solo se ofrece dar de alta a quien no está ya en la familia. */
+    const esPersonaNueva =
+        familiarSel === null &&
+        !!currentFicha.entrevistado?.trim() &&
+        !!currentFicha.parentesco;
+
+    const elegirFamiliar = (idx: number | null) => {
+        setFamiliarSel(idx);
+        setRegistrarEnFamilia(false);
+        const f = idx === null ? null : familiares[idx];
+        setCurrentFicha((prev: any) => ({
+            ...prev,
+            entrevistado: f?.nombres    ?? '',
+            parentesco:   f?.parentesco ?? '',
+            telefono:     f?.telefono   ?? '',
+        }));
+    };
 
     useEffect(() => {
         if (!caso?.id) return;
@@ -84,11 +153,21 @@ export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any })
     const openCreate = () => {
         setEditingFicha(null);
         setCurrentFicha(blankFicha(nna));
+        setFamiliarSel(null);
+        setRegistrarEnFamilia(false);
         setShowModal(true);
     };
 
     const openEdit = (ficha: any) => {
         setEditingFicha(ficha);
+        // Si el entrevistado coincide con alguien de la familia, se deja su
+        // botón marcado para que se vea de quién se trata.
+        const nombreGuardado = (ficha.entrevistado || ficha.ENTREVISTADO || '').trim().toLowerCase();
+        const idx = familiares.findIndex(
+            (f: any) => (f.nombres || '').trim().toLowerCase() === nombreGuardado
+        );
+        setFamiliarSel(idx >= 0 ? idx : null);
+        setRegistrarEnFamilia(false);
         const raw = (v: any) => (v ?? '').toString().split('T')[0].replace('undefined', '');
         setCurrentFicha({
             zona:             ficha.zona              || ficha.ZONA              || '',
@@ -103,10 +182,6 @@ export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any })
             descripcion:      ficha.descripcion       || ficha.DESCRIPCION       || '',
             acuerdos:         ficha.acuerdos          || ficha.ACUERDOS          || '',
             observaciones:    ficha.observaciones     || ficha.OBSERVACIONES     || '',
-            evaluacion:       ficha.evaluacion        || ficha.EVALUACION        || 'EN_PROCESO',
-            proximaVisita:    raw(ficha.proxima_visita || ficha.proximaVisita    || ficha.PROXIMA_VISITA),
-            fechaTermino:     raw(ficha.fecha_termino  || ficha.fechaTermino     || ficha.FECHA_TERMINO),
-            nombreEducador:   ficha.nombre_educador   || ficha.nombreEducador    || 'Usuario Actual',
         });
         setShowModal(true);
     };
@@ -128,7 +203,62 @@ export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any })
     const up = (key: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
         setCurrentFicha((prev: any) => ({ ...prev, [key]: e.target.value }));
 
-    const handleSave = async () => {
+    /** Igual que `up`, pero recibe el valor ya listo (lo usa el dictado). */
+    const setCampo = (key: string, valor: string) =>
+        setCurrentFicha((prev: any) => ({ ...prev, [key]: valor }));
+
+    /**
+     * Sube el entrevistado nuevo a la familia del NNA (Resumen del Caso).
+     *
+     * El endpoint **reemplaza** toda la familia de la carpeta con la lista que
+     * recibe, así que hay que reenviar los familiares actuales junto al nuevo:
+     * mandar solo el nuevo dejaría al NNA sin el resto de su familia.
+     *
+     * Se guarda contra `carpeta.id`, nunca contra `nna.id` — los dos viven en
+     * el mismo rango de números y el equivocado escribe sobre otra familia sin
+     * dar ningún error.
+     */
+    const agregarAFamilia = async () => {
+        const carpetaId = nna?.carpeta?.id;
+        if (!carpetaId) {
+            toast.error('No se pudo identificar la carpeta del NNA; la persona no se agregó a la familia.');
+            return;
+        }
+        try {
+            await saveFamiliares(carpetaId, [
+                ...familiares.map((f: any) => ({
+                    nombres:    f.nombres,
+                    parentesco: f.parentesco,
+                    dni:        f.dni       || null,
+                    telefono:   f.telefono  || null,
+                    ocupacion:  f.ocupacion || null,
+                    viveCon:    f.viveCon   || 'NO',
+                })),
+                {
+                    nombres:    currentFicha.entrevistado.trim(),
+                    parentesco: currentFicha.parentesco,
+                    dni:        null,
+                    telefono:   currentFicha.telefono || null,
+                    ocupacion:  null,
+                    viveCon:    'NO',
+                },
+            ]);
+            if (nna?.id) await fetchExpediente(nna.id);
+            toast.success(`${currentFicha.entrevistado.trim()} se agregó a la familia del NNA.`);
+        } catch {
+            toast.error('La ficha se guardó, pero no se pudo agregar a la persona a la familia.');
+        }
+    };
+
+    /**
+     * Guarda la ficha.
+     *
+     * `BORRADOR` deja constancia de lo escrito sin darla por cerrada: el
+     * educador llena en campo, a veces sin señal ni tiempo, y perder lo
+     * avanzado significa volver a visitar a la familia para reconstruirlo.
+     * Una ficha en borrador no se firma ni se folia hasta finalizarla.
+     */
+    const handleSave = async (estado: 'BORRADOR' | 'FINALIZADA' = 'FINALIZADA') => {
         const token = getToken();
         if (!token) return;
 
@@ -146,10 +276,12 @@ export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any })
             descripcion:       currentFicha.descripcion,
             acuerdos:          currentFicha.acuerdos,
             observaciones:     currentFicha.observaciones,
-            evaluacion:        currentFicha.evaluacion,
-            proxima_visita:    currentFicha.proximaVisita || null,
-            fecha_termino:     currentFicha.fechaTermino  || null,
-            nombre_educador:   currentFicha.nombreEducador,
+            // `evaluacion`, `proxima_visita` y `fecha_termino` ya no se envían.
+            // Las columnas se conservan en Oracle por las fichas ya cargadas,
+            // pero el educador dejó de llenarlas: la ficha registra un hecho
+            // puntual, no un proceso con cierre.
+            nombre_educador:   educadorDeLaSesion(),
+            estado,
         };
 
         setIsSaving(true);
@@ -171,9 +303,15 @@ export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any })
                     ? prev.map(f => f.id === saved.id ? saved : f)
                     : [saved, ...prev]
                 );
+                if (registrarEnFamilia && esPersonaNueva) await agregarAFamilia();
+                toast.success(estado === 'BORRADOR'
+                    ? 'Borrador guardado. Puedes continuar la ficha después.'
+                    : 'Ficha de seguimiento guardada.');
+            } else {
+                toast.error('No se pudo guardar la ficha.');
             }
         } catch {
-            // silently ignore
+            toast.error('No se pudo guardar la ficha.');
         } finally {
             setIsSaving(false);
         }
@@ -181,68 +319,152 @@ export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any })
         closeModal();
     };
 
+    // ── Firmas ────────────────────────────────────────────────────────────────
+
+    /**
+     * Genera el PDF de la ficha y lo folia en el expediente.
+     *
+     * `firmas` trae los trazos de quienes firmaron en pantalla; vacío produce
+     * la hoja en blanco para firmar con lapicero. La firma no se guarda en
+     * ninguna tabla: queda estampada en el PDF, que es el documento con valor.
+     */
+    const construirPdf = async (
+        firmas: Record<string, string>,
+        soloDescargar: boolean,
+        fichaExplicita?: any,
+    ) => {
+        // `fichaAFirmar` puede no haberse propagado todavía cuando la llamada
+        // viene de "Registrar en expediente", que la fija en el mismo turno.
+        const ficha = fichaExplicita ?? fichaAFirmar;
+        const contenedor = document.getElementById('f12-firma-print');
+        if (!contenedor || !ficha) return;
+
+        // Un gif transparente en vez de dejar el src vacío: el navegador dibuja
+        // el icono de imagen rota y saldría impreso en la ficha.
+        const vacio = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+        (['entrevistado', 'usuario', 'educador'] as const).forEach(clave => {
+            const firma  = document.getElementById(`f12-firma-print-firma-${clave}`)  as HTMLImageElement | null;
+            const huella = document.getElementById(`f12-firma-print-huella-${clave}`) as HTMLImageElement | null;
+            if (firma)  firma.src  = firmas[clave]              || vacio;
+            if (huella) huella.src = firmas[`${clave}-huella`]   || vacio;
+        });
+
+        /*
+         * Hay que esperar a que las imágenes estén realmente decodificadas.
+         *
+         * Con una pausa fija html2canvas capturaba los recuadros vacíos: las
+         * firmas son PNG en base64 de varios cientos de kB —el canvas se dibuja
+         * a 560×224 para que no salgan pixeladas— y no siempre alcanzan a
+         * pintarse en unos milisegundos.
+         */
+        const imagenes = Array.from(contenedor.querySelectorAll('img'));
+        await Promise.all(imagenes.map(img => (
+            img.complete && img.naturalWidth > 0
+                ? Promise.resolve()
+                : new Promise<void>(resolve => {
+                    img.onload  = () => resolve();
+                    img.onerror = () => resolve();
+                })
+        )));
+
+        const lienzo = await html2canvas(contenedor, {
+            scale: 2,
+            useCORS: true,
+            logging: false,
+            backgroundColor: '#ffffff',
+            windowWidth: 800,
+            onclone: (doc) => {
+                doc.querySelectorAll('link[rel="stylesheet"], style').forEach(el => el.remove());
+            },
+        });
+
+        const pdf   = new jsPDF('p', 'mm', 'a4');
+        const ancho = pdf.internal.pageSize.getWidth();
+        const alto  = (lienzo.height * ancho) / lienzo.width;
+        pdf.addImage(lienzo.toDataURL('image/png', 1.0), 'PNG', 0, 0, ancho, alto, undefined, 'FAST');
+
+        const fechaStr = (ficha.fecha || ficha.FECHA || '').toString().split('T')[0];
+        const base     = `F12_Seguimiento_${(nna?.apellidoPaterno || '').replace(/\s+/g, '_')}_${fechaStr}`;
+
+        if (soloDescargar) {
+            pdf.save(`${base}_para_firmar.pdf`);
+            return;
+        }
+
+        const hayFirmas = Object.keys(firmas).length > 0;
+        const archivo   = new File(
+            [pdf.output('blob')],
+            `${base}${hayFirmas ? '_firmado' : ''}.pdf`,
+            { type: 'application/pdf' },
+        );
+        await uploadPhysicalDocument(nna.id, archivo, 'FICHA DE SEGUIMIENTO FAMILIAR (FORMATO 12)', caso?.id);
+        await fetchExpediente(nna.id);
+    };
+
+    const firmarEnPantalla = async (firmas: Record<string, string>) => {
+        if (Object.keys(firmas).length === 0) {
+            toast.error('Ninguna persona firmó todavía.');
+            return;
+        }
+        try {
+            await construirPdf(firmas, false);
+            setRegisteredIds(prev => new Set(prev).add(fichaAFirmar.id));
+            toast.success('Ficha firmada y registrada en el expediente digital.');
+            setFichaAFirmar(null);
+        } catch {
+            toast.error('No se pudo generar la ficha firmada.');
+        }
+    };
+
+    const descargarParaFirmar = async () => {
+        try {
+            await construirPdf({}, true);
+        } catch {
+            toast.error('No se pudo generar la ficha para imprimir.');
+        }
+    };
+
+    const subirFirmadoEnPapel = async (archivo: File) => {
+        try {
+            await uploadPhysicalDocument(nna.id, archivo, 'FICHA DE SEGUIMIENTO FAMILIAR (FORMATO 12)', caso?.id);
+            await fetchExpediente(nna.id);
+            setRegisteredIds(prev => new Set(prev).add(fichaAFirmar.id));
+            toast.success('Documento firmado registrado en el expediente digital.');
+            setFichaAFirmar(null);
+        } catch {
+            toast.error('No se pudo subir el documento firmado.');
+        }
+    };
+
+    /**
+     * Registra la ficha en el expediente digital.
+     *
+     * Antes foliaba una URL al PDF que arma el servidor con reportlab, un
+     * documento distinto del formato oficial: por eso el ojito del expediente
+     * mostraba una ficha sin firmar aunque se acabara de firmar, y con secciones
+     * —"Cierre y Evaluación"— que ya no existen en el formulario.
+     *
+     * Ahora se sube el mismo PDF del formato oficial que produce el panel de
+     * firmas. Un solo documento, el que ve el educador es el que se archiva.
+     */
     const handleRegistrarExpediente = async (ficha: any) => {
         if (registeredIds.has(ficha.id) || !caso?.id) return;
-        const token = getToken();
-        if (!token) return;
 
         setIsRegistering(true);
+        setFichaParaPdf(ficha);   // monta el formato oficial fuera de pantalla
         try {
-            // 1. Trigger PDF generation on the server (waits until the file is ready)
-            const pdfRes = await fetch(`${INTERVENCION_API_URL}/seguimiento/${ficha.id}/pdf`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
-            if (!pdfRes.ok) throw new Error('Error al generar el PDF en el servidor');
-
-            const pdfUrl = `${INTERVENCION_API_URL}/seguimiento/${ficha.id}/pdf`;
-            const fechaStr = (ficha.fecha || ficha.FECHA || new Date().toISOString()).toString().split('T')[0];
-
-            // 2. Register folio in EXP_FOLIO
-            const folioRes = await fetch(`${EXPEDIENTE_API_URL}/expediente/caso/${caso.id}/folio`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({
-                    tipo_documento: 'SEG_F12',
-                    titulo: `FICHA DE SEGUIMIENTO FAMILIAR (F12) — ${fechaStr}`,
-                    archivo_url: pdfUrl,
-                    contenido_hash: `SEG-F12-${ficha.id}`.substring(0, 40),
-                }),
-            });
-            if (!folioRes.ok) throw new Error('Error al registrar el folio en el expediente');
-
-            // 3. Show immediately in the local document store
-            registerDocument({
-                nnaId: nna.id,
-                type: 'FICHA DE SEGUIMIENTO FAMILIAR (FORMATO 12)',
-                code: `SEG-F12-${ficha.id}`,
-                pages: 1,
-                nombreResponsable: 'Educador Registrado',
-                pdfUrl,
-                status: 'APROBADO',
-            });
-
+            // Esperar a que React pinte el formato antes de capturarlo.
+            await new Promise(r => setTimeout(r, 200));
+            await construirPdf({}, false, ficha);
             setRegisteredIds(prev => new Set(prev).add(ficha.id));
+            toast.success('Ficha registrada en el expediente digital.');
         } catch (e) {
             console.error(e);
             toast.error('Error al registrar en el expediente digital');
         } finally {
+            setFichaParaPdf(null);
             setIsRegistering(false);
         }
-    };
-
-    const evalColor = (v: string) => {
-        if (v === 'FAVORABLE')    return 'bg-success-soft text-success border-success/20';
-        if (v === 'EN_PROCESO')   return 'bg-warning-soft text-warning border-warning/20';
-        if (v === 'DESFAVORABLE') return 'bg-danger-soft text-danger border-danger/20';
-        return 'bg-surface-muted text-fg-muted border-border';
-    };
-
-    const accentColor = (v: string, finalizada: boolean) => {
-        if (finalizada)           return 'bg-primary';
-        if (v === 'FAVORABLE')    return 'bg-green-500';
-        if (v === 'EN_PROCESO')   return 'bg-amber-500';
-        if (v === 'DESFAVORABLE') return 'bg-red-500';
-        return 'bg-gray-400';
     };
 
     return (
@@ -276,133 +498,192 @@ export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any })
                     </p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {fichas.map(ficha => {
-                        const evalVal    = ficha.evaluacion        || ficha.EVALUACION        || 'SIN_CAMBIOS';
-                        const lugar      = ficha.lugar_seguimiento || ficha.lugarSeguimiento  || ficha.LUGAR_SEGUIMIENTO || '';
-                        const acuerdos   = ficha.acuerdos          || ficha.ACUERDOS          || '';
-                        const proxima    = ficha.proxima_visita    || ficha.proximaVisita      || ficha.PROXIMA_VISITA   || '';
-                        const termino    = ficha.fecha_termino     || ficha.fechaTermino       || ficha.FECHA_TERMINO    || '';
-                        const finalizada = !!termino;
-                        const isExpanded = expandedFichaId === ficha.id;
-                        const alreadyReg = registeredIds.has(ficha.id);
+                /* Tabla de registros en vez de tarjetas: un educador acumula
+                   decenas de seguimientos por NNA y en mosaico no se pueden
+                   recorrer por fecha ni comparar de un vistazo. La fila se
+                   despliega para leer el detalle completo sin abrir la ficha. */
+                <div className="bg-surface border border-border rounded-[8px] overflow-hidden">
+                    <table className="w-full text-[13px]" style={{ tableLayout: 'fixed' }}>
+                        <thead>
+                            <tr className="bg-surface-muted text-[10px] text-fg-muted uppercase tracking-wider text-left">
+                                <th style={{ width: '11%' }} className="px-3 py-2.5 font-bold">Fecha</th>
+                                <th style={{ width: '14%' }} className="px-3 py-2.5 font-bold">Lugar</th>
+                                <th style={{ width: '22%' }} className="px-3 py-2.5 font-bold">Entrevistado</th>
+                                <th style={{ width: '43%' }} className="px-3 py-2.5 font-bold">Resultados / Compromisos</th>
+                                <th style={{ width: '10%' }} className="px-3 py-2.5 font-bold text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {fichas.map(ficha => {
+                                const lugar      = ficha.lugar_seguimiento || ficha.lugarSeguimiento || ficha.LUGAR_SEGUIMIENTO || '';
+                                const acuerdos   = ficha.acuerdos          || ficha.ACUERDOS         || '';
+                                const parentesco = etiquetaParentesco(ficha.parentesco || ficha.PARENTESCO);
+                                const isExpanded = expandedFichaId === ficha.id;
+                                const alreadyReg = registeredIds.has(ficha.id);
+                                // Las fichas anteriores a la migración no traen
+                                // ESTADO: se consideran finalizadas.
+                                const esBorrador = (ficha.estado || ficha.ESTADO) === 'BORRADOR';
 
-                        return (
-                            <div
-                                key={ficha.id}
-                                onClick={() => setExpandedFichaId(isExpanded ? null : ficha.id)}
-                                className="relative bg-surface border border-border rounded-[8px] p-4 pl-6 cursor-pointer hover:shadow-lg hover:-translate-y-0.5 transform transition-all duration-300"
-                            >
-                                <div className={`absolute left-0 top-0 bottom-0 w-1.5 rounded-l-[8px] ${accentColor(evalVal, finalizada)}`} />
-
-                                <div className="flex justify-between items-start mb-3">
-                                    <div className="flex flex-col gap-1">
-                                        <span className="bg-primary-soft text-primary px-2.5 py-0.5 rounded text-[11px] font-bold">
-                                            {new Date(ficha.fecha || ficha.FECHA).toLocaleDateString('es-PE')}
-                                        </span>
-                                        {finalizada && (
-                                            <span className="bg-primary-soft text-primary px-2.5 py-0.5 rounded text-[10px] font-bold flex items-center gap-1">
-                                                <CheckCheck size={10} /> Finalizada
-                                            </span>
-                                        )}
-                                    </div>
-                                    <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                                        {!finalizada && (
-                                            <span className={`px-2 py-0.5 rounded border text-[10px] font-bold ${evalColor(evalVal)}`}>
-                                                {evalVal.replace(/_/g, ' ')}
-                                            </span>
-                                        )}
-                                        <button
-                                            onClick={() => openEdit(ficha)}
-                                            className="p-1.5 text-fg-muted hover:text-primary hover:bg-primary-soft rounded-[5px] transition-all"
-                                            title="Editar ficha"
-                                        >
-                                            <Pencil size={13} />
-                                        </button>
-                                        <button
-                                            onClick={() => handleRegistrarExpediente(ficha)}
-                                            disabled={isRegistering || alreadyReg}
-                                            className={`p-1.5 rounded-[5px] transition-all ${
-                                                alreadyReg
-                                                    ? 'text-success bg-success-soft cursor-default'
-                                                    : 'text-fg-muted hover:text-primary hover:bg-primary-soft'
+                                return (
+                                    <Fragment key={ficha.id}>
+                                        <tr
+                                            onClick={() => setExpandedFichaId(isExpanded ? null : ficha.id)}
+                                            className={`border-t border-border cursor-pointer transition-colors align-top ${
+                                                isExpanded ? 'bg-primary-soft/30' : 'hover:bg-surface-muted'
                                             }`}
-                                            title={alreadyReg ? 'Ya registrada en expediente' : 'Registrar en expediente digital'}
                                         >
-                                            {alreadyReg ? <CheckCheck size={14} /> : <FolderInput size={14} />}
-                                        </button>
-                                    </div>
-                                </div>
+                                            <td className="px-3 py-2.5 font-semibold text-fg whitespace-nowrap">
+                                                {new Date(ficha.fecha || ficha.FECHA).toLocaleDateString('es-PE')}
+                                                <span className="block text-[11px] font-normal text-fg-muted">
+                                                    {ficha.hora || ficha.HORA || ''}
+                                                </span>
+                                                {esBorrador && (
+                                                    <span className="inline-block mt-1 bg-warning-soft text-warning border border-warning/20 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider">
+                                                        Borrador
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="px-3 py-2.5 text-fg-2">
+                                                <span className="flex items-center gap-1.5">
+                                                    <MapPin size={12} className="text-fg-muted flex-shrink-0" />
+                                                    {lugar.replace(/_/g, ' ') || '—'}
+                                                </span>
+                                            </td>
+                                            <td className="px-3 py-2.5 text-fg-2">
+                                                <span className="font-medium text-fg">
+                                                    {ficha.entrevistado || ficha.ENTREVISTADO || '(sin nombre)'}
+                                                </span>
+                                                {parentesco && (
+                                                    <span className="block text-[11px] text-fg-muted">{parentesco}</span>
+                                                )}
+                                            </td>
+                                            <td className={`px-3 py-2.5 text-fg-muted ${isExpanded ? '' : 'line-clamp-2'}`}>
+                                                {acuerdos || <span className="italic opacity-60">Sin compromisos registrados</span>}
+                                            </td>
+                                            <td className="px-3 py-2.5" onClick={e => e.stopPropagation()}>
+                                                <div className="flex items-center justify-center gap-1">
+                                                    <button
+                                                        onClick={() => openEdit(ficha)}
+                                                        className="p-1.5 text-fg-muted hover:text-primary hover:bg-primary-soft rounded-[5px] transition-all"
+                                                        title={esBorrador ? 'Continuar borrador' : 'Editar ficha'}
+                                                    >
+                                                        <Pencil size={13} />
+                                                    </button>
+                                                    {/* Un borrador no se firma ni se folia: iría
+                                                        al expediente un documento a medio llenar. */}
+                                                    <button
+                                                        onClick={() => setFichaAFirmar(ficha)}
+                                                        disabled={esBorrador}
+                                                        className="p-1.5 text-fg-muted hover:text-primary hover:bg-primary-soft rounded-[5px] transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-fg-muted"
+                                                        title={esBorrador ? 'Finalice la ficha para poder firmarla' : 'Firmar ficha'}
+                                                    >
+                                                        <FileSignature size={13} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleRegistrarExpediente(ficha)}
+                                                        disabled={isRegistering || alreadyReg || esBorrador}
+                                                        className={`p-1.5 rounded-[5px] transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                                                            alreadyReg
+                                                                ? 'text-success bg-success-soft cursor-default'
+                                                                : 'text-fg-muted hover:text-primary hover:bg-primary-soft'
+                                                        }`}
+                                                        title={
+                                                            esBorrador ? 'Finalice la ficha para registrarla en el expediente'
+                                                                : alreadyReg ? 'Ya registrada en expediente'
+                                                                : 'Registrar en expediente digital'
+                                                        }
+                                                    >
+                                                        {alreadyReg ? <CheckCheck size={14} /> : <FolderInput size={14} />}
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
 
-                                <div className="space-y-1.5">
-                                    <div className="flex items-center gap-1.5 text-[12px] text-fg-secondary">
-                                        <MapPin size={12} className="text-fg-muted flex-shrink-0" />
-                                        <span className="font-medium">{lugar.replace(/_/g, ' ')}</span>
-                                    </div>
-                                    <p className="font-semibold text-fg text-[13px]">
-                                        {ficha.entrevistado || ficha.ENTREVISTADO || '(sin nombre)'}
-                                        {(ficha.parentesco || ficha.PARENTESCO) && ` (${ficha.parentesco || ficha.PARENTESCO})`}
-                                    </p>
-                                    <p className={`text-[12px] text-fg-muted ${isExpanded ? '' : 'line-clamp-2'}`}>
-                                        {ficha.descripcion || ficha.DESCRIPCION || 'Sin descripción registrada.'}
-                                    </p>
-                                    {acuerdos && (
-                                        <p className={`text-[11px] text-fg-secondary italic ${isExpanded ? '' : 'line-clamp-1'}`}>
-                                            <span className="font-semibold not-italic">Acuerdos: </span>{acuerdos}
-                                        </p>
-                                    )}
+                                        {isExpanded && (
+                                            <tr className="border-t border-border bg-primary-soft/10">
+                                                <td colSpan={5} className="px-3 py-3">
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-[12px]">
+                                                        <Detalle titulo="Antecedentes / Motivo" valor={ficha.antecedentes || ficha.ANTECEDENTES} />
+                                                        <Detalle titulo="Descripción de la visita" valor={ficha.descripcion || ficha.DESCRIPCION} />
+                                                        <Detalle titulo="Observaciones" valor={ficha.observaciones || ficha.OBSERVACIONES} />
+                                                        <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                                                            <Detalle titulo="Dirección" valor={ficha.direccion || ficha.DIRECCION} />
+                                                            <Detalle titulo="Teléfono" valor={ficha.telefono || ficha.TELEFONO} />
+                                                            <Detalle titulo="Zona" valor={ficha.zona || ficha.ZONA} />
+                                                            <Detalle titulo="Educador" valor={ficha.nombre_educador || ficha.NOMBRE_EDUCADOR} />
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </Fragment>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            )}
 
-                                    {isExpanded && (
-                                        <div className="mt-3 pt-3 border-t border-border space-y-2 text-[12px] text-fg-secondary">
-                                            {(ficha.antecedentes || ficha.ANTECEDENTES) && (
-                                                <div>
-                                                    <span className="font-semibold text-fg block">Antecedentes:</span>
-                                                    <p className="text-fg-muted">{ficha.antecedentes || ficha.ANTECEDENTES}</p>
-                                                </div>
-                                            )}
-                                            {(ficha.direccion || ficha.DIRECCION) && (
-                                                <div>
-                                                    <span className="font-semibold text-fg block">Dirección:</span>
-                                                    <p className="text-fg-muted">{ficha.direccion || ficha.DIRECCION}</p>
-                                                </div>
-                                            )}
-                                            {(ficha.telefono || ficha.TELEFONO) && (
-                                                <div>
-                                                    <span className="font-semibold text-fg block">Teléfono:</span>
-                                                    <p className="text-fg-muted">{ficha.telefono || ficha.TELEFONO}</p>
-                                                </div>
-                                            )}
-                                            {(ficha.observaciones || ficha.OBSERVACIONES) && (
-                                                <div>
-                                                    <span className="font-semibold text-fg block">Observaciones:</span>
-                                                    <p className="text-fg-muted">{ficha.observaciones || ficha.OBSERVACIONES}</p>
-                                                </div>
-                                            )}
-                                            {termino && (
-                                                <div>
-                                                    <span className="font-semibold text-fg block">Fecha de término:</span>
-                                                    <p className="text-fg-muted">{new Date(termino).toLocaleDateString('es-PE')}</p>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
+            {/* ─── Firmas ───
+                Los tres firmantes del Anexo 10. Ninguno se escribe: el
+                entrevistado sale de la ficha, el usuario del expediente y el
+                educador de la sesión. */}
+            {fichaAFirmar && (
+                <>
+                    <PanelFirmas
+                        titulo="Firmas de la Ficha de Seguimiento Familiar"
+                        subtitulo={`Formato 12 · ${new Date(fichaAFirmar.fecha || fichaAFirmar.FECHA).toLocaleDateString('es-PE')}`}
+                        firmantes={[
+                            {
+                                clave: 'entrevistado',
+                                etiqueta: 'Entrevistado',
+                                rol: 'Nombre y firma del entrevistado',
+                                nombre: fichaAFirmar.entrevistado || fichaAFirmar.ENTREVISTADO || '',
+                                dni: familiares.find(
+                                    (f: any) => (f.nombres || '').trim().toLowerCase() ===
+                                        (fichaAFirmar.entrevistado || fichaAFirmar.ENTREVISTADO || '').trim().toLowerCase()
+                                )?.dni,
+                            },
+                            {
+                                clave: 'usuario',
+                                etiqueta: 'Usuario/a',
+                                rol: 'Nombre y firma del usuario/a',
+                                nombre: `${nna?.nombres ?? ''} ${nna?.apellidoPaterno ?? ''}`.trim(),
+                                dni: nna?.numeroDoc || undefined,
+                            },
+                            {
+                                clave: 'educador',
+                                etiqueta: 'Educador/a',
+                                rol: 'Nombre y firma del / la educador/a',
+                                nombre: educadorDeLaFicha(fichaAFirmar),
+                                // El educador acredita con su firma y sello, no con huella.
+                                conHuella: false,
+                            },
+                        ]}
+                        onFirmar={firmarEnPantalla}
+                        onDescargarParaFirmar={descargarParaFirmar}
+                        onSubirFirmado={subirFirmadoEnPapel}
+                        onClose={() => setFichaAFirmar(null)}
+                    />
+                </>
+            )}
 
-                                <div className="mt-3 pt-3 border-t border-border flex justify-between items-center text-[11px] text-fg-muted">
-                                    <span className="flex items-center gap-1">
-                                        <Calendar size={11} /> {ficha.hora || ficha.HORA || ''}
-                                    </span>
-                                    {proxima ? (
-                                        <span className="flex items-center gap-1 text-primary font-medium">
-                                            <Home size={11} /> Próx. {new Date(proxima).toLocaleDateString('es-PE')}
-                                        </span>
-                                    ) : (
-                                        <span>{ficha.zona || ficha.ZONA || 'Sin zona'}</span>
-                                    )}
-                                </div>
-                            </div>
-                        );
-                    })}
+            {/* Formato oficial fuera de pantalla, del que se captura el PDF.
+                Se monta tanto al firmar como al registrar en el expediente.
+                Fuera de pantalla y no oculto: html2canvas no captura un elemento
+                con display:none; y en `absolute`, no `fixed`, porque resuelve
+                las coordenadas contra el documento y no contra la ventana. */}
+            {fichaImpresa && (
+                <div style={{ position: 'absolute', left: '-10000px', top: 0 }}>
+                    <Formato12Print
+                        nna={nna}
+                        ficha={{
+                            ...fichaImpresa,
+                            nombreUsuario:  `${nna?.nombres ?? ''} ${nna?.apellidoPaterno ?? ''}`.trim(),
+                            nombreEducador: educadorDeLaFicha(fichaImpresa),
+                        }}
+                        id="f12-firma-print"
+                    />
                 </div>
             )}
 
@@ -472,100 +753,142 @@ export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any })
                             {/* Persona Entrevistada */}
                             <div>
                                 <SectionTitle>Persona Entrevistada</SectionTitle>
+
+                                {/* La familia sale del Resumen del Caso (F03): la ficha
+                                    no vuelve a pedir un dato que el expediente ya tiene. */}
+                                <div className="mb-3">
+                                    {familiares.length === 0 ? (
+                                        <p className="text-[11px] text-fg-muted italic">
+                                            Este NNA aún no tiene familiares registrados en su ficha de inscripción.
+                                            Escribe los datos abajo y márcalos para agregarlos a su familia.
+                                        </p>
+                                    ) : (
+                                        <>
+                                            <label className="block text-[11px] font-semibold text-fg-muted uppercase tracking-wider mb-1">
+                                                ¿A quién se entrevistó?
+                                            </label>
+                                            <div className="flex gap-2 flex-wrap">
+                                                {familiares.map((f: any, idx: number) => (
+                                                    <button
+                                                        key={idx}
+                                                        type="button"
+                                                        onClick={() => elegirFamiliar(idx)}
+                                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] border text-[12px] font-medium transition-all ${
+                                                            familiarSel === idx
+                                                                ? 'border-primary bg-primary-soft text-primary'
+                                                                : 'border-border-strong text-fg-secondary hover:border-primary hover:text-fg'
+                                                        }`}
+                                                    >
+                                                        <Users size={12} />
+                                                        <span className="font-semibold">{etiquetaParentesco(f.parentesco)}</span>
+                                                        <span className="opacity-70">· {f.nombres}</span>
+                                                    </button>
+                                                ))}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => elegirFamiliar(null)}
+                                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] border text-[12px] font-medium transition-all ${
+                                                        familiarSel === null
+                                                            ? 'border-primary bg-primary-soft text-primary'
+                                                            : 'border-border-strong text-fg-secondary hover:border-primary hover:text-fg'
+                                                    }`}
+                                                >
+                                                    <Plus size={12} /> Otra persona
+                                                </button>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                     <FormField label="Nombre Completo">
                                         <input className={inputCls} value={currentFicha.entrevistado} onChange={up('entrevistado')} placeholder="Nombre del entrevistado" />
                                     </FormField>
                                     <FormField label="Parentesco">
-                                        <input className={inputCls} value={currentFicha.parentesco} onChange={up('parentesco')} placeholder="Ej: Madre, Tío" />
+                                        <select className={inputCls} value={currentFicha.parentesco} onChange={up('parentesco')}>
+                                            <option value="">Seleccionar…</option>
+                                            {OPCIONES_VINCULO.map(o => (
+                                                <option key={o.value} value={o.value}>{o.label}</option>
+                                            ))}
+                                            {/* Las fichas antiguas guardaron el parentesco
+                                                escrito a mano; se conserva como opción para
+                                                no perder el dato al editarlas. */}
+                                            {currentFicha.parentesco &&
+                                             !OPCIONES_VINCULO.some(o => o.value === currentFicha.parentesco) && (
+                                                <option value={currentFicha.parentesco}>{currentFicha.parentesco}</option>
+                                            )}
+                                        </select>
                                     </FormField>
                                     <FormField label="Teléfono">
                                         <input className={inputCls} value={currentFicha.telefono} onChange={up('telefono')} placeholder="999 999 999" />
                                     </FormField>
                                 </div>
+
+                                {/* El dato sube al Resumen del Caso en vez de quedarse
+                                    encerrado en esta ficha: desde la próxima visita la
+                                    persona ya aparece como botón, aquí y en el F11. */}
+                                {esPersonaNueva && (
+                                    <label className="mt-3 flex items-start gap-2.5 px-3 py-2.5 rounded-[6px] border border-primary/30 bg-primary-soft/40 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            className="mt-0.5 w-4 h-4 cursor-pointer accent-primary"
+                                            checked={registrarEnFamilia}
+                                            onChange={e => setRegistrarEnFamilia(e.target.checked)}
+                                        />
+                                        <span className="text-[12px] text-fg-2 leading-snug">
+                                            Agregar a <strong className="text-fg">{currentFicha.entrevistado}</strong> a la
+                                            familia del NNA
+                                            <span className="block text-[11px] text-fg-muted mt-0.5">
+                                                Quedará registrada en el Resumen del Caso y la próxima vez podrás elegirla directamente.
+                                            </span>
+                                        </span>
+                                    </label>
+                                )}
                             </div>
 
                             {/* Contenido de la Visita */}
                             <div>
                                 <SectionTitle>Contenido de la Visita</SectionTitle>
+                                {/* Las cuatro casillas largas llevan dictado por voz,
+                                    igual que la narración del Diario de Campo: el
+                                    educador las llena en campo, desde el celular. */}
                                 <div className="space-y-3">
-                                    <FormField label="Antecedentes / Motivo de la Visita">
-                                        <textarea className={textareaCls} rows={2} value={currentFicha.antecedentes} onChange={up('antecedentes')} placeholder="Motivo o contexto de la visita…" />
-                                    </FormField>
-                                    <FormField label="Descripción de la Visita">
-                                        <textarea className={textareaCls} rows={3} value={currentFicha.descripcion} onChange={up('descripcion')} placeholder="Relato detallado de lo ocurrido en la visita…" />
-                                    </FormField>
-                                    <FormField label="Acuerdos / Compromisos">
-                                        <textarea className={textareaCls} rows={2} value={currentFicha.acuerdos} onChange={up('acuerdos')} placeholder="Acuerdos y compromisos alcanzados con la familia…" />
-                                    </FormField>
-                                    <FormField label="Observaciones">
-                                        <textarea className={textareaCls} rows={2} value={currentFicha.observaciones} onChange={up('observaciones')} placeholder="Observaciones adicionales…" />
-                                    </FormField>
-                                </div>
-                            </div>
+                                    <CampoDictado
+                                        label="Antecedentes / Motivo de la Visita"
+                                        value={currentFicha.antecedentes}
+                                        onChange={v => setCampo('antecedentes', v)}
+                                        placeholder="Motivo o contexto de la visita…"
+                                    />
+                                    <CampoDictado
+                                        label="Descripción de la Visita"
+                                        value={currentFicha.descripcion}
+                                        onChange={v => setCampo('descripcion', v)}
+                                        placeholder="Relato detallado de lo ocurrido en la visita…"
+                                        rows={3}
+                                    />
+                                    <CampoDictado
+                                        label="Resultados / Compromisos"
+                                        value={currentFicha.acuerdos}
+                                        onChange={v => setCampo('acuerdos', v)}
+                                        placeholder="Acuerdos y compromisos alcanzados con la familia…"
+                                    />
+                                    <CampoDictado
+                                        label="Observaciones"
+                                        value={currentFicha.observaciones}
+                                        onChange={v => setCampo('observaciones', v)}
+                                        placeholder="Observaciones adicionales…"
+                                    />
+                                    {/* Se quitaron "Cierre y Evaluación" y "Término del
+                                        Seguimiento": la ficha registra un hecho puntual
+                                        —una consejería, un acuerdo— y no un proceso con
+                                        inicio y fin, así que la fecha de término y la
+                                        evaluación de la visita no aplican (reunión SEC
+                                        del 11/08/2026).
 
-                            {/* Cierre y Evaluación */}
-                            <div>
-                                <SectionTitle>Cierre y Evaluación</SectionTitle>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <FormField label="Evaluación de la Visita">
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1">
-                                            {EVALUACION_OPTIONS.map(opt => (
-                                                <label
-                                                    key={opt.value}
-                                                    className={`relative flex flex-col p-2.5 rounded-[8px] border cursor-pointer transition-all duration-200 select-none ${
-                                                        currentFicha.evaluacion === opt.value
-                                                            ? 'border-primary ring-1 ring-primary'
-                                                            : 'border-border bg-surface hover:border-primary/50'
-                                                    }`}
-                                                    style={currentFicha.evaluacion === opt.value ? { backgroundColor: opt.bgSoft } : {}}
-                                                >
-                                                    <input
-                                                        type="radio"
-                                                        name="evaluacion"
-                                                        value={opt.value}
-                                                        checked={currentFicha.evaluacion === opt.value}
-                                                        onChange={up('evaluacion')}
-                                                        className="sr-only"
-                                                    />
-                                                    <div className="flex items-center gap-1.5 font-semibold text-[11px]">
-                                                        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: opt.color }} />
-                                                        <span className={currentFicha.evaluacion === opt.value ? 'text-primary' : 'text-fg'}>{opt.label}</span>
-                                                        <span className="ml-auto text-[10px] opacity-70">{opt.icon}</span>
-                                                    </div>
-                                                    <p className="text-[10px] text-fg-muted mt-1 leading-normal">{opt.description}</p>
-                                                </label>
-                                            ))}
-                                        </div>
-                                    </FormField>
-                                    <div className="space-y-3">
-                                        <FormField label="Próxima Visita Programada">
-                                            <input type="date" className={inputCls} value={currentFicha.proximaVisita} onChange={up('proximaVisita')} />
-                                            <p className="text-[11px] text-fg-muted mt-1">Deja vacío si no hay próxima visita agendada.</p>
-                                        </FormField>
-                                        <FormField label="Educador Responsable">
-                                            <input className={inputCls} value={currentFicha.nombreEducador} onChange={up('nombreEducador')} placeholder="Nombre del educador" />
-                                        </FormField>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Término del Seguimiento */}
-                            <div>
-                                <SectionTitle>Término del Seguimiento</SectionTitle>
-                                <div className="rounded-[8px] border border-border bg-surface-muted p-4">
-                                    <p className="text-[11px] text-fg-muted mb-3">
-                                        Completa este campo solo cuando el seguimiento familiar haya concluido.
-                                        La ficha quedará marcada como <strong className="text-fg">Finalizada</strong>.
-                                    </p>
-                                    <FormField label="Fecha de Término">
-                                        <input
-                                            type="date"
-                                            className={inputCls}
-                                            value={currentFicha.fechaTermino}
-                                            onChange={up('fechaTermino')}
-                                        />
-                                    </FormField>
+                                        El educador responsable tampoco se pide: es quien
+                                        tiene la sesión abierta. Escribirlo a mano abría
+                                        la puerta a que una ficha saliera firmada con el
+                                        nombre de otro. */}
                                 </div>
                             </div>
                         </div>
@@ -578,7 +901,14 @@ export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any })
                                 Cancelar
                             </button>
                             <button
-                                onClick={handleSave}
+                                onClick={() => handleSave('BORRADOR')}
+                                disabled={isSaving}
+                                className="flex items-center gap-2 px-4 py-2 bg-warning text-white text-[13px] font-medium rounded-[6px] hover:bg-warning/90 transition-colors disabled:opacity-60"
+                            >
+                                <Save size={14} /> Guardar Borrador
+                            </button>
+                            <button
+                                onClick={() => handleSave('FINALIZADA')}
                                 disabled={isSaving}
                                 className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-fg text-[13px] font-medium rounded-[6px] hover:bg-primary/90 transition-colors disabled:opacity-60"
                             >

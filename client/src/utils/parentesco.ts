@@ -18,6 +18,16 @@ const VINCULO_TUTOR: Record<string, string> = {
     '6': 'Otro no familiar',
 };
 
+/**
+ * El catálogo como lista, para los combos.
+ *
+ * Existe para que ninguna ficha vuelva a pedir el parentesco como texto libre:
+ * escrito a mano el mismo vínculo llega como "Mamá", "madre" y "MADRE", y los
+ * indicadores por parentesco salen partidos en tres.
+ */
+export const OPCIONES_VINCULO = Object.entries(VINCULO_TUTOR)
+    .map(([value, label]) => ({ value, label }));
+
 /** Etiqueta corta, pensada para la impresión del F11. */
 export const etiquetaParentesco = (valor?: string | null): string => {
     if (valor === null || valor === undefined) return '';

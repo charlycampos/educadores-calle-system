@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { toast } from '../../../components/ui/Toast';
-import { CheckCircle2, AlertTriangle, Printer, ChevronDown, ChevronUp, User, FileText, Plus, Edit, Eye, Download } from 'lucide-react';
+import { AlertTriangle, Lock, Printer, ChevronDown, ChevronUp, User, FileText, Plus, Edit, Eye, Download } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { Formato13Print } from './Formato13Print';
@@ -21,6 +21,43 @@ const LBL = 'block text-[11px] font-semibold text-fg-muted uppercase tracking-wi
 const getInputClass = (disabled?: boolean) => disabled ? INP_DISABLED : INP;
 const getSelectClass = (disabled?: boolean) => disabled ? INP_DISABLED : SEL;
 const getTextareaClass = (disabled?: boolean) => disabled ? INP_DISABLED + ' resize-none' : TA;
+
+/**
+ * Las seis causas de salida del formato, en sus dos grupos.
+ *
+ * Un caso **o** egresa **o** se retira: nunca las dos cosas. Dentro de un mismo
+ * grupo sí pueden concurrir varias (se puede cumplir fases y además llegar a la
+ * mayoría de edad), por eso el bloqueo es de grupo y no de casilla.
+ */
+const MODALIDADES_EGRESO = ['cumplioFases', 'mayoriaEdad', 'derivacionServicios'] as const;
+const MODALIDADES_RETIRO = ['interesSuperior', 'noUbicado', 'noDeseaParticipar'] as const;
+
+/** Lo que se borra cuando una modalidad deja de estar marcada. */
+const DEPENDIENTES_MODALIDAD: Record<string, Record<string, any>> = {
+    cumplioFases: { logros: {}, observacionesLogros: '' },
+    mayoriaEdad: {
+        derechosIdentidad: false, derechosSalud: false, derechosEducacion: false,
+        derechosRecreacion: false, derechosOtros: '', entregaDirectorio: '',
+        observacionesMayoriaEdad: '',
+    },
+    derivacionServicios: { institucionDerivada: '', observacionesDerivacion: '' },
+    interesSuperior: {
+        interesSuperiorTrata: false, interesSuperiorDelincuencia: false,
+        interesSuperiorOtro: '', retiInterSuperiorAcciones: '',
+    },
+    noUbicado: { accionesBusqueda: '' },
+    noDeseaParticipar: { motivoNoDesea: '' },
+};
+
+/** Los seis logros del Formato 13, en el orden y con el texto del oficial. */
+const LOGROS_F13 = [
+    { id: 1, text: 'Niñas, niños y adolescentes dejan la situación de calle, ejerciendo permanentemente sus derechos (identidad, salud, alimentación, educación, recreación, entre otros)' },
+    { id: 2, text: 'Las niñas, niños y adolescentes desarrollan capacidades de autoprotección y habilidades para la vida' },
+    { id: 3, text: 'Las niñas, niños y adolescentes hacen uso de programas y servicios que restituyen el ejercicio de sus derechos' },
+    { id: 4, text: 'Persona adulta responsable presenta capacidades para garantizar la protección integral de las niñas, niños y adolescentes usuarias/os del servicio' },
+    { id: 5, text: 'Las/os NNA presentan y desarrollan sus proyectos de vida con el cumplimiento de algunas de sus metas según su temporalidad' },
+    { id: 6, text: 'Padres, madres o tutor cuenta con herramientas para asumir el cuidado de sus hijos' },
+];
 
 /* ── SectionHeader reutilizable (.esec-hd) ─────────────────────────── */
 interface EsecHeaderProps {
@@ -45,10 +82,19 @@ const EsecHeader = ({ title, section, icon: Icon, expanded, onToggle }: EsecHead
 );
 
 /* ── Checkbox card (.rcard style) ─────────────────────────────────── */
+// Un solo fondo por estado: dos clases bg-* en el mismo className las resuelve
+// el orden de la hoja de estilos, no el del string, y la casilla marcada
+// terminaba con el fondo de "deshabilitada".
 const CheckCard = ({ label, checked, onChange, disabled }: { label: string; checked: boolean; onChange: (v: boolean) => void, disabled?: boolean }) => (
-    <label className={`flex items-center gap-2.5 px-3 py-2 rounded-[6px] border cursor-pointer transition-all text-[13px] ${
-        checked ? 'border-primary bg-primary-soft text-primary' : 'border-border text-fg-2 hover:border-primary'
-    } ${disabled ? 'opacity-70 cursor-not-allowed' : ''}`}>
+    <label className={`flex items-center gap-2.5 px-3 py-2 rounded-[6px] border transition-all text-[13px] ${
+        disabled
+            ? (checked
+                ? 'border-primary bg-primary-soft text-primary cursor-not-allowed'
+                : 'border-border bg-surface-muted text-fg-muted cursor-not-allowed')
+            : (checked
+                ? 'border-primary bg-primary-soft text-primary cursor-pointer'
+                : 'border-border text-fg-2 hover:border-primary cursor-pointer')
+    }`}>
         <input type="checkbox" className="sr-only" checked={checked} onChange={e => !disabled && onChange(e.target.checked)} disabled={disabled} />
         <span className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center ${checked ? 'bg-primary border-primary' : 'border-border-strong bg-surface'}`}>
             {checked && <svg width="9" height="7" viewBox="0 0 9 7" fill="none"><polyline points="1 3.5 3.5 6 8 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
@@ -95,6 +141,8 @@ interface FichaFormato13 {
     cumplioFases: boolean;
     mayoriaEdad: boolean;
     derivacionServicios: boolean;
+    /** Primera opción de MODALIDAD DE RETIRO en el formato oficial. */
+    interesSuperior: boolean;
     modalidadRetiro: string;
     interesSuperiorTrata: boolean;
     interesSuperiorDelincuencia: boolean;
@@ -107,7 +155,13 @@ interface FichaFormato13 {
     recibeDefensaPublica: string;
     descripcionDefensa: string;
     faseAlEgreso: string;
-    logros: Record<number, boolean>;
+    /**
+     * Fase en que se cumplió cada logro: 'FASE I' | 'FASE II' | 'FASE III'.
+     * `boolean` se conserva porque las fichas guardadas antes marcaban sí/no.
+     */
+    logros: Record<number, string | boolean>;
+    /** Observaciones de la tabla de logros cumplidos. */
+    observacionesLogros: string;
     derechosIdentidad: boolean;
     derechosSalud: boolean;
     derechosEducacion: boolean;
@@ -206,6 +260,7 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
             cumplioFases: false,
             mayoriaEdad: false,
             derivacionServicios: false,
+            interesSuperior: false,
             modalidadRetiro: '',
             interesSuperiorTrata: false,
             interesSuperiorDelincuencia: false,
@@ -224,6 +279,7 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
             derechosEducacion: false,
             derechosRecreacion: false,
             derechosOtros: '',
+            observacionesLogros: '',
             entregaDirectorio: '',
             observacionesMayoriaEdad: '',
             institucionDerivada: '',
@@ -318,7 +374,49 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
     const upF = (key: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
         setFicha((p: FichaFormato13) => ({ ...p, [key]: e.target.value }));
     const upBool = (key: string, val: boolean) => setFicha((p: FichaFormato13) => ({ ...p, [key]: val }));
-    const toggleLogro = (id: number) => setFicha((p: FichaFormato13) => ({ ...p, logros: { ...p.logros, [id]: !p.logros[id] } }));
+    /**
+     * Marca o desmarca una modalidad.
+     *
+     * Al desmarcarla se borra lo que se hubiera escrito en sus campos: si no, la
+     * ficha se guardaba con datos huérfanos —una institución derivada en un caso
+     * de "no ubicado"— y el motivo de egreso terminaba deduciéndose del campo
+     * equivocado.
+     *
+     * El bloqueo del otro grupo no se hace aquí sino en la propia casilla
+     * (`disabled`): así el educador ve por qué no puede marcarla, en vez de que
+     * el sistema le apague en silencio lo que ya había llenado.
+     */
+    const marcarModalidad = (campo: string, valor: boolean) =>
+        setFicha((p: FichaFormato13) => {
+            const next: any = { ...p, [campo]: valor };
+            if (!valor) Object.assign(next, DEPENDIENTES_MODALIDAD[campo]);
+            return next as FichaFormato13;
+        });
+
+    /** ¿Ya se marcó algo en cada grupo? Lo que bloquea al grupo contrario. */
+    const hayEgreso = MODALIDADES_EGRESO.some(m => (ficha as any)[m]);
+    const hayRetiro = MODALIDADES_RETIRO.some(m => (ficha as any)[m]);
+
+    /**
+     * Cada logro se marca con una sola casilla: cumplido o no.
+     *
+     * La fase del servicio **no** se pregunta por logro — es un dato único del
+     * NNA (`faseAlEgreso`) que va arriba, junto a defensa pública, tal como en
+     * el formato oficial.
+     */
+    const marcarLogro = (id: number) =>
+        setFicha((p: FichaFormato13) => ({
+            ...p,
+            logros: { ...p.logros, [id]: !logroCumplido(p.logros[id]) },
+        }));
+
+    /**
+     * Hubo una versión intermedia que guardaba la fase ('FASE II') en vez de un
+     * booleano. Cualquier valor con contenido significa que el logro se marcó,
+     * así que esas fichas se siguen viendo bien.
+     */
+    const logroCumplido = (valor: any): boolean =>
+        valor === true || (typeof valor === 'string' && valor.trim() !== '');
 
     const handleSaveDraft = async () => {
         if (!caso?.id) return;
@@ -331,7 +429,12 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
                 motivoEgreso = 'MAYORIA_EDAD';
             } else if (ficha.derivacionServicios) {
                 motivoEgreso = 'DERIVACION';
-            } else if (ficha.modalidadRetiro === 'NO_UBICADO' || ficha.modalidadRetiro === 'NO_DESEA' || ficha.noResuelveUPE) {
+            } else if (ficha.interesSuperior) {
+                motivoEgreso = 'INTERES_SUPERIOR';
+            } else if (ficha.noUbicado || ficha.noDeseaParticipar) {
+                // Antes se comparaba modalidadRetiro contra 'NO_UBICADO', valor
+                // que la pantalla nunca llegaba a guardar: un NNA perdido se
+                // cerraba como 'CUMPLIMIENTO_OBJETIVOS', el valor por defecto.
                 motivoEgreso = 'DESERCION';
             }
 
@@ -347,7 +450,7 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
             });
 
             setInforme(data);
-            toast.success('Borrador de Ficha de Egreso guardado correctamente.');
+            toast.success('Borrador de Ficha de Egreso – Retiro guardado correctamente.');
             setShowForm(false);
         } catch (e) {
             console.error(e);
@@ -390,7 +493,12 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
                 motivoEgreso = 'MAYORIA_EDAD';
             } else if (ficha.derivacionServicios) {
                 motivoEgreso = 'DERIVACION';
-            } else if (ficha.modalidadRetiro === 'NO_UBICADO' || ficha.modalidadRetiro === 'NO_DESEA' || ficha.noResuelveUPE) {
+            } else if (ficha.interesSuperior) {
+                motivoEgreso = 'INTERES_SUPERIOR';
+            } else if (ficha.noUbicado || ficha.noDeseaParticipar) {
+                // Antes se comparaba modalidadRetiro contra 'NO_UBICADO', valor
+                // que la pantalla nunca llegaba a guardar: un NNA perdido se
+                // cerraba como 'CUMPLIMIENTO_OBJETIVOS', el valor por defecto.
                 motivoEgreso = 'DESERCION';
             }
 
@@ -407,7 +515,7 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
             });
 
             setInforme(data);
-            toast.success('Ficha de Egreso finalizada y registrada correctamente.');
+            toast.success('Ficha de Egreso – Retiro finalizada y registrada correctamente.');
             window.location.reload();
         } catch (e) {
             console.error(e);
@@ -463,7 +571,7 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
                         <Plus size={24} />
                     </div>
                     <div className="space-y-1">
-                        <h4 className="text-[15px] font-semibold text-fg">No hay Ficha de Egreso registrada</h4>
+                        <h4 className="text-[15px] font-semibold text-fg">No hay Ficha de Egreso – Retiro registrada</h4>
                         <p className="text-[12px] text-fg-muted max-w-sm">
                             Este caso aún no cuenta con un proceso de egreso o retiro registrado en el sistema. Registre uno para proceder con el cierre del caso.
                         </p>
@@ -472,7 +580,7 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
                         onClick={() => { setShowForm(true); setIsViewing(false); setCurrentStep(1); }}
                         className="flex items-center gap-1.5 bg-primary text-white px-4 py-2 rounded-[6px] text-[13px] font-medium hover:opacity-90 transition-opacity"
                     >
-                        Registrar Egreso (F13)
+                        Registrar Egreso – Retiro (F13)
                     </button>
                 </div>
             );
@@ -482,7 +590,7 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
             <div className="bg-surface border border-border rounded-[8px] shadow-1 p-5 space-y-4">
                 <div className="flex items-center justify-between border-b border-border pb-3">
                     <div>
-                        <h4 className="text-[14px] font-semibold text-fg">Historial de Ficha de Egreso</h4>
+                        <h4 className="text-[14px] font-semibold text-fg">Historial de Ficha de Egreso – Retiro</h4>
                         <p className="text-[12px] text-fg-muted mt-0.5">Detalles del informe de cierre del NNA</p>
                     </div>
                 </div>
@@ -611,7 +719,7 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
                     nnaId={nna.id}
                     nnaName={`${nna.nombres} ${nna.apellidoPaterno}`}
                     pdfUrl={informe?.archivoUrl}
-                    title="Ficha de Egreso (Formato 13)"
+                    title="Ficha de Egreso – Retiro (Formato 13)"
                 />
 
                 {/* Hidden Print */}
@@ -631,7 +739,7 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
             <div className="bg-surface border border-border rounded-[8px] shadow-1 px-5 py-4 flex items-center justify-between">
                 <div>
                     <h3 className="text-[15px] font-semibold text-fg">
-                        {isViewing ? 'Ver Ficha de Egreso / Retiro' : 'Registrar Ficha de Egreso / Retiro'}
+                        {isViewing ? 'Ver Ficha de Egreso – Retiro' : 'Registrar Ficha de Egreso – Retiro'}
                     </h3>
                     <p className="text-[12px] text-fg-2 mt-0.5">
                         Formato 13 · {nna.nombres} {nna.apellidoPaterno}
@@ -669,8 +777,8 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
                         </div>
                         <span className={`ml-2 text-xs font-semibold hidden md:inline transition-colors ${currentStep === s ? 'text-primary' : 'text-fg-muted hover:text-fg'}`}>
                             {s === 1 && "Datos Generales"}
-                            {s === 2 && "Modalidad Egreso"}
-                            {s === 3 && "Logros, Firmas y Cierre"}
+                            {s === 2 && "Modalidad Egreso / Retiro"}
+                            {s === 3 && "Firmas y Cierre"}
                         </span>
                         {s < 3 && <div className="flex-1 h-0.5 mx-4 bg-border" />}
                     </button>
@@ -753,85 +861,197 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
                 <div className="bg-surface border border-border rounded-[8px] overflow-hidden">
                     <div className="px-4 py-3 bg-surface-muted border-b border-border flex items-center gap-2">
                         <AlertTriangle size={16} className="text-success" />
-                        <h3 className="font-semibold text-[13px] text-fg">Modalidad de Egreso</h3>
+                        <h3 className="font-semibold text-[13px] text-fg">Modalidad de Egreso / Retiro</h3>
                     </div>
                     <div className="p-5 space-y-3">
-                        {/* Cumplió fases */}
-                        <CheckCard label="Cumplió Fases (Culminación Exitosa)" checked={ficha.cumplioFases} onChange={v => upBool('cumplioFases', v)} disabled={isViewing} />
-
-                        {/* Mayoría de Edad */}
-                        <div className={`rounded-[8px] border transition-all ${ficha.mayoriaEdad ? 'bg-info-soft border-info/20 p-4' : 'border-border p-3'}`}>
-                            <CheckCard label="Mayoría de Edad" checked={ficha.mayoriaEdad} onChange={v => upBool('mayoriaEdad', v)} disabled={isViewing} />
-                            {ficha.mayoriaEdad && (
-                                <div className="ml-6 mt-3 space-y-3">
-                                    <div>
-                                        <label className={LBL + ' mb-2'}>Derechos Restituidos</label>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                            {['derechosIdentidad','derechosSalud','derechosEducacion','derechosRecreacion'].map((k, i) => (
-                                                <CheckCard key={k} label={['Identidad','Salud','Educación','Recreación'][i]} checked={ficha[k]} onChange={v => upBool(k, v)} disabled={isViewing} />
-                                            ))}
+                        {/* ── MODALIDAD DE EGRESO ──
+                            Las tres del formato oficial. Antes faltaba la de
+                            derivación: el campo existía y se guardaba, pero no
+                            había casilla para marcarlo. */}
+                        {/* El grupo bloqueado no se atenúa: el CheckCard ya baja la
+                            opacidad al deshabilitarse y, sumada a la del contenedor,
+                            el texto quedaba ilegible. El candado dice lo mismo sin
+                            borrar el contenido de la pantalla. */}
+                        <div>
+                            <div className="flex items-center justify-between gap-3 mb-2">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-fg-muted">Modalidad de egreso</p>
+                                {hayRetiro && (
+                                    <span className="flex items-center gap-1.5 text-[11px] font-semibold text-fg-muted bg-surface-muted border border-border rounded-full px-2.5 py-0.5">
+                                        <Lock size={11} /> No aplica: el caso se registró como retiro
+                                    </span>
+                                )}
+                            </div>
+                            <div className="space-y-2">
+                                {/* Cumplió fases despliega su propio bloque, igual que
+                                    las demás modalidades: en el formato oficial la
+                                    tabla de logros solo se llena en este supuesto. */}
+                                <div className={`rounded-[8px] border transition-all ${ficha.cumplioFases ? 'bg-info-soft border-info/20 p-4' : 'border-border p-3'}`}>
+                                    <CheckCard label="Cumplió fases" checked={ficha.cumplioFases} onChange={v => marcarModalidad('cumplioFases', v)} disabled={isViewing || hayRetiro} />
+                                    {ficha.cumplioFases && (
+                                        <div className="mt-3 space-y-3">
+                                            <p className="text-[11px] text-fg-muted">
+                                                Marque los logros cumplidos.
+                                            </p>
+                                            <div className="border border-border rounded-[8px] overflow-hidden bg-surface">
+                                                <table className="w-full text-[13px]" style={{ tableLayout: 'fixed' }}>
+                                                    <thead>
+                                                        <tr className="bg-surface-muted text-[10px] text-fg-muted uppercase tracking-wider">
+                                                            <th style={{ width: '5%' }} className="px-2 py-2 font-bold">N°</th>
+                                                            <th className="px-3 py-2 font-bold text-left">Logros cumplidos</th>
+                                                            <th style={{ width: '12%' }} className="px-2 py-2 font-bold border-l border-border">Cumplido</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {/* Toda la fila marca el logro: la casilla sola,
+                                                            al final de un texto largo, obligaba a apuntar a
+                                                            un cuadrito de 13 px y parecía que la tabla no
+                                                            respondía. */}
+                                                        {LOGROS_F13.map(logro => {
+                                                            const cumplido = logroCumplido(ficha.logros[logro.id]);
+                                                            return (
+                                                                <tr
+                                                                    key={logro.id}
+                                                                    onClick={() => !isViewing && marcarLogro(logro.id)}
+                                                                    className={`border-t border-border align-top select-none transition-colors
+                                                                        ${cumplido ? 'bg-success-soft' : ''}
+                                                                        ${isViewing ? '' : 'cursor-pointer hover:bg-surface-muted'}`}
+                                                                >
+                                                                    <td className="px-2 py-2.5 text-center font-bold text-fg-muted">{logro.id}</td>
+                                                                    <td className={`px-3 py-2.5 leading-snug ${cumplido ? 'text-fg font-medium' : 'text-fg-2'}`}>{logro.text}</td>
+                                                                    <td className="px-2 py-2.5 text-center border-l border-border">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            className="w-4 h-4 cursor-pointer accent-primary"
+                                                                            aria-label={`Logro ${logro.id} cumplido`}
+                                                                            checked={cumplido}
+                                                                            onChange={() => !isViewing && marcarLogro(logro.id)}
+                                                                            onClick={e => e.stopPropagation()}
+                                                                            disabled={isViewing}
+                                                                        />
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                            <div>
+                                                <label className={LBL}>Observaciones</label>
+                                                <textarea
+                                                    className={getTextareaClass(isViewing)}
+                                                    rows={3}
+                                                    value={ficha.observacionesLogros || ''}
+                                                    onChange={upF('observacionesLogros')}
+                                                    disabled={isViewing}
+                                                />
+                                            </div>
                                         </div>
-                                        <input className={getInputClass(isViewing)} placeholder="Otros derechos…" value={ficha.derechosOtros} onChange={upF('derechosOtros')} disabled={isViewing} />
-                                    </div>
-                                    <div>
-                                        <label className={LBL}>Observaciones Generales</label>
-                                        <textarea className={getTextareaClass(isViewing)} rows={2} value={ficha.observacionesMayoriaEdad || ''} onChange={upF('observacionesMayoriaEdad')} disabled={isViewing} />
-                                    </div>
-                                    <div>
-                                        <label className={LBL}>Se Entrega Directorio de Instituciones</label>
-                                        <select className={getSelectClass(isViewing)} value={ficha.entregaDirectorio} onChange={upF('entregaDirectorio')} disabled={isViewing}>
-                                            <option value="">Seleccionar…</option>
-                                            <option value="SI">SÍ</option><option value="NO">NO</option>
-                                        </select>
-                                    </div>
+                                    )}
                                 </div>
-                            )}
+
+                                <div className={`rounded-[8px] border transition-all ${ficha.mayoriaEdad ? 'bg-info-soft border-info/20 p-4' : 'border-border p-3'}`}>
+                                    <CheckCard label="Mayoría de edad" checked={ficha.mayoriaEdad} onChange={v => marcarModalidad('mayoriaEdad', v)} disabled={isViewing || hayRetiro} />
+                                    {ficha.mayoriaEdad && (
+                                        <div className="ml-6 mt-3 space-y-3">
+                                            <div>
+                                                <label className={LBL + ' mb-2'}>Derechos restituidos</label>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                    {['derechosIdentidad','derechosSalud','derechosEducacion','derechosRecreacion'].map((k, i) => (
+                                                        <CheckCard key={k} label={['Identidad','Salud','Educación','Recreación'][i]} checked={ficha[k]} onChange={v => upBool(k, v)} disabled={isViewing} />
+                                                    ))}
+                                                </div>
+                                                <input className={getInputClass(isViewing)} placeholder="Otros derechos…" value={ficha.derechosOtros} onChange={upF('derechosOtros')} disabled={isViewing} />
+                                            </div>
+                                            <div>
+                                                <label className={LBL}>Observaciones</label>
+                                                <textarea className={getTextareaClass(isViewing)} rows={2} value={ficha.observacionesMayoriaEdad || ''} onChange={upF('observacionesMayoriaEdad')} disabled={isViewing} />
+                                            </div>
+                                            <div>
+                                                <label className={LBL}>Se entrega directorio de instituciones al usuario</label>
+                                                <select className={getSelectClass(isViewing)} value={ficha.entregaDirectorio} onChange={upF('entregaDirectorio')} disabled={isViewing}>
+                                                    <option value="">Seleccionar…</option>
+                                                    <option value="SI">SÍ</option><option value="NO">NO</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className={`rounded-[8px] border transition-all ${ficha.derivacionServicios ? 'bg-info-soft border-info/20 p-4' : 'border-border p-3'}`}>
+                                    <CheckCard label="Derivación servicios complementarios" checked={ficha.derivacionServicios} onChange={v => marcarModalidad('derivacionServicios', v)} disabled={isViewing || hayRetiro} />
+                                    {ficha.derivacionServicios && (
+                                        <div className="ml-6 mt-3 space-y-3">
+                                            <div>
+                                                <label className={LBL}>Institución derivada</label>
+                                                <input className={getInputClass(isViewing)} value={ficha.institucionDerivada} onChange={upF('institucionDerivada')} disabled={isViewing} />
+                                            </div>
+                                            <div>
+                                                <label className={LBL}>Observaciones</label>
+                                                <textarea className={getTextareaClass(isViewing)} rows={2} value={ficha.observacionesDerivacion} onChange={upF('observacionesDerivacion')} disabled={isViewing} />
+                                            </div>
+                                            <p className="text-[11px] text-fg-muted italic">Adjuntar evidencia de derivación al expediente digital.</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         </div>
 
-                        {/* Intervención Integral */}
-                        <div className={`rounded-[8px] border transition-all ${ficha.modalidadRetiro === 'RET_INTEGRAL' ? 'bg-success-soft/30 border-success/20 p-4' : 'border-border p-3'}`}>
-                            <label className="flex items-center gap-2.5 cursor-pointer text-[13px] text-fg-2 font-medium">
-                                <input type="radio" name="modalidadRetiro" checked={ficha.modalidadRetiro === 'RET_INTEGRAL'} onChange={() => !isViewing && setFicha(p => ({ ...p, modalidadRetiro: 'RET_INTEGRAL' }))} disabled={isViewing} />
-                                Retiro por Intervención Integral
-                            </label>
-                            {ficha.modalidadRetiro === 'RET_INTEGRAL' && (
-                                <div className="ml-6 mt-3 space-y-3">
-                                    <CheckCard label="Medida de Protección de Acogimiento Familiar" checked={ficha.interesSuperiorTrata} onChange={v => upBool('interesSuperiorTrata', v)} disabled={isViewing} />
-                                    <CheckCard label="Medida de Protección de Acogimiento Residencial" checked={ficha.interesSuperiorDelincuencia} onChange={v => upBool('interesSuperiorDelincuencia', v)} disabled={isViewing} />
-                                    <input className={getInputClass(isViewing)} placeholder="Otros motivos de interés superior…" value={ficha.interesSuperiorOtro} onChange={upF('interesSuperiorOtro')} disabled={isViewing} />
-                                    <div>
-                                        <label className={LBL}>Acciones Realizadas</label>
-                                        <textarea className={getTextareaClass(isViewing)} rows={2} value={ficha.retiInterSuperiorAcciones} onChange={upF('retiInterSuperiorAcciones')} disabled={isViewing} />
-                                    </div>
+                        {/* ── MODALIDAD DE RETIRO ──
+                            Las tres del formato oficial. Antes estaban dentro de
+                            "Retiro por Intervención Integral" y "Retiro
+                            Desestimado", dos categorías que no existen en el
+                            papel: el educador que buscaba "No ubicado" no lo
+                            encontraba. */}
+                        <div className="pt-3 border-t border-border">
+                            <div className="flex items-center justify-between gap-3 mb-2">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-fg-muted">Modalidad de retiro</p>
+                                {hayEgreso && (
+                                    <span className="flex items-center gap-1.5 text-[11px] font-semibold text-fg-muted bg-surface-muted border border-border rounded-full px-2.5 py-0.5">
+                                        <Lock size={11} /> No aplica: el caso se registró como egreso
+                                    </span>
+                                )}
+                            </div>
+                            <div className="space-y-2">
+                                <div className={`rounded-[8px] border transition-all ${ficha.interesSuperior ? 'bg-warning-soft/40 border-warning/20 p-4' : 'border-border p-3'}`}>
+                                    <CheckCard label="Interés superior del NNA (trata, delincuencia, etc.)" checked={ficha.interesSuperior} onChange={v => marcarModalidad('interesSuperior', v)} disabled={isViewing || hayEgreso} />
+                                    {ficha.interesSuperior && (
+                                        <div className="ml-6 mt-3 space-y-3">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                <CheckCard label="Trata" checked={ficha.interesSuperiorTrata} onChange={v => upBool('interesSuperiorTrata', v)} disabled={isViewing} />
+                                                <CheckCard label="Infractor / delincuencia" checked={ficha.interesSuperiorDelincuencia} onChange={v => upBool('interesSuperiorDelincuencia', v)} disabled={isViewing} />
+                                            </div>
+                                            <input className={getInputClass(isViewing)} placeholder="Otros…" value={ficha.interesSuperiorOtro} onChange={upF('interesSuperiorOtro')} disabled={isViewing} />
+                                            <div>
+                                                <label className={LBL}>Acciones realizadas</label>
+                                                <textarea className={getTextareaClass(isViewing)} rows={2} value={ficha.retiInterSuperiorAcciones} onChange={upF('retiInterSuperiorAcciones')} disabled={isViewing} />
+                                                <p className="text-[11px] text-fg-muted italic mt-1">Adjuntar evidencia al expediente digital.</p>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
-                            )}
-                        </div>
 
-                        {/* Retiro Desestimado */}
-                        <div className={`rounded-[8px] border transition-all ${ficha.modalidadRetiro === 'RET_DESESTIMADO' ? 'bg-amber-50/50 border-amber-200 p-4' : 'border-border p-3'}`}>
-                            <label className="flex items-center gap-2.5 cursor-pointer text-[13px] text-fg-2 font-medium">
-                                <input type="radio" name="modalidadRetiro" checked={ficha.modalidadRetiro === 'RET_DESESTIMADO'} onChange={() => !isViewing && setFicha(p => ({ ...p, modalidadRetiro: 'RET_DESESTIMADO' }))} disabled={isViewing} />
-                                Retiro Desestimado (Pérdida de Contacto / Rechazo / UPE)
-                            </label>
-                            {ficha.modalidadRetiro === 'RET_DESESTIMADO' && (
-                                <div className="ml-6 mt-3 space-y-3">
-                                    <CheckCard label="No Ubicado (Pérdida de Contacto)" checked={ficha.noUbicado} onChange={v => upBool('noUbicado', v)} disabled={isViewing} />
+                                <div className={`rounded-[8px] border transition-all ${ficha.noUbicado ? 'bg-warning-soft/40 border-warning/20 p-4' : 'border-border p-3'}`}>
+                                    <CheckCard label="No ubicado (3 meses o más de no ubicado)" checked={ficha.noUbicado} onChange={v => marcarModalidad('noUbicado', v)} disabled={isViewing || hayEgreso} />
                                     {ficha.noUbicado && (
-                                        <div>
-                                            <label className={LBL}>Acciones de Búsqueda y Coordinación</label>
+                                        <div className="ml-6 mt-3">
+                                            <label className={LBL}>Acciones realizadas para ubicarlo</label>
                                             <textarea className={getTextareaClass(isViewing)} rows={2} value={ficha.accionesBusqueda} onChange={upF('accionesBusqueda')} disabled={isViewing} />
+                                            <p className="text-[11px] text-fg-muted italic mt-1">Adjuntar evidencia en el cuaderno de campo.</p>
                                         </div>
                                     )}
-                                    <CheckCard label="No Desea Participar" checked={ficha.noDeseaParticipar} onChange={v => upBool('noDeseaParticipar', v)} disabled={isViewing} />
-                                    {ficha.noDeseaParticipar && (
-                                        <div>
-                                            <label className={LBL}>Motivo Manifestado / Dificultades</label>
-                                            <textarea className={getTextareaClass(isViewing)} rows={2} value={ficha.motivoNoDesea} onChange={upF('motivoNoDesea')} disabled={isViewing} />
-                                        </div>
-                                    )}
-                                    <CheckCard label="No Resuelve UPE" checked={ficha.noResuelveUPE} onChange={v => upBool('noResuelveUPE', v)} disabled={isViewing} />
                                 </div>
-                            )}
+
+                                <div className={`rounded-[8px] border transition-all ${ficha.noDeseaParticipar ? 'bg-warning-soft/40 border-warning/20 p-4' : 'border-border p-3'}`}>
+                                    <CheckCard label="No desea participar" checked={ficha.noDeseaParticipar} onChange={v => marcarModalidad('noDeseaParticipar', v)} disabled={isViewing || hayEgreso} />
+                                    {ficha.noDeseaParticipar && (
+                                        <div className="ml-6 mt-3">
+                                            <label className={LBL}>Motivo y acciones realizadas para motivarlo</label>
+                                            <textarea className={getTextareaClass(isViewing)} rows={2} value={ficha.motivoNoDesea} onChange={upF('motivoNoDesea')} disabled={isViewing} />
+                                            <p className="text-[11px] text-fg-muted italic mt-1">Adjuntar evidencia en el cuaderno de campo.</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-border">
@@ -858,21 +1078,26 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
                     <div className="bg-surface border border-border rounded-[8px] overflow-hidden">
                         <div className="px-4 py-3 bg-surface-muted border-b border-border flex items-center gap-2">
                             <FileText size={16} className="text-success" />
-                            <h3 className="font-semibold text-[13px] text-fg">Defensa Pública y Fase del Servicio</h3>
+                            <h3 className="font-semibold text-[13px] text-fg">Defensa Pública</h3>
                         </div>
                         <div className="p-5 space-y-4">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
-                                    <label className={LBL}>Recibe Servicio de Defensa Pública</label>
+                                    <label className={LBL}>Recibe servicio de defensa pública</label>
                                     <select className={getSelectClass(isViewing)} value={ficha.recibeDefensaPublica} onChange={upF('recibeDefensaPublica')} disabled={isViewing}>
                                         <option value="">Seleccionar…</option><option value="SI">SÍ</option><option value="NO">NO</option>
                                     </select>
                                 </div>
+                                {/* En el formato oficial esta pregunta va en la misma
+                                    fila que defensa pública y es una sola por NNA: no
+                                    se pregunta por cada logro. */}
                                 <div>
-                                    <label className={LBL}>Fase al Momento del Egreso</label>
+                                    <label className={LBL}>En qué fase del servicio se encuentra al momento del egreso o retiro</label>
                                     <select className={getSelectClass(isViewing)} value={ficha.faseAlEgreso} onChange={upF('faseAlEgreso')} disabled={isViewing}>
                                         <option value="">Seleccionar…</option>
-                                        <option value="FASE I">FASE I</option><option value="FASE II">FASE II</option><option value="FASE III">FASE III</option>
+                                        <option value="FASE I">FASE I</option>
+                                        <option value="FASE II">FASE II</option>
+                                        <option value="FASE III">FASE III</option>
                                     </select>
                                 </div>
                             </div>
@@ -880,46 +1105,6 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
                                 <label className={LBL}>Descripción (Defensa Pública)</label>
                                 <textarea className={getTextareaClass(isViewing)} rows={3} value={ficha.descripcionDefensa} onChange={upF('descripcionDefensa')} placeholder="Detalles del servicio de defensa pública…" disabled={isViewing} />
                             </div>
-                        </div>
-                    </div>
-
-                    <div className="bg-surface border border-border rounded-[8px] overflow-hidden">
-                        <div className="px-4 py-3 bg-surface-muted border-b border-border flex items-center gap-2">
-                            <CheckCircle2 size={16} className="text-success" />
-                            <h3 className="font-semibold text-[13px] text-fg">Logros Cumplidos</h3>
-                        </div>
-                        <div className="p-5 space-y-2">
-                            {[
-                                { id: 1, text: 'Niñas, niños y adolescentes dejan la situación de calle, ejerciendo permanentemente sus derechos (identidad, salud, alimentación, educación, recreación, entre otros)' },
-                                { id: 2, text: 'Las niñas, niños y adolescentes desarrollan capacidades de autoprotección y habilidades para la vida' },
-                                { id: 3, text: 'Las niñas, niños y adolescentes hacen uso de programas y servicios que restituyen el ejercicio de sus derechos' },
-                                { id: 4, text: 'Persona adulta responsable presenta capacidades para garantizar la protección integral de las niñas, niños y adolescentes usuarios/as del servicio' },
-                                { id: 5, text: 'Las/os NNA presentan y desarrollan sus proyectos de vida con el cumplimiento de algunas de sus metas según su temporalidad' },
-                                { id: 6, text: 'Padres, madres o tutor cuenta con herramientas para asumir el cuidado de sus hijos' },
-                            ].map(logro => (
-                                <label
-                                    key={logro.id}
-                                    className={`flex gap-3 items-start px-3 py-2.5 rounded-[6px] border cursor-pointer transition-all ${
-                                        ficha.logros[logro.id]
-                                            ? 'border-success bg-success-soft text-success'
-                                            : 'border-border hover:border-success hover:bg-success-soft/30 text-fg-2'
-                                    } ${isViewing ? 'opacity-70 cursor-not-allowed' : ''}`}
-                                >
-                                    <input
-                                        type="checkbox"
-                                        className="mt-0.5 flex-shrink-0"
-                                        checked={ficha.logros[logro.id]}
-                                        onChange={() => !isViewing && toggleLogro(logro.id)}
-                                        disabled={isViewing}
-                                    />
-                                    <div className="text-[13px]">
-                                        <span className="font-bold mr-1.5">
-                                            Logro {logro.id}:
-                                        </span>
-                                        <span>{logro.text}</span>
-                                    </div>
-                                </label>
-                            ))}
                         </div>
                     </div>
 

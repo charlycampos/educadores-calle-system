@@ -567,7 +567,39 @@ class OracleTallerRepository:
                 for row in await cur.fetchall():
                     t = self._row_to_dict(row, columns)
                     t["asiste"] = bool(t.get("asiste", 0))
+                    t["familiaresAcompanantes"] = []
                     result.append(t)
+
+                # Quién de su familia lo acompañó a cada taller. Es el dato que
+                # sostiene los indicadores del F05 sobre el adulto responsable,
+                # y hasta ahora no se veía en ninguna parte del expediente.
+                if result and await familiares_habilitados():
+                    ids = [t["id"] for t in result if t.get("id")]
+                    if ids:
+                        marcas = ", ".join(f":t{i}" for i in range(len(ids)))
+                        binds = {f"t{i}": v for i, v in enumerate(ids)}
+                        binds["nna"] = nna_id
+                        await cur.execute(
+                            f"""
+                            SELECT pt.TALLER_ID, f.NOMBRES, f.PARENTESCO, pt.ASISTE
+                              FROM PARTICIPANTE_TALLER pt
+                              JOIN NNA_FAMILIAR f ON f.ID = pt.FAMILIAR_ID
+                             WHERE pt.TIPO = 'FAMILIAR'
+                               AND pt.TALLER_ID IN ({marcas})
+                               AND f.CARPETA_ID = (SELECT CARPETA_ID FROM NNA WHERE ID = :nna)
+                            """,
+                            binds,
+                        )
+                        por_taller = {}
+                        for taller_id, nombres, parentesco, asiste in (await cur.fetchall() or []):
+                            por_taller.setdefault(taller_id, []).append({
+                                "nombres": nombres,
+                                "parentesco": parentesco,
+                                "asistio": bool(asiste),
+                            })
+                        for t in result:
+                            t["familiaresAcompanantes"] = por_taller.get(t["id"], [])
+
                 return result
 
     async def list_candidatos(self, taller_id: int, rol: str, user_id: int, sede_id: int) -> list:

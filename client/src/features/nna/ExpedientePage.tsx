@@ -355,7 +355,12 @@ export const ExpedientePage = () => {
 
     return (
         <>
-        <div className="min-h-screen bg-bg space-y-6">
+        {/* Sin `min-h-screen`: pedía 100vh dentro de un panel que ya tiene su
+            propio scroll y arranca debajo de la cabecera fija, así que sobraba
+            en blanco justo lo que mide esa cabecera más el padding. Con
+            formularios cortos —el F13 al marcar una modalidad— el hueco
+            quedaba a la vista. */}
+        <div className="bg-bg space-y-6">
             {/* Header del Expediente */}
             <div className="bg-surface border-b border-border">
                 <div className="w-full px-6 py-4">
@@ -561,7 +566,7 @@ export const ExpedientePage = () => {
                             active={activeTab === 'egreso'}
                             onClick={() => setActiveTab('egreso')}
                             icon={CheckCircle2}
-                            label="Ficha de Egreso"
+                            label="Ficha de Egreso – Retiro"
                             subLabel="Formato 13"
                         />
                     </div>

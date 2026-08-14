@@ -504,7 +504,83 @@ El equipo de Atención de Urgencia realiza recorridos nocturnos en lugares de ma
 > obtienen automáticamente de la ficha F03 de esos NNA — el educador solo marca con
 > checks, descarga el PDF y lo hace firmar en campo. Detalle en `CAMBIOS_TALLERES_FAMILIAS.md`.
 | **F12** | Ficha de Seguimiento Familiar — Consejería | Fase III — en cada visita de seguimiento familiar |
-| **F13** | Ficha de Egreso / Retiro | Al finalizar el servicio o al retirar al NNA |
+
+> **F12 en el sistema (08/2026):** se quitaron *Cierre y Evaluación* (evaluación de la
+> visita y próxima visita programada) y *Término del Seguimiento* (fecha de término): la
+> ficha registra un hecho puntual —una consejería, un acuerdo— y no un proceso con
+> inicio y fin. Las columnas quedan en Oracle por las fichas ya cargadas, pero el
+> formulario dejó de escribirlas. "Acuerdos / Compromisos" pasó a llamarse **Resultados
+> / Compromisos**, como en el formato oficial y en el PDF.
+>
+> **Persona entrevistada:** la familia del NNA sale del Resumen del Caso (F03) y se
+> muestra como botones; al elegir uno se copian nombre, parentesco y teléfono, que
+> quedan editables. Si el entrevistado no está registrado se marca *"Otra persona"*, se
+> escribe a mano y una casilla permite **agregarlo a la familia del NNA**: el dato sube
+> al Resumen y desde la siguiente ficha ya aparece como botón, también en el F11. El
+> parentesco dejó de ser texto libre y usa el catálogo `OPCIONES_VINCULO_TUTOR_2026`,
+> para que los indicadores por vínculo no se partan entre "Mamá", "madre" y "MADRE".
+> Ver `PRINCIPIO_RESUMEN_DEL_CASO.md`.
+>
+> **Educador responsable:** dejó de pedirse. Sale del usuario con la sesión abierta —era
+> una casilla escribible que llegaba con el texto "Usuario Actual" de relleno y así se
+> imprimía.
+>
+> **Firmas (`PanelFirmas`, componente compartido):** cada ficha se firma con los tres
+> firmantes del Anexo 10 —entrevistado, usuario/a y educador/a—, cuyos nombres salen del
+> expediente y no se escriben. Dos caminos, como en la ficha de compromiso (F09):
+> *firma en pantalla* (cada quien traza con el dedo; se estampa en el PDF y se folia en
+> el expediente) o *firma en papel* (se descarga la ficha, se firma con lapicero y se
+> sube la foto o el escaneo). Firmar no es obligatorio para guardar: la ficha se registra
+> igual y las firmas pueden agregarse después desde la tabla. Las firmas **no se guardan
+> en tablas**: viven estampadas en el PDF foliado, que es el documento con valor.
+>
+> **Borrador:** la ficha puede guardarse como **BORRADOR** —el educador llena en campo y
+> no siempre puede terminar— y continuarse después desde el lápiz de la tabla. Un
+> borrador se ve con su etiqueta y **no se firma ni se folia** hasta finalizarlo. Las
+> fichas anteriores a la migración `012` se consideran finalizadas.
+>
+> **Dictado por voz (`CampoDictado`, componente compartido):** las cuatro casillas largas
+> —antecedentes, descripción, resultados y observaciones— llevan el mismo micrófono del
+> Diario de Campo. Se presiona una vez para empezar y otra para detener; si Chrome corta
+> por silencio se reconecta solo, y tras un minuto sin oír nada se apaga avisando.
+> Requiere conexión: Chrome procesa la voz en sus servidores.
+| **F13** | Ficha de Egreso – Retiro | Al finalizar el servicio o al retirar al NNA |
+
+> **F13 en el sistema (08/2026):** la ficha se llama **Ficha de Egreso – Retiro** en
+> todo el sistema (menú del expediente, asistente, historial y avisos), a pedido de la
+> reunión del 11/08/2026: egreso y retiro son conceptos distintos y el nombre corto
+> hacía pensar que el módulo solo servía para los casos que cumplen objetivos. El PDF
+> conserva su encabezado oficial *FICHA DE EGRESO/RETIRO USUARIO/A DEL SERVICIO DE
+> EDUCADORES DE CALLE - INABIF*, que ya distinguía ambos. El paso *Modalidad de Egreso / Retiro* reproduce el formato
+> oficial con **seis casillas**: tres de egreso (cumplió fases, mayoría de edad,
+> derivación por servicios complementarios) y tres de retiro (interés superior del NNA,
+> no ubicado —3 meses o más—, no desea participar). **Los dos grupos son excluyentes
+> entre sí**: al marcar cualquier casilla de egreso, el bloque de retiro se deshabilita
+> entero (y al revés), porque un caso o egresa o se retira. Dentro del mismo grupo sí
+> pueden marcarse varias —cumplió fases *y* mayoría de edad, por ejemplo—. Al desmarcar
+> la última casilla del grupo, el otro vuelve a habilitarse; y al desmarcar una casilla
+> se borran sus campos, para que no quede en la ficha una institución derivada de una
+> modalidad que ya no aplica. Cada casilla **despliega sus propios campos al marcarse**,
+> tal como en el papel:
+>
+> | Casilla | Lo que se abre |
+> |---------|----------------|
+> | Cumplió fases | Tabla de los 6 logros con casilla *Cumplido* + observaciones |
+> | Mayoría de edad | Derechos restituidos (identidad, salud, educación, recreación, otros), observaciones y entrega de directorio SÍ/NO |
+> | Derivación servicios complementarios | Institución derivada, observaciones y recordatorio de adjuntar la evidencia |
+> | Interés superior del NNA | Trata / infractor / otros + acciones realizadas |
+> | No ubicado | Acciones realizadas para ubicarlo (evidencia en cuaderno de campo) |
+> | No desea participar | Motivo y acciones para motivarlo (evidencia en cuaderno de campo) |
+>
+> La tabla de logros vive junto a su casilla —no en un paso aparte— porque el formato
+> oficial solo la contempla para el egreso por cumplimiento de fases. El paso 3 quedó
+> como *Firmas y Cierre*.
+>
+> **La fase del servicio es un dato aparte:** *"En qué fase del servicio se encuentra al
+> momento del egreso o retiro"* (FASE I / II / III) es **una sola respuesta por NNA**, no
+> una por logro. Va en el combo `faseAlEgreso`, en la misma fila que *Recibe servicio de
+> defensa pública*, igual que en el papel.
+>
 | **F14** | Autorización de Padres para Eventos | Fase II — cuando el NNA asiste a eventos sin el adulto |
 | **F15** | Ficha de Atención Inmediata | Atención de Urgencia — al recibir un reporte |
 

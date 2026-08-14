@@ -80,6 +80,51 @@ DIAS_LABEL = {
     "viernes": "Vie", "sabado": "Sáb", "domingo": "Dom",
 }
 
+# Orden de la semana: los diccionarios de la agenda no garantizan que los días
+# vengan en orden, y "Mié, Lun, Vie" en un documento oficial se lee mal.
+_ORDEN_DIAS = ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo"]
+
+
+def formatear_agenda(agenda: dict) -> str:
+    """La agenda semanal, legible.
+
+    Cada día llega como {'activo': True, 'turno1Inicio': '08:00', ...}. El PDF
+    lo imprimía tal cual, así que en el documento salía el diccionario de
+    Python entero. Acá se traduce a "Lun 08:00-12:00" y se omiten los días
+    inactivos, que son ruido en una ficha que se imprime y se archiva.
+    """
+    if not isinstance(agenda, dict):
+        return ""
+
+    partes = []
+    for dia in _ORDEN_DIAS + [d for d in agenda if d not in _ORDEN_DIAS]:
+        datos = agenda.get(dia)
+        if not datos:
+            continue
+        etiqueta = DIAS_LABEL.get(dia, str(dia).capitalize())
+
+        # Formas antiguas: lista de rangos o texto suelto.
+        if isinstance(datos, list):
+            if datos:
+                partes.append(f"{etiqueta} {', '.join(map(str, datos))}")
+            continue
+        if not isinstance(datos, dict):
+            partes.append(f"{etiqueta} {datos}")
+            continue
+
+        if not datos.get("activo"):
+            continue
+        turnos = []
+        for ini, fin in (("turno1Inicio", "turno1Fin"), ("turno2Inicio", "turno2Fin")):
+            desde, hasta = (datos.get(ini) or "").strip(), (datos.get(fin) or "").strip()
+            if desde and hasta:
+                turnos.append(f"{desde}-{hasta}")
+            elif desde:
+                turnos.append(f"desde {desde}")
+        partes.append(f"{etiqueta} {' y '.join(turnos)}".strip() if turnos else etiqueta)
+
+    return " · ".join(partes)
+
 
 def generate_f04_pdf(diag_data: dict, nna_data: dict, output_path: str) -> str:
     """
@@ -312,19 +357,17 @@ def generate_f04_pdf(diag_data: dict, nna_data: dict, output_path: str) -> str:
     if actividades:
         act_rows = []
         for a in actividades:
-            agenda = a.get("agenda") or {}
-            dias = []
-            for dia, rangos in agenda.items():
-                if rangos:
-                    if isinstance(rangos, list):
-                        dias.append(f"{DIAS_LABEL.get(dia, dia)}: {', '.join(map(str, rangos))}")
-                    else:
-                        dias.append(f"{DIAS_LABEL.get(dia, dia)}: {rangos}")
+            nombre = a.get("actividad") or ""
+            if str(nombre).upper().startswith("OTRO") and a.get("actividadEspecifique"):
+                nombre = a["actividadEspecifique"]
+            permanencia = a.get("permanencia") or a.get("tiempo")
+            if not permanencia and a.get("tiempoValor"):
+                permanencia = f'{a.get("tiempoValor")} {str(a.get("tiempoUnidad") or "").lower()}'.strip()
             act_rows.append([
-                Paragraph(c(a.get("actividad")), value_style),
+                Paragraph(c(str(nombre).replace("_", " ")), value_style),
                 Paragraph(c(a.get("acompanamiento") or a.get("acompanado")), value_style),
-                Paragraph(c(a.get("permanencia") or a.get("tiempo")), value_style),
-                Paragraph(c("; ".join(dias)), value_style),
+                Paragraph(c(permanencia), value_style),
+                Paragraph(c(formatear_agenda(a.get("agenda") or {})), value_style),
             ])
         c4 = doc.width / 4
         story.append(grid_table(

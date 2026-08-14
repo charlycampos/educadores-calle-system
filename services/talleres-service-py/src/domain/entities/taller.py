@@ -142,12 +142,28 @@ class ActualizarParticipanteRequest(BaseModel):
 class EducadorResponsable(BaseModel):
     nombreCompleto: Optional[str] = None
 
+class FamiliarAcompanante(BaseModel):
+    """Familiar del NNA que participó en el mismo taller.
+
+    Sostiene los indicadores del F05 sobre el adulto responsable: sin esto no
+    había forma de saber, desde el expediente, si la familia acompaña.
+    """
+    nombres: str
+    parentesco: Optional[str] = None
+    asistio: bool = False
+
+
 class TallerResponse(TallerBase):
     id: int
     fecha_ejecucion: Optional[datetime] = None
     estado: str
     fecha_registro: datetime
     participantes: Optional[List[ParticipanteResponse]] = None
+    # Solo lo llena el historial por NNA: quién de su familia fue con él.
+    familiaresAcompanantes: Optional[List[FamiliarAcompanante]] = None
+    # Asistencia y evaluación del propio NNA en ese taller.
+    asiste: Optional[bool] = None
+    evaluacion: Optional[str] = None
 
     # Campos camelCase para compatibilidad con el frontend
     nombre: Optional[str] = None

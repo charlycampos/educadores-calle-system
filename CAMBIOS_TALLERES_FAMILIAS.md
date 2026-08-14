@@ -875,3 +875,78 @@ en el modal de familiares del F03.
 
 **Verificado en el navegador** sobre el taller "Habilidades Socioemocionales": el F10 marca
 H y M y la casilla NN; el F11 muestra la columna del hijo/hermano con el NNA acompañado.
+
+---
+
+## 20. Expediente — historial de participación en talleres
+
+La sección **Talleres Socioeducativos (Formatos 07 y 08)** conserva su nombre y su lugar en
+el menú. Lo que cambia es lo que muestra.
+
+### 20.1 Se quita el taller individual
+
+*"Si hace un taller X para una fecha, solo en esa debe colocar lo que participaron; si lo
+hace en otra fecha tiene que hacer otro registro de taller"*. El taller es grupal y de una
+fecha: el F10 tiene quince filas y el F11 se llama "HERMANOS(AS)-PADRES/TUTORES". Un taller
+de un solo NNA produce una hoja con una fila y catorce en blanco.
+
+Se quitó el botón **Planificar Taller Individual (F7)** del expediente. Queda solo
+*Inscribir en Taller Grupal*. Los talleres individuales ya registrados se siguen viendo.
+
+Efecto colateral que se corta de raíz: esos talleres se creaban con `dirigidoA: 'NNA'`,
+valor que ningún formato reconocía — el origen del bug de las casillas "Dirigido a"
+(ver 19.1).
+
+> El modal de planificación y su manejador siguen en el código, ya sin acceso. Se dejaron
+> a pedido expreso: la instrucción fue quitar el botón, no desmontar la función.
+
+### 20.2 Con quién de su familia asistió
+
+Cada tarjeta muestra ahora los familiares del NNA que participaron en ese mismo taller, con
+nombre y parentesco. Los que asistieron van resaltados; los inscritos que no asistieron,
+tachados.
+
+El dato existía —`PARTICIPANTE_TALLER` guarda tipo NNA/FAMILIAR y el familiar comparte
+`CARPETA_ID` con el NNA— pero no se veía en ninguna parte del expediente. Sostiene los
+indicadores del F05 sobre el adulto responsable (3 y 4 de la Fase I, 6 de la Fase II).
+
+`/talleres/historial/{nna_id}` devolvía `participantes: []`. Se agregó una segunda consulta
+que trae los familiares de la misma carpeta por taller, y **se declaró
+`familiaresAcompanantes` en `TallerResponse`**: sin declararlo, Pydantic lo descartaba en
+silencio — el mismo error que ya había cometido con la edad en el F10.
+
+### 20.3 Registros, no tarjetas
+
+La grilla de tarjetas se reemplazó por una tabla. Con nueve talleres obligaba a hacer
+scroll para armarse una idea que debería leerse de un vistazo.
+
+**Línea de asistencia.** Una fila de cuadros en orden cronológico: verde asistió, rojo
+faltó, y el ícono de personas marca los que fueron con familia. Muestra el patrón del
+proceso —si viene sostenido o dejó de venir hace dos meses—, que es lo que hay que juzgar
+para marcar el indicador 2 del F05 y hasta ahora no se veía en ninguna parte.
+
+**Filtros que además cuentan.** "Faltó · 2" informa antes de pulsarlo.
+
+**Tabla densa.** Fecha, taller, estado del NNA, quién lo acompañó y la acción pendiente.
+La evaluación del F08 va como segunda línea en gris bajo el nombre del taller, solo si
+existe. El acompañante muestra el primero y `+N` con el detalle en el tooltip: en 680px no
+entran tres nombres. Tras 15 filas aparece "ver los restantes".
+
+Estados que resuelven casos reales: **Faltó** con familia acompañante (pasa: la madre va y
+el chico no), y **Sin F08** en ámbar, que es trabajo pendiente del educador.
+
+**Solo cuentan talleres ejecutados** para las cifras; uno planificado todavía no dice nada
+del proceso.
+
+Y un botón que copia el párrafo listo para la sección III del Informe Situacional:
+
+> *"HAVER CAMPOS participó en 7 de 9 talleres socioeducativos ejecutados por el servicio,
+> siendo su última participación el 07/08/2026. En 4 de ellos asistió acompañado de Karen
+> Campos Guerra."*
+
+Hoy el educador redacta eso a mano revisando taller por taller.
+
+**Límite conocido:** el acompañamiento familiar depende de que el educador haya registrado
+al familiar como participante. Si el padre firmó el F11 pero nadie lo inscribió en el
+sistema, el contador saldrá bajo. Conviene confirmarlo con los educadores antes de usar el
+dato como indicador.

@@ -102,6 +102,22 @@ def generate_f12_pdf(seg_data: dict, nna_data: dict, output_path: str) -> str:
     lugar_raw  = c(seg_data.get('lugar_seguimiento') or seg_data.get('LUGAR_SEGUIMIENTO'), 'DOMICILIO').upper()
     lugar_text = lugar_map.get(lugar_raw, lugar_raw.replace('_', ' ').title())
 
+    # El parentesco se guarda como código del catálogo OPCIONES_VINCULO_TUTOR_2026
+    # (el mismo que usa la familia del F03). Sin traducir, la ficha impresa
+    # saldría con un "1" en la casilla Parentesco.
+    # Las fichas antiguas guardaron el texto directo: si no es un código
+    # conocido, se imprime tal cual.
+    vinculo_map = {
+        '1': 'Padre/Madre',
+        '2': 'Tío/a',
+        '3': 'Abuelo/a',
+        '4': 'Hermano/a',
+        '5': 'Otro familiar',
+        '6': 'Otro no familiar',
+    }
+    parentesco_raw  = str(seg_data.get('parentesco') or seg_data.get('PARENTESCO') or '').strip()
+    parentesco_text = vinculo_map.get(parentesco_raw, parentesco_raw)
+
     fecha_raw = seg_data.get('fecha') or seg_data.get('FECHA') or ''
     fecha_str = str(fecha_raw)[:10] if fecha_raw else datetime.now().strftime('%Y-%m-%d')
     try:
@@ -124,7 +140,7 @@ def generate_f12_pdf(seg_data: dict, nna_data: dict, output_path: str) -> str:
         [L("NNA:"), V(nna_nombre),
          L("Hora:"), V(seg_data.get('hora') or seg_data.get('HORA'))],
         [L("Entrevistado:"), V(seg_data.get('entrevistado') or seg_data.get('ENTREVISTADO')),
-         L("Parentesco:"), V(seg_data.get('parentesco') or seg_data.get('PARENTESCO'))],
+         L("Parentesco:"), V(parentesco_text)],
         [L("Lugar:"), V(lugar_text),
          L("Teléfono:"), V(seg_data.get('telefono') or seg_data.get('TELEFONO'))],
         [L("Dirección:"), Paragraph(c(seg_data.get('direccion') or seg_data.get('DIRECCION')), value_style),

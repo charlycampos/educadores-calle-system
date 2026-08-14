@@ -129,6 +129,40 @@ async def obtener_diagnostico_prellenado(nna_id: int, repo: OracleDiagnosticoRep
     return await use_case.obtener_diagnostico_prellenado(nna_id)
 
 
+def _pdf_desactualizado(filepath: str, diag: dict) -> bool:
+    """¿Hay que volver a generar el PDF?
+
+    El PDF se guarda en disco y antes solo se generaba si el archivo no
+    existía. Eso lo dejaba congelado: si el educador corregía la ficha —o si
+    cambiaba el propio generador— el documento seguía siendo el viejo y no
+    había forma de refrescarlo salvo borrando el archivo a mano.
+
+    Se regenera cuando el archivo es más antiguo que la última edición de la
+    ficha, o que el módulo que lo dibuja.
+    """
+    if not os.path.exists(filepath):
+        return True
+
+    generado = os.path.getmtime(filepath)
+
+    editado = diag.get("updated_at") or diag.get("created_at")
+    if editado is not None and hasattr(editado, "timestamp"):
+        try:
+            if editado.timestamp() > generado:
+                return True
+        except (OSError, OverflowError, ValueError):
+            pass
+
+    try:
+        from src.infrastructure.services import pdf_generator_f04
+        if os.path.getmtime(pdf_generator_f04.__file__) > generado:
+            return True
+    except Exception:
+        pass
+
+    return False
+
+
 @router.get("/{id}/pdf/pages")
 async def get_diagnostico_pdf_pages(id: int, request: Request, token: Optional[str] = None):
     from pypdf import PdfReader
@@ -150,7 +184,7 @@ async def get_diagnostico_pdf_pages(id: int, request: Request, token: Optional[s
         raise HTTPException(status_code=404, detail="Diagnóstico no encontrado")
 
     filepath = _get_pdf_path(diag)
-    if not os.path.exists(filepath):
+    if _pdf_desactualizado(filepath, diag):
         nna_data = await _get_nna_data(diag.get("nna_id"))
         try:
             generate_f04_pdf(diag, nna_data, filepath)
@@ -185,7 +219,7 @@ async def get_diagnostico_pdf(id: int, request: Request, token: Optional[str] = 
         raise HTTPException(status_code=404, detail="Diagnóstico no encontrado")
 
     filepath = _get_pdf_path(diag)
-    if not os.path.exists(filepath):
+    if _pdf_desactualizado(filepath, diag):
         nna_data = await _get_nna_data(diag.get("nna_id"))
         try:
             generate_f04_pdf(diag, nna_data, filepath)

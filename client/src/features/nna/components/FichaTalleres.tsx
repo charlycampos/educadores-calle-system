@@ -1,8 +1,9 @@
+import { etiquetaParentesco } from '../../../utils/parentesco';
 import { useState, useEffect } from 'react';
 import { confirmar } from '../../../components/ui/ConfirmDialog';
 import { toast } from '../../../components/ui/Toast';
 import {
-    Calendar, MapPin, CheckCircle2, User, Plus, Link2,
+    Calendar, MapPin, CheckCircle2, User, Users, Plus, Link2,
     StickyNote, AlertTriangle, Lightbulb, BookOpen,
     Clock, Save, X, Edit3, CheckSquare, Target, FileDown, Loader2
 } from 'lucide-react';
@@ -264,6 +265,55 @@ export const FichaTalleres = ({ nna }: FichaTalleresProps) => {
         );
     }
 
+    // Solo los talleres ya ejecutados cuentan para la participación: uno
+    // planificado todavía no dice nada del proceso del NNA.
+    const resumen = (() => {
+        const realizados = talleres.filter((t: any) => t.estado !== 'PLANIFICADO');
+        const asistio = realizados.filter((t: any) => (t.asistio ?? t.asiste)).length;
+        const conFamilia = realizados.filter(
+            (t: any) => (t.familiaresAcompanantes || []).some((f: any) => f.asistio)
+        ).length;
+
+        const familiares = [...new Set(
+            realizados.flatMap((t: any) =>
+                (t.familiaresAcompanantes || [])
+                    .filter((f: any) => f.asistio)
+                    .map((f: any) => f.nombres)
+            )
+        )] as string[];
+
+        const fechas = realizados
+            .filter((t: any) => (t.asistio ?? t.asiste) && t.fecha)
+            .map((t: any) => new Date(t.fecha).getTime())
+            .filter((n: number) => Number.isFinite(n));
+
+        return {
+            convocados: realizados.length,
+            asistio,
+            conFamilia,
+            familiares,
+            ultima: fechas.length ? new Date(Math.max(...fechas)).toLocaleDateString('es-PE') : '',
+        };
+    })();
+
+    /** El párrafo que el educador pega en la sección III del informe. */
+    const copiarResumen = async () => {
+        const nombre = `${nna?.nombres ?? ''} ${nna?.apellidoPaterno ?? ''}`.trim();
+        let texto = `${nombre} participó en ${resumen.asistio} de ${resumen.convocados} talleres socioeducativos ejecutados por el servicio`;
+        if (resumen.ultima) texto += `, siendo su última participación el ${resumen.ultima}`;
+        texto += '.';
+        if (resumen.conFamilia > 0) {
+            texto += ` En ${resumen.conFamilia} de ellos asistió acompañado de ${resumen.familiares.join(', ')}.`;
+        }
+        try {
+            await navigator.clipboard.writeText(texto);
+            toast.success('Resumen copiado. Pégalo en la sección III del informe.');
+        } catch {
+            // Sin permiso de portapapeles el educador igual necesita el texto.
+            toast.info(texto);
+        }
+    };
+
     return (
         <div className="space-y-6">
             {/* Header con acciones */}
@@ -279,14 +329,7 @@ export const FichaTalleres = ({ nna }: FichaTalleresProps) => {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <button
-                            onClick={() => setShowPlanificarModal(true)}
-                            className="bg-surface text-primary px-5 py-3 rounded-[12px] font-bold flex items-center justify-center gap-2 hover:bg-surface-muted transition-all shadow-lg active:scale-95"
-                        >
-                            <Plus size={20} />
-                            Planificar Taller Individual (F7)
-                        </button>
+                    <div className="grid grid-cols-1 gap-4">
                         <button
                             onClick={() => {
                                 loadTalleresDisponibles();
@@ -301,42 +344,16 @@ export const FichaTalleres = ({ nna }: FichaTalleresProps) => {
                 </div>
             </div>
 
-            {/* Listados por estado */}
-            <div className="grid grid-cols-1 gap-8">
-                {planificados.length > 0 && (
-                    <SeccionTalleres
-                        titulo="📋 Talleres Planificados"
-                        subtitulo="Pendientes de ejecución"
-                        talleres={planificados}
-                        color="blue"
-                        onSelect={setSelectedTaller}
-                        onAction={handleEjecutar}
-                        actionLabel="Marcar como Ejecutado"
-                    />
-                )}
-
-                {ejecutados.length > 0 && (
-                    <SeccionTalleres
-                        titulo="⏳ Talleres por Evaluar"
-                        subtitulo="Actividades ejecutadas con pendiente de F8"
-                        talleres={ejecutados}
-                        color="yellow"
-                        onSelect={setSelectedTaller}
-                        onAction={(t: any) => openEvaluar(t)}
-                        actionLabel="Evaluar (F8)"
-                    />
-                )}
-
-                {evaluados.length > 0 && (
-                    <SeccionTalleres
-                        titulo="✅ Historial de Talleres"
-                        subtitulo="Evaluaciones completadas"
-                        talleres={evaluados}
-                        color="green"
-                        onSelect={setSelectedTaller}
-                    />
-                )}
-            </div>
+            {talleres.length > 0 && (
+                <HistorialTalleres
+                    talleres={talleres}
+                    resumen={resumen}
+                    onSelect={setSelectedTaller}
+                    onEjecutar={handleEjecutar}
+                    onEvaluar={openEvaluar}
+                    onCopiarResumen={copiarResumen}
+                />
+            )}
 
             {/* Empty state */}
             {talleres.length === 0 && !loading && (
@@ -595,72 +612,224 @@ export const FichaTalleres = ({ nna }: FichaTalleresProps) => {
 };
 
 // Componente para sección de talleres
-const SeccionTalleres = ({ titulo, subtitulo, talleres, color, onSelect, onAction, actionLabel }: any) => {
-    const colorClasses = {
-        blue: 'bg-primary-soft/10 border-primary/20 text-primary',
-        yellow: 'bg-warning-soft/10 border-warning/20 text-warning',
-        green: 'bg-success-soft/10 border-success/20 text-success',
+/** "Padre o madre" no entra al lado del nombre completo en una celda de tabla. */
+const abreviarParentesco = (codigo: any): string => {
+    const etiqueta = etiquetaParentesco(codigo) || '';
+    return etiqueta
+        .replace(/Padre o madre/i, 'Padre/madre')
+        .replace(/Otro no familiar/i, 'No familiar')
+        .replace(/Otro familiar/i, 'Familiar');
+};
+
+/**
+ * Historial de participación del NNA en talleres, en registros.
+ *
+ * Se reemplazó la grilla de tarjetas: con nueve talleres obligaba a hacer
+ * scroll para armarse una idea que debe leerse de un vistazo. La tabla y la
+ * línea de asistencia muestran el patrón —si viene sostenido o dejó de venir—
+ * que es justo lo que hay que juzgar para marcar el indicador 2 del F05.
+ */
+const HistorialTalleres = ({ talleres, resumen, onSelect, onEjecutar, onEvaluar, onCopiarResumen }: any) => {
+    const [filtro, setFiltro] = useState<'todos' | 'asistio' | 'falto' | 'familia'>('todos');
+    const [verTodos, setVerTodos] = useState(false);
+
+    const asistioDe = (t: any) => (t.asistio !== undefined ? t.asistio : t.asiste);
+    const conFamilia = (t: any) => (t.familiaresAcompanantes || []).some((f: any) => f.asistio);
+    const realizados = talleres.filter((t: any) => t.estado !== 'PLANIFICADO');
+
+    const conteos = {
+        todos: talleres.length,
+        asistio: realizados.filter(asistioDe).length,
+        falto: realizados.filter((t: any) => !asistioDe(t)).length,
+        familia: realizados.filter(conFamilia).length,
     };
 
-    const accentClasses = {
-        blue: 'border-primary hover:bg-primary-soft/10',
-        yellow: 'border-warning hover:bg-warning-soft/10',
-        green: 'border-success hover:bg-success-soft/10',
+    const filtrados = talleres.filter((t: any) => {
+        if (filtro === 'todos') return true;
+        if (t.estado === 'PLANIFICADO') return false;
+        if (filtro === 'asistio') return asistioDe(t);
+        if (filtro === 'falto') return !asistioDe(t);
+        return conFamilia(t);
+    });
+
+    // Los más recientes primero: es lo que el educador necesita al abrir.
+    const ordenados = [...filtrados].sort(
+        (a: any, b: any) => new Date(b.fecha || 0).getTime() - new Date(a.fecha || 0).getTime()
+    );
+    const visibles = verTodos ? ordenados : ordenados.slice(0, 15);
+
+    const FILTROS: Array<[typeof filtro, string]> = [
+        ['todos', 'Todos'], ['asistio', 'Asistió'], ['falto', 'Faltó'], ['familia', 'Con familia'],
+    ];
+
+    /** Cronología, del más antiguo al más reciente: así se lee el proceso. */
+    const linea = [...realizados].sort(
+        (a: any, b: any) => new Date(a.fecha || 0).getTime() - new Date(b.fecha || 0).getTime()
+    );
+
+    const fechaCorta = (iso: any) => {
+        if (!iso) return 's/f';
+        const d = new Date(iso);
+        return Number.isNaN(d.getTime())
+            ? 's/f'
+            : d.toLocaleDateString('es-PE', { day: '2-digit', month: 'short' });
+    };
+
+    const estadoNna = (t: any) => {
+        if (t.estado === 'PLANIFICADO') return { txt: 'Planificado', cls: 'bg-surface-muted text-fg-muted' };
+        if (!asistioDe(t)) return { txt: 'Faltó', cls: 'bg-danger-soft text-danger' };
+        if (t.estado === 'EJECUTADO') return { txt: 'Sin F08', cls: 'bg-warning-soft text-warning' };
+        return { txt: 'Asistió', cls: 'bg-success-soft text-success' };
     };
 
     return (
-        <div className="space-y-4">
-            <div className="flex items-baseline gap-3 mb-2 px-2">
-                <h3 className="text-lg font-black text-fg tracking-tight">{titulo}</h3>
-                <span className="text-[10px] uppercase font-bold text-fg-muted tracking-widest">{subtitulo}</span>
+        <div className="space-y-3">
+            {/* Cifras y línea de asistencia */}
+            <div className="flex flex-wrap items-end gap-6">
+                <div>
+                    <p className="text-[11px] text-fg-muted">Asistencia</p>
+                    <p className="text-2xl font-black text-fg leading-none">
+                        {resumen.asistio}<span className="text-sm font-bold text-fg-muted"> / {resumen.convocados}</span>
+                    </p>
+                </div>
+                <div>
+                    <p className="text-[11px] text-fg-muted">Con familia</p>
+                    <p className="text-2xl font-black text-fg leading-none">
+                        {resumen.conFamilia}<span className="text-sm font-bold text-fg-muted"> / {resumen.convocados}</span>
+                    </p>
+                </div>
+                {linea.length > 0 && (
+                    <div className="flex-1 min-w-[180px]">
+                        <p className="text-[11px] text-fg-muted mb-1.5">Línea de asistencia</p>
+                        <div className="flex flex-wrap gap-1">
+                            {linea.map((t: any) => {
+                                const fue = asistioDe(t);
+                                const fam = conFamilia(t);
+                                return (
+                                    <span
+                                        key={t.id}
+                                        title={`${fechaCorta(t.fecha)} · ${t.nombre} · ${fue ? 'asistió' : 'no asistió'}${fam ? ' con familia' : ''}`}
+                                        className={`w-5 h-5 rounded-[4px] flex items-center justify-center text-[9px] ${
+                                            fue ? 'bg-success-soft text-success' : 'bg-danger-soft text-danger'
+                                        }`}
+                                    >
+                                        {fue ? (fam ? <Users size={11} /> : '') : <X size={11} />}
+                                    </span>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {talleres.map((taller: any) => (
-                    <div
-                        key={taller.id}
-                        className={`${colorClasses[color as keyof typeof colorClasses]} border-l-[6px] ${accentClasses[color as keyof typeof accentClasses]} rounded-2xl p-5 shadow-sm hover:translate-x-1 transition-all group relative`}
+            {/* Filtros con su conteo */}
+            <div className="flex flex-wrap items-center gap-1.5">
+                {FILTROS.map(([clave, etiqueta]) => (
+                    <button
+                        key={clave}
+                        onClick={() => { setFiltro(clave); setVerTodos(false); }}
+                        className={`px-2.5 py-1 rounded-[6px] text-[11px] font-bold border transition-colors ${
+                            filtro === clave
+                                ? 'bg-primary text-primary-fg border-primary'
+                                : 'bg-surface text-fg-2 border-border hover:bg-surface-muted'
+                        }`}
                     >
-                        <div className="flex justify-between items-start mb-3 cursor-pointer" onClick={() => onSelect(taller)}>
-                            <div className="flex-1">
-                                <h4 className="font-extrabold text-fg mb-2 group-hover:text-primary transition-colors">{taller.nombre}</h4>
-                                <div className="space-y-1.5">
-                                    <div className="flex items-center gap-2 text-[11px] font-bold text-fg-muted uppercase tracking-tighter">
-                                        <Calendar size={12} className="text-fg-muted" />
-                                        {taller.fecha ? new Date(taller.fecha).toLocaleDateString() : 'S/F'}
-                                        <span className="text-border mx-1">|</span>
-                                        <Clock size={12} className="text-fg-muted" />
-                                        {taller.hora}
-                                    </div>
-                                    <div className="flex items-center gap-2 text-[11px] font-bold text-fg-muted uppercase tracking-tighter">
-                                        <MapPin size={12} className="text-fg-muted" />
-                                        {taller.lugar}
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="flex flex-col items-end gap-2">
-                                {taller.asistio !== undefined && (
-                                    <span className={`flex items-center gap-1.5 px-2 py-1 rounded-[6px] text-[10px] font-black uppercase ${taller.asistio ? 'bg-success-soft text-success' : 'bg-danger-soft text-danger'}`}>
-                                        {taller.asistio ? 'SÍ ASISTIÓ' : 'NO ASISTIÓ'}
-                                    </span>
-                                )}
-                            </div>
-                        </div>
-
-                        {onAction && (
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onAction(taller);
-                                }}
-                                className="mt-4 w-full bg-surface border-2 border-border text-fg-2 py-2.5 rounded-[12px] text-[10px] font-black uppercase tracking-widest hover:border-warning hover:text-warning transition-all flex items-center justify-center gap-2"
-                            >
-                                <Edit3 size={12} />
-                                {actionLabel}
-                            </button>
-                        )}
-                    </div>
+                        {etiqueta} · {conteos[clave]}
+                    </button>
                 ))}
+                {resumen.convocados > 0 && (
+                    <button
+                        onClick={onCopiarResumen}
+                        className="ml-auto px-2.5 py-1 rounded-[6px] text-[11px] font-bold border border-border text-fg-2 hover:bg-surface-muted flex items-center gap-1.5"
+                    >
+                        <StickyNote size={12} /> Copiar para el informe
+                    </button>
+                )}
+            </div>
+
+            {/* Registros */}
+            <div className="border border-border rounded-[12px] overflow-hidden bg-surface">
+                <table className="w-full text-[13px]" style={{ tableLayout: 'fixed' }}>
+                    <thead>
+                        <tr className="bg-surface-muted text-[11px] text-fg-muted">
+                            <th style={{ width: '9%' }} className="text-left px-3 py-2 font-bold">Fecha</th>
+                            <th style={{ width: '39%' }} className="text-left px-3 py-2 font-bold">Taller</th>
+                            <th style={{ width: '11%' }} className="text-left px-3 py-2 font-bold">NNA</th>
+                            <th style={{ width: '29%' }} className="text-left px-3 py-2 font-bold">Acompañado por</th>
+                            <th style={{ width: '12%' }} className="px-3 py-2"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {visibles.map((t: any) => {
+                            const est = estadoNna(t);
+                            const acomp = t.familiaresAcompanantes || [];
+                            return (
+                                <tr key={t.id} className="border-t border-border hover:bg-surface-muted/40">
+                                    <td className="px-3 py-2.5 text-fg-muted align-top whitespace-nowrap">{fechaCorta(t.fecha)}</td>
+                                    <td className="px-3 py-2.5 align-top">
+                                        <button
+                                            onClick={() => onSelect(t)}
+                                            title={t.nombre}
+                                            className="text-left font-semibold text-fg hover:text-primary transition-colors block w-full truncate"
+                                        >
+                                            {t.nombre}
+                                        </button>
+                                        {t.evaluacion?.logros && (
+                                            <p className="text-[11px] text-fg-muted mt-0.5 line-clamp-1">{t.evaluacion.logros}</p>
+                                        )}
+                                    </td>
+                                    <td className="px-3 py-2.5 align-top">
+                                        <span className={`px-2 py-0.5 rounded-[6px] text-[11px] font-bold whitespace-nowrap ${est.cls}`}>
+                                            {est.txt}
+                                        </span>
+                                    </td>
+                                    <td className="px-3 py-2.5 align-top">
+                                        {acomp.length === 0 ? (
+                                            <span className="text-[11px] text-fg-muted">—</span>
+                                        ) : (
+                                            <span
+                                                title={acomp.map((f: any) => `${f.nombres}${f.asistio ? '' : ' (no asistió)'}`).join(' · ')}
+                                                className="text-[11px] font-bold text-primary bg-primary-soft border border-primary/20 px-2 py-0.5 rounded-full inline-block max-w-full truncate"
+                                            >
+                                                {acomp[0].nombres}
+                                                {acomp[0].parentesco ? ` · ${abreviarParentesco(acomp[0].parentesco)}` : ''}
+                                                {acomp.length > 1 ? ` +${acomp.length - 1}` : ''}
+                                            </span>
+                                        )}
+                                    </td>
+                                    <td className="px-3 py-2.5 align-top text-right">
+                                        {t.estado === 'PLANIFICADO' && (
+                                            <button onClick={() => onEjecutar(t)} className="text-[11px] font-bold text-primary hover:underline">
+                                                Ejecutado
+                                            </button>
+                                        )}
+                                        {t.estado === 'EJECUTADO' && (
+                                            <button onClick={() => onEvaluar(t)} className="text-[11px] font-bold text-warning hover:underline">
+                                                Evaluar F08
+                                            </button>
+                                        )}
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                        {visibles.length === 0 && (
+                            <tr className="border-t border-border">
+                                <td colSpan={5} className="px-3 py-6 text-center text-[12px] text-fg-muted">
+                                    Ningún taller con este filtro.
+                                </td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
+
+                {ordenados.length > 15 && !verTodos && (
+                    <button
+                        onClick={() => setVerTodos(true)}
+                        className="w-full py-2.5 text-[11px] font-bold text-fg-muted hover:text-primary border-t border-border transition-colors"
+                    >
+                        Ver los {ordenados.length - 15} restantes
+                    </button>
+                )}
             </div>
         </div>
     );
