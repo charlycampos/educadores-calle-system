@@ -539,6 +539,31 @@ El equipo de Atención de Urgencia realiza recorridos nocturnos en lugares de ma
 > borrador se ve con su etiqueta y **no se firma ni se folia** hasta finalizarlo. Las
 > fichas anteriores a la migración `012` se consideran finalizadas.
 >
+> **Texto con formato:** las cuatro casillas largas admiten **negrita**, *cursiva*,
+> subrayado y viñetas, con su barrita de botones junto al micrófono. El mismo campo
+> (`components/ui/CampoDictado.tsx`) está en el **Diario de Campo** (narración,
+> resultados y observaciones), el **F09 Informe Situacional** (secciones II a VIII,
+> incluido el PII), las **observaciones por fase del F05** y el **F13** (observaciones
+> de logros, mayoría de edad y derivación; acciones de interés superior, no ubicado y no
+> desea participar; descripción de defensa pública) y los **talleres F07/F08** —objetivo,
+> acciones previas, metodología de inicio/proceso/cierre, incidencias, y logros,
+> limitaciones y sugerencias de la evaluación—, tanto en la ficha del expediente como en
+> el módulo de Talleres. En el **F04** lo llevan *actividad que realiza en calle*,
+> *motivo de la situación de calle* y *observaciones de salud*; la matriz de gestiones
+> por fase conserva su propio dictado por celda. El **F15 · Atención Inmediata** lo lleva
+> en antecedentes, los cinco riesgos observados (salud, violencia, escolar, laboral de
+> los padres y familiar), acciones realizadas, otra situación encontrada y acuerdos.
+>
+> Cada vez que un campo pasa a tener formato hay que revisar **su salida**: los
+> generadores de PDF con reportlab abortan el documento entero si encuentran una
+> etiqueta que no conocen (`services/.../texto_rico.py` la traduce), el Word del F09
+> convierte las viñetas y los formatos impresos del navegador pintan el HTML en vez de
+> mostrarlo como texto. Solo esos tres: es un formato
+> oficial y con colores o tamaños la ficha impresa dejaría de parecerse al Anexo 10. El
+> contenido se guarda como HTML acotado (`utils/texto-rico.ts` lo limpia al entrar y al
+> salir; lo pegado desde Word entra como texto plano). El formato se respeta en el PDF, y
+> donde no se puede pintar —la columna resumida de la tabla— se muestra en texto plano.
+>
 > **Dictado por voz (`CampoDictado`, componente compartido):** las cuatro casillas largas
 > —antecedentes, descripción, resultados y observaciones— llevan el mismo micrófono del
 > Diario de Campo. Se presiona una vez para empezar y otra para detener; si Chrome corta
@@ -546,6 +571,28 @@ El equipo de Atención de Urgencia realiza recorridos nocturnos en lugares de ma
 > Requiere conexión: Chrome procesa la voz en sus servidores.
 | **F13** | Ficha de Egreso – Retiro | Al finalizar el servicio o al retirar al NNA |
 
+> **F13 · Circuito de firma (08/2026):** la ficha ya no pide escribir los datos del
+> educador ni del coordinador —el asistente quedó en dos pasos—: cada uno **firma** y su
+> nombre sale de su cuenta, así que una ficha no puede salir firmada a nombre de otro.
+>
+> ```
+> BORRADOR ─┐
+> SIN FIRMAR ┴─ firma el educador ─► ESPERANDO AL COORDINADOR ─ firma ─► FIRMADA
+>                                            │
+>                                            └─ observa ─► OBSERVADA ─► (el educador corrige y reenvía)
+> ```
+>
+> El educador firma desde la tabla de fichas del expediente. Al coordinador le llegan a
+> su bandeja **Fichas por Firmar** (`/coordinador/firmas`), donde ve el NNA, el educador,
+> el código y los días de espera; desde ahí firma o **devuelve la ficha con una
+> observación**, que el educador ve en su propia tabla. Antes eso viajaba por correo o
+> Zimbra y se perdía fuera del sistema.
+>
+> Las firmas y la observación se guardan dentro de `EXP_INFORME_CIERRE.DETALLES`, el CLOB
+> donde ya vive el formulario: **no hizo falta ninguna migración**. Al observar se
+> descarta la firma del educador —va a modificar la ficha, así que lo que firmó deja de
+> ser lo que quedará escrito—.
+>
 > **F13 en el sistema (08/2026):** la ficha se llama **Ficha de Egreso – Retiro** en
 > todo el sistema (menú del expediente, asistente, historial y avisos), a pedido de la
 > reunión del 11/08/2026: egreso y retiro son conceptos distintos y el nombre corto

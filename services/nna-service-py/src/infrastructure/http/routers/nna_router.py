@@ -711,7 +711,7 @@ async def _verificar_apertura_expediente(nna_id: int, carpeta_id: int, carpeta_r
         if not crow or crow[0]:
             return
         async with conn.cursor() as cur:
-            await cur.execute("SELECT COUNT(1) FROM DIAGNOSTICO_SOCIAL WHERE NNA_ID = :1", [nna_id])
+            await cur.execute("SELECT COUNT(1) FROM DIAGNOSTICO_SOCIAL WHERE NNA_ID = :1 AND ESTADO = 'COMPLETO'", [nna_id])
             f04 = (await cur.fetchone())[0]
         if f04 == 0:
             return

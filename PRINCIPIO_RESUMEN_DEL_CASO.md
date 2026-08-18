@@ -88,6 +88,42 @@ Parentesco, nivel educativo, seguro de salud y demás usan el
 | Familia del NNA (nombre, parentesco, teléfono) | Resumen del Caso → Familia | F11 (asistencia de padres), F12 (persona entrevistada), F04 |
 | Fecha de nacimiento | Resumen del Caso | La edad de F10, F11 y el informe se **calcula** de aquí; no se guarda una edad por ficha |
 | Educador responsable, sede, zona | Resumen del Caso | Todos los formatos impresos |
+| **Fase del servicio** (`NNA_CASO.FASE`) | Resumen del Caso → Estado del expediente | Los cuatro tableros, la bandeja del coordinador, el F13 (fase al egreso) |
+
+## Caso de estudio: la fase del servicio
+
+Vale la pena documentarlo porque es el ejemplo más caro de lo que pasa cuando el
+principio no se aplica.
+
+La fase llegó a estar representada en **cinco lugares** que no se hablaban entre sí:
+`NNA_CASO.ESTADO` traducido a etiquetas por cada tablero (con dos diccionarios
+distintos en dos servicios), `NNA_CASO.FASE` —que existía pero nadie escribía—, las
+fechas `Fn_FIN` del F05, la existencia de un folio `F05-FASE-N`, y en la bandeja del
+coordinador una deducción a partir de "¿tiene PTI activo?".
+
+Lo que costó:
+
+- La Fase II valía **0 en todas las sedes**, porque ningún código llegaba a poner
+  `ESTADO = 'INTERVENCION'`.
+- El Resumen del Caso imprimía **"Fase CONTACTO_INICIAL"** bajo el título FASE ACTUAL.
+- Cerrar el F13 no cerraba el caso: los **egresados seguían contando como activos**.
+- El botón "Cerrar fase" generaba el PDF y no escribía nada: el único rastro de una
+  fase cerrada era el nombre de un archivo.
+
+**Cómo quedó, aplicando el principio:**
+
+- `NNA_CASO.FASE` es el dato reutilizable → vive en el Resumen del Caso. Valores
+  `I`, `II`, `III`, `EGRESADO`.
+- Los logros de cada fase son datos propios del F05 → se quedan en su ficha.
+- El F05 **escribe** la fase al Resumen cuando el educador cierra una fase.
+  El F13 escribe `EGRESADO` al finalizarse.
+- Todos los demás **leen** de ahí. Ninguna pantalla vuelve a deducir la fase.
+- `CASO_FASE` guarda el recorrido: cuándo empezó cada fase, cuánto duró, si se
+  extendió y quién la cerró. La columna dice *dónde está*; la tabla, *cómo llegó*.
+
+**La regla que se desprende:** cuando un dato aparece calculado de tres maneras
+distintas en tres pantallas, el problema no es que los cálculos difieran — es que
+nadie lo está escribiendo en el Resumen.
 
 ## Antes de crear un campo nuevo
 

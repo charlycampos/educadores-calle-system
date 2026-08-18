@@ -1,4 +1,18 @@
 import { marcaDirigido } from '../../../utils/formatos';
+import { limpiarHtml, tieneContenido } from '../../../utils/texto-rico';
+/**
+ * Texto de un campo con formato dentro del formato impreso.
+ *
+ * Los campos largos del taller se capturan con negrita, cursiva, subrayado y
+ * viñetas y se guardan como HTML; impresos como texto plano se verían las
+ * etiquetas.
+ */
+const TextoRico = ({ html, alto }: { html?: string; alto?: string }) =>
+    tieneContenido(html || '')
+        ? <div className="texto-rico" style={{ minHeight: alto, whiteSpace: 'pre-wrap' }}
+               dangerouslySetInnerHTML={{ __html: limpiarHtml(html || '') }} />
+        : <div style={{ minHeight: alto }}>---</div>;
+
 interface Formato8Props {
     taller: any;
     nna: any;
@@ -107,7 +121,7 @@ export const Formato8Print = ({ taller, nna, id = 'formato-8-print' }: Formato8P
                             <div style={{ fontSize: '10px', fontStyle: 'italic', marginBottom: '8px' }}>
                                 (Describir cuáles son los resultados que esperamos obtener en la actividad, para después evaluar el logro de metas).
                             </div>
-                            <div style={{ minHeight: '40px', whiteSpace: 'pre-wrap' }}>{taller.objetivo || '---'}</div>
+                            <TextoRico html={taller.objetivo} alto="40px" />
                         </td>
                     </tr>
 
@@ -129,7 +143,7 @@ export const Formato8Print = ({ taller, nna, id = 'formato-8-print' }: Formato8P
                         <td colSpan={3} style={cellStyle}>
                             <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>5. LOGROS:</div>
                             <div style={{ fontSize: '9px', fontStyle: 'italic', marginBottom: '6px' }}>(Indicar los cambios obtenidos luego de recibir el taller)</div>
-                            <div style={{ minHeight: '80px', whiteSpace: 'pre-wrap' }}>{evalData.logros || '---'}</div>
+                            <TextoRico html={evalData.logros} alto="80px" />
                         </td>
                     </tr>
 
@@ -138,7 +152,7 @@ export const Formato8Print = ({ taller, nna, id = 'formato-8-print' }: Formato8P
                         <td colSpan={3} style={cellStyle}>
                             <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>6. LIMITACIONES ENCONTRADAS:</div>
                             <div style={{ fontSize: '9px', fontStyle: 'italic', marginBottom: '6px' }}>(Señalar las dificultades encontradas en función a la planificación del taller)</div>
-                            <div style={{ minHeight: '60px', whiteSpace: 'pre-wrap' }}>{evalData.limitaciones || '---'}</div>
+                            <TextoRico html={evalData.limitaciones} alto="60px" />
                         </td>
                     </tr>
 
@@ -146,7 +160,7 @@ export const Formato8Print = ({ taller, nna, id = 'formato-8-print' }: Formato8P
                     <tr>
                         <td colSpan={3} style={cellStyle}>
                             <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>7. SUGERENCIAS Y RECOMENDACIONES:</div>
-                            <div style={{ minHeight: '50px', whiteSpace: 'pre-wrap' }}>{evalData.sugerencias || '---'}</div>
+                            <TextoRico html={evalData.sugerencias} alto="50px" />
                         </td>
                     </tr>
 

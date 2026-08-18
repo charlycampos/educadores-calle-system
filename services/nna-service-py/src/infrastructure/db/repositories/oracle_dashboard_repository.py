@@ -22,7 +22,7 @@ class OracleDashboardRepository:
                 sql_alertas = """
                     SELECT COUNT(*) FROM NNA_CASO c
                     WHERE (c.ESTADO IN ('CAPTACION', 'EN_EVALUACION') AND c.FECHA_INGRESO < SYSTIMESTAMP - 30)
-                       OR NOT EXISTS (SELECT 1 FROM DIAGNOSTICO_SOCIAL d WHERE d.NNA_ID = c.NNA_ID)
+                       OR NOT EXISTS (SELECT 1 FROM DIAGNOSTICO_SOCIAL d WHERE d.NNA_ID = c.NNA_ID AND d.ESTADO = 'COMPLETO')
                 """
                 await cur.execute(sql_alertas)
                 alertas_criticas = (await cur.fetchone())[0]
@@ -51,10 +51,25 @@ class OracleDashboardRepository:
                     SELECT 
                         s.ID, s.NOMBRE, s.CODIGO,
                         COUNT(c.ID) as TOTAL_NNA,
-                        SUM(CASE WHEN c.ESTADO = 'CAPTACION' THEN 1 ELSE 0 END) as CAPTACION,
-                        SUM(CASE WHEN c.ESTADO = 'EN_EVALUACION' THEN 1 ELSE 0 END) as DIAGNOSTICO,
-                        SUM(CASE WHEN c.ESTADO = 'INTERVENCION' THEN 1 ELSE 0 END) as INTERVENCION,
-                        SUM(CASE WHEN c.ESTADO = 'PRE_EGRESO' THEN 1 ELSE 0 END) as PRE_EGRESO,
+                        -- Se agrupa por FASE, no por ESTADO. Con el criterio
+                        -- anterior 'INTERVENCION' y 'PRE_EGRESO' valían siempre
+                        -- 0: el primero no lo escribía ningún flujo y el
+                        -- segundo ni siquiera existe en ESTADOS_VALIDOS.
+                        --
+                        -- Se conservan los alias de columna (CAPTACION,
+                        -- DIAGNOSTICO...) para no romper el tablero nacional,
+                        -- que los mapea a captacion/diagnostico/intervencion/
+                        -- preEgreso. Fase I ocupa las dos primeras: es la fase
+                        -- de contacto Y diagnóstico, así que se reparte según
+                        -- si el caso ya tiene F04.
+                        SUM(CASE WHEN c.FASE = 'I' AND NOT EXISTS (
+                                SELECT 1 FROM DIAGNOSTICO_SOCIAL d WHERE d.NNA_ID = c.NNA_ID AND d.ESTADO = 'COMPLETO'
+                            ) THEN 1 ELSE 0 END) as CAPTACION,
+                        SUM(CASE WHEN c.FASE = 'I' AND EXISTS (
+                                SELECT 1 FROM DIAGNOSTICO_SOCIAL d WHERE d.NNA_ID = c.NNA_ID AND d.ESTADO = 'COMPLETO'
+                            ) THEN 1 ELSE 0 END) as DIAGNOSTICO,
+                        SUM(CASE WHEN c.FASE = 'II'  THEN 1 ELSE 0 END) as INTERVENCION,
+                        SUM(CASE WHEN c.FASE = 'III' THEN 1 ELSE 0 END) as PRE_EGRESO,
                         SUM(CASE WHEN (c.ESTADO IN ('CAPTACION', 'EN_EVALUACION') AND c.FECHA_INGRESO < SYSTIMESTAMP - 30) THEN 1 ELSE 0 END) as ALERTAS
                     FROM SEC_SEDE s
                     LEFT JOIN NNA_CASO c ON c.SEDE_ID = s.ID AND c.ESTADO != 'CERRADO'
@@ -111,7 +126,7 @@ class OracleDashboardRepository:
                 await cur.execute("""
                     SELECT COUNT(*) FROM NNA_CASO c
                     WHERE c.ESTADO != 'CERRADO'
-                      AND NOT EXISTS (SELECT 1 FROM DIAGNOSTICO_SOCIAL d WHERE d.NNA_ID = c.NNA_ID)
+                      AND NOT EXISTS (SELECT 1 FROM DIAGNOSTICO_SOCIAL d WHERE d.NNA_ID = c.NNA_ID AND d.ESTADO = 'COMPLETO')
                 """)
                 sin_f04 = (await cur.fetchone())[0]
 

@@ -8,6 +8,7 @@ import { UbigeoSelectorSimple } from './components/UbigeoSelectorSimple';
 import { FamiliarModal } from './components/FamiliarModal';
 import { useNnaStore } from '../../store/nna.store';
 import { ActividadModal } from './components/ActividadModal';
+import { CampoDictado } from '../../components/ui/CampoDictado';
 
 const SEGUROS_PREDEFINIDOS = [
     "EsSalud",
@@ -734,13 +735,12 @@ export const FormularioF15Page = () => {
 
                         <div>
                             <label className="block text-xs font-bold text-fg-muted mb-1">Antecedentes (Descripción breve de la referencia, CEM, Línea 100 o denuncia)</label>
-                            <textarea
-                                name="antecedentes"
+                            <CampoDictado
+                                label=""
+                                value={formData.antecedentes || ''}
+                                onChange={v => setFormData(prev => ({ ...prev, antecedentes: v }))}
                                 rows={3}
                                 placeholder="NNA referido por el CEM del sector..."
-                                value={formData.antecedentes}
-                                onChange={handleInputChange}
-                                className="w-full px-3.5 py-2 bg-surface border border-border rounded-lg text-sm text-fg focus:ring-2 focus:ring-primary focus:outline-none resize-none"
                             />
                         </div>
                     </div>
@@ -1193,61 +1193,56 @@ export const FormularioF15Page = () => {
                     <div className="space-y-4">
                         <div>
                             <label className="block text-xs font-bold text-fg-muted mb-1">Problemas de Salud (En el niño o familiar directo)</label>
-                            <textarea
-                                name="riesgo_salud"
+                            <CampoDictado
+                                label=""
+                                value={formData.riesgo_salud || ''}
+                                onChange={v => setFormData(prev => ({ ...prev, riesgo_salud: v }))}
                                 rows={2}
                                 placeholder="Describe si presenta indicios de desnutrición, asma, discapacidad..."
-                                value={formData.riesgo_salud}
-                                onChange={handleInputChange}
-                                className="w-full px-3.5 py-2 bg-surface border border-border rounded-lg text-sm text-fg focus:ring-2 focus:ring-primary focus:outline-none resize-none"
                             />
                         </div>
 
                         <div>
                             <label className="block text-xs font-bold text-fg-muted mb-1">Situación de Violencia (Si refiere o se encuentra evidencia)</label>
-                            <textarea
-                                name="riesgo_violencia"
+                            <CampoDictado
+                                label=""
+                                value={formData.riesgo_violencia || ''}
+                                onChange={v => setFormData(prev => ({ ...prev, riesgo_violencia: v }))}
                                 rows={2}
                                 placeholder="Marcas físicas, hostilidad por parte de cuidadores en vía pública..."
-                                value={formData.riesgo_violencia}
-                                onChange={handleInputChange}
-                                className="w-full px-3.5 py-2 bg-surface border border-border rounded-lg text-sm text-fg focus:ring-2 focus:ring-primary focus:outline-none resize-none"
                             />
                         </div>
 
                         <div>
                             <label className="block text-xs font-bold text-fg-muted mb-1">Situación Escolar (Deserción, atraso escolar severo)</label>
-                            <textarea
-                                name="riesgo_escolar"
+                            <CampoDictado
+                                label=""
+                                value={formData.riesgo_escolar || ''}
+                                onChange={v => setFormData(prev => ({ ...prev, riesgo_escolar: v }))}
                                 rows={2}
                                 placeholder="No asiste a clases hace 2 años por motivos económicos..."
-                                value={formData.riesgo_escolar}
-                                onChange={handleInputChange}
-                                className="w-full px-3.5 py-2 bg-surface border border-border rounded-lg text-sm text-fg focus:ring-2 focus:ring-primary focus:outline-none resize-none"
                             />
                         </div>
 
                         <div>
                             <label className="block text-xs font-bold text-fg-muted mb-1">Situación laboral de padres</label>
-                            <textarea
-                                name="riesgo_laboral_padres"
+                            <CampoDictado
+                                label=""
+                                value={formData.riesgo_laboral_padres || ''}
+                                onChange={v => setFormData(prev => ({ ...prev, riesgo_laboral_padres: v }))}
                                 rows={2}
                                 placeholder="Padres desempleados o dedicados al comercio informal ambulatorio..."
-                                value={formData.riesgo_laboral_padres}
-                                onChange={handleInputChange}
-                                className="w-full px-3.5 py-2 bg-surface border border-border rounded-lg text-sm text-fg focus:ring-2 focus:ring-primary focus:outline-none resize-none"
                             />
                         </div>
 
                         <div>
                             <label className="block text-xs font-bold text-fg-muted mb-1">Situación Familiar (Abandono, hacinamiento, desestructuración)</label>
-                            <textarea
-                                name="riesgo_familiar"
+                            <CampoDictado
+                                label=""
+                                value={formData.riesgo_familiar || ''}
+                                onChange={v => setFormData(prev => ({ ...prev, riesgo_familiar: v }))}
                                 rows={2}
                                 placeholder="NNA pernocta con conocidos en cuartos compartidos de hotel..."
-                                value={formData.riesgo_familiar}
-                                onChange={handleInputChange}
-                                className="w-full px-3.5 py-2 bg-surface border border-border rounded-lg text-sm text-fg focus:ring-2 focus:ring-primary focus:outline-none resize-none"
                             />
                         </div>
                     </div>
@@ -1414,37 +1409,34 @@ export const FormularioF15Page = () => {
 
                         <div>
                             <label className="block text-xs font-bold text-fg-muted mb-1">Acciones realizadas (En caso de requerir coordinación inmediata)</label>
-                            <textarea
-                                name="acciones_realizadas"
+                            <CampoDictado
+                                label=""
+                                value={formData.acciones_realizadas || ''}
+                                onChange={v => setFormData(prev => ({ ...prev, acciones_realizadas: v }))}
                                 rows={3}
                                 placeholder="Se brindó contención inicial y se coordinó con la fiscalía de familia..."
-                                value={formData.acciones_realizadas}
-                                onChange={handleInputChange}
-                                className="w-full px-3.5 py-2 bg-surface border border-border rounded-lg text-sm text-fg focus:ring-2 focus:ring-primary focus:outline-none resize-none"
                             />
                         </div>
 
                         <div>
                             <label className="block text-xs font-bold text-fg-muted mb-1">Otra situación encontrada (Fuera del perfil regular)</label>
-                            <textarea
-                                name="otra_situacion"
+                            <CampoDictado
+                                label=""
+                                value={formData.otra_situacion || ''}
+                                onChange={v => setFormData(prev => ({ ...prev, otra_situacion: v }))}
                                 rows={3}
                                 placeholder="Describe hallazgos adicionales relevantes..."
-                                value={formData.otra_situacion}
-                                onChange={handleInputChange}
-                                className="w-full px-3.5 py-2 bg-surface border border-border rounded-lg text-sm text-fg focus:ring-2 focus:ring-primary focus:outline-none resize-none"
                             />
                         </div>
 
                         <div>
                             <label className="block text-xs font-bold text-fg-muted mb-1">Acuerdos (Compromisos para siguiente visita o posterior encuentro)</label>
-                            <textarea
-                                name="acuerdos"
+                            <CampoDictado
+                                label=""
+                                value={formData.acuerdos || ''}
+                                onChange={v => setFormData(prev => ({ ...prev, acuerdos: v }))}
                                 rows={3}
                                 placeholder="Se coordinó nueva visita para mañana a las 5:00 PM con la madre..."
-                                value={formData.acuerdos}
-                                onChange={handleInputChange}
-                                className="w-full px-3.5 py-2 bg-surface border border-border rounded-lg text-sm text-fg focus:ring-2 focus:ring-primary focus:outline-none resize-none"
                             />
                         </div>
                     </div>

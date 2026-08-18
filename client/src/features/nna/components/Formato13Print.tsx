@@ -1,4 +1,24 @@
 import React from 'react';
+import { limpiarHtml, tieneContenido } from '../../../utils/texto-rico';
+
+/**
+ * Texto de un campo con formato dentro de la ficha impresa.
+ *
+ * Los campos largos se capturan con negrita, cursiva, subrayado y viñetas, y se
+ * guardan como HTML; impresos como texto plano se verían las etiquetas. Si está
+ * vacío se deja la línea en blanco para llenar a mano, como en el formato
+ * oficial.
+ */
+const TextoRico = ({ html }: { html?: string }) =>
+    tieneContenido(html || '')
+        ? <span className="texto-rico" dangerouslySetInnerHTML={{ __html: limpiarHtml(html || '') }} />
+        : <>____________________</>;
+
+interface FirmaImpresa {
+    imagen?: string;
+    nombre?: string;
+    fecha?: string;
+}
 
 interface Formato13Props {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -6,6 +26,9 @@ interface Formato13Props {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ficha: any;
     id?: string;
+    /** Firmas guardadas en `detalles`. Sin ellas el PDF sale sin firmar. */
+    firmaEducador?: FirmaImpresa;
+    firmaCoordinador?: FirmaImpresa;
 }
 
 const styles = {
@@ -69,7 +92,9 @@ const Check = ({ checked }: { checked?: boolean }) => (
     <span style={styles.checkbox}>{checked ? 'X' : ''}</span>
 );
 
-export const Formato13Print = ({ nna, ficha, id = 'formato-13-print' }: Formato13Props) => {
+export const Formato13Print = ({
+    nna, ficha, id = 'formato-13-print', firmaEducador, firmaCoordinador,
+}: Formato13Props) => {
     const formatDate = (dateStr?: string) => {
         if (!dateStr) return { d: '', m: '', a: '' };
         const d = new Date(dateStr);
@@ -82,7 +107,7 @@ export const Formato13Print = ({ nna, ficha, id = 'formato-13-print' }: Formato1
 
     const fecIngreso = formatDate(ficha.fechaIngreso);
     const fecEgreso = formatDate(ficha.fechaEgreso);
-    const fecNac = formatDate(nna.fechaNacimiento);
+    const fecNac = formatDate(ficha.fechaNacimiento || nna.fechaNacimiento);
 
     return (
         <div id={id} style={styles.page}>
@@ -108,7 +133,7 @@ export const Formato13Print = ({ nna, ficha, id = 'formato-13-print' }: Formato1
                         <td style={styles.th}>MM</td>
                         <td style={styles.th}>AA</td>
                         <td style={styles.th} rowSpan={2}>DNI</td>
-                        <td style={styles.td} rowSpan={2}>{nna.numeroDoc || nna.documento || ""}</td>
+                        <td style={styles.td} rowSpan={2}>{ficha.dni || nna.numeroDoc || nna.documento || ""}</td>
                         <td style={styles.th} colSpan={2}>SEXO</td>
                         <td style={styles.th} colSpan={4}>CUENTA CON SEGURO DE SALUD</td>
                     </tr>
@@ -127,10 +152,10 @@ export const Formato13Print = ({ nna, ficha, id = 'formato-13-print' }: Formato1
                         <td style={{ ...styles.td, textAlign: 'center' }} colSpan={4}>---</td>
                         <td style={styles.td} colSpan={2}></td>
                         <td style={styles.td}>
-                            <Check checked={["M", "HOMBRE", "1", "MASCULINO"].includes(String(nna.sexo).toUpperCase())} />
+                            <Check checked={["M", "HOMBRE", "1", "MASCULINO"].includes(String(ficha.sexo || nna.sexo).toUpperCase())} />
                         </td>
                         <td style={styles.td}>
-                            <Check checked={["F", "MUJER", "2", "FEMENINO"].includes(String(nna.sexo).toUpperCase())} />
+                            <Check checked={["F", "MUJER", "2", "FEMENINO"].includes(String(ficha.sexo || nna.sexo).toUpperCase())} />
                         </td>
                         <td style={styles.td}><Check checked={ficha.seguroSalud === "NO" || !ficha.seguroSalud} /></td>
                         <td style={styles.td}><Check checked={ficha.seguroSalud === "SIS"} /></td>
@@ -173,6 +198,29 @@ export const Formato13Print = ({ nna, ficha, id = 'formato-13-print' }: Formato1
                 </tbody>
             </table>
 
+            {/* Fase del servicio y defensa pública.
+                Faltaban en el impreso pese a ser datos del formato oficial: la
+                fase al egreso se capturaba y no salía en ninguna parte. */}
+            <table style={styles.table}>
+                <tbody>
+                    <tr>
+                        <td style={styles.th}>FASE DEL SERVICIO AL MOMENTO DEL EGRESO</td>
+                        <td style={{ ...styles.td, textAlign: 'center' }}>{ficha.faseAlEgreso || '—'}</td>
+                        <td style={styles.th}>¿RECIBE DEFENSA PÚBLICA?</td>
+                        <td style={{ ...styles.td, textAlign: 'center' }}>
+                            SI <Check checked={ficha.recibeDefensaPublica === 'SI'} />{' '}
+                            NO <Check checked={ficha.recibeDefensaPublica === 'NO'} />
+                        </td>
+                    </tr>
+                    {ficha.descripcionDefensa && (
+                        <tr>
+                            <td style={styles.th}>DESCRIPCIÓN</td>
+                            <td style={styles.td} colSpan={3}>{ficha.descripcionDefensa}</td>
+                        </tr>
+                    )}
+                </tbody>
+            </table>
+
             {/* Modalidad de Egreso */}
             <table style={styles.table}>
                 <tbody>
@@ -183,6 +231,7 @@ export const Formato13Print = ({ nna, ficha, id = 'formato-13-print' }: Formato1
                         <td style={styles.th}>DERIVACIÓN SERVICIOS COMPLEMENTARIOS</td>
                         <td style={styles.th}>MODALIDAD DE RETIRO</td>
                         <td style={styles.th}>Interés superior del NNA</td>
+                        <td style={styles.th}>NO ubicado</td>
                         <td style={styles.th}>NO desea participar</td>
                         <td style={styles.th}>CUENTA CON RESOLUCIÓN UPE</td>
                         <td style={styles.th}>SITUACIÓN DE RESOLUCIÓN UPE</td>
@@ -193,8 +242,14 @@ export const Formato13Print = ({ nna, ficha, id = 'formato-13-print' }: Formato1
                         <td style={{ ...styles.td, textAlign: 'center' }}><Check checked={ficha.mayoriaEdad} /></td>
                         <td style={{ ...styles.td, textAlign: 'center' }}><Check checked={ficha.derivacionServicios} /></td>
                         <td style={{ ...styles.td, textAlign: 'center' }}>--</td>
-                        <td style={{ ...styles.td, textAlign: 'center' }}><Check checked={ficha.modalidadRetiro === 'INTERES_SUPERIOR'} /></td>
-                        <td style={{ ...styles.td, textAlign: 'center' }}><Check checked={ficha.modalidadRetiro === 'NO_DESEA'} /></td>
+                        {/* Se leen los booleanos del formulario, no
+                            `modalidadRetiro`: ese campo existía en la interfaz
+                            pero ningún control lo escribía, así que TODO retiro
+                            se imprimía con las casillas en blanco. Y faltaba la
+                            columna "No ubicado". */}
+                        <td style={{ ...styles.td, textAlign: 'center' }}><Check checked={ficha.interesSuperior} /></td>
+                        <td style={{ ...styles.td, textAlign: 'center' }}><Check checked={ficha.noUbicado} /></td>
+                        <td style={{ ...styles.td, textAlign: 'center' }}><Check checked={ficha.noDeseaParticipar} /></td>
                         <td style={{ ...styles.td, textAlign: 'center' }}>
                             SI <Check checked={ficha.cuentaResolucionUPE === 'SI'} /> NO <Check checked={ficha.cuentaResolucionUPE === 'NO'} />
                         </td>
@@ -249,29 +304,109 @@ export const Formato13Print = ({ nna, ficha, id = 'formato-13-print' }: Formato1
                         <td style={styles.th}>EGRESO CON DERIVACIÓN</td>
                         <td style={styles.td} colSpan={2}>
                             Institución: {ficha.institucionDerivada || '____________________'} <br />
-                            Observaciones: {ficha.observacionesDerivacion || '____________________'}
+                            Observaciones: <TextoRico html={ficha.observacionesDerivacion} />
                         </td>
                     </tr>
-                    <tr>
-                        <td style={styles.th}>NO UBICADO / RETIRO</td>
-                        <td style={styles.td} colSpan={2}>
-                            Acciones Realizadas: {ficha.accionesBusqueda || ficha.retiInterSuperiorAcciones || ficha.motivoNoDesea || '____________________'}
-                        </td>
-                    </tr>
+                    {/* Cada acción en su fila. Antes compartían una celda con
+                        `||`, así que si había dos con texto solo se imprimía la
+                        primera y el resto se perdía en el documento firmado. */}
+                    {ficha.retiInterSuperiorAcciones && (
+                        <tr>
+                            <td style={styles.th}>INTERÉS SUPERIOR — ACCIONES</td>
+                            <td style={styles.td} colSpan={2}>
+                                <TextoRico html={ficha.retiInterSuperiorAcciones} />
+                            </td>
+                        </tr>
+                    )}
+                    {ficha.accionesBusqueda && (
+                        <tr>
+                            <td style={styles.th}>NO UBICADO — ACCIONES DE BÚSQUEDA</td>
+                            <td style={styles.td} colSpan={2}>
+                                <TextoRico html={ficha.accionesBusqueda} />
+                            </td>
+                        </tr>
+                    )}
+                    {ficha.motivoNoDesea && (
+                        <tr>
+                            <td style={styles.th}>NO DESEA PARTICIPAR — MOTIVO</td>
+                            <td style={styles.td} colSpan={2}>
+                                <TextoRico html={ficha.motivoNoDesea} />
+                            </td>
+                        </tr>
+                    )}
+                    {ficha.observacionesMayoriaEdad && (
+                        <tr>
+                            <td style={styles.th}>MAYORÍA DE EDAD — OBSERVACIONES</td>
+                            <td style={styles.td} colSpan={2}>
+                                <TextoRico html={ficha.observacionesMayoriaEdad} />
+                            </td>
+                        </tr>
+                    )}
+                    {/* Se capturaban y no salían en ninguna parte del impreso. */}
+                    {ficha.observacionesLogros && (
+                        <tr>
+                            <td style={styles.th}>OBSERVACIONES DE LOGROS</td>
+                            <td style={styles.td} colSpan={2}>
+                                <TextoRico html={ficha.observacionesLogros} />
+                            </td>
+                        </tr>
+                    )}
+                    {ficha.derechosOtros && (
+                        <tr>
+                            <td style={styles.th}>OTROS DERECHOS RESTITUIDOS</td>
+                            <td style={styles.td} colSpan={2}>{ficha.derechosOtros}</td>
+                        </tr>
+                    )}
+                    {(ficha.interesSuperiorTrata || ficha.interesSuperiorDelincuencia || ficha.interesSuperiorOtro) && (
+                        <tr>
+                            <td style={styles.th}>INTERÉS SUPERIOR — DETALLE</td>
+                            <td style={styles.td} colSpan={2}>
+                                {ficha.interesSuperiorTrata && <><Check checked /> Trata de personas </>}
+                                {ficha.interesSuperiorDelincuencia && <><Check checked /> Delincuencia </>}
+                                {ficha.interesSuperiorOtro && <>Otro: {ficha.interesSuperiorOtro}</>}
+                            </td>
+                        </tr>
+                    )}
                 </tbody>
             </table>
 
-            {/* Firmas */}
+            {/* Firmas.
+                Se pintan las imágenes de quien firmó de verdad, tomadas de
+                `detalles`. Antes el PDF salía siempre con las líneas en blanco
+                y con nombres deducidos por heurística, así que el documento
+                que se archivaba como firmado no tenía ninguna firma. */}
             <div style={{ marginTop: '40px', display: 'flex', justifyContent: 'space-around' }}>
-                <div style={{ textAlign: 'center', borderTop: '1px solid #000', width: '200px' }}>
-                    Firma del Educador/a <br />
-                    Nombre: {ficha.educadorNombres} {ficha.educadorApellidoPaterno}<br />
-                    DNI: {ficha.educadorDNI}
+                <div style={{ textAlign: 'center', width: '220px' }}>
+                    <div style={{ height: '70px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+                        {firmaEducador?.imagen && (
+                            <img src={firmaEducador.imagen} alt="" style={{ maxHeight: '68px', maxWidth: '200px' }} />
+                        )}
+                    </div>
+                    <div style={{ borderTop: '1px solid #000', paddingTop: '4px' }}>
+                        Firma del Educador/a <br />
+                        Nombre: {firmaEducador?.nombre
+                            || `${ficha.educadorNombres || ''} ${ficha.educadorApellidoPaterno || ''}`.trim()}<br />
+                        DNI: {ficha.educadorDNI || '—'}
+                        {firmaEducador?.fecha && (
+                            <><br />Fecha: {firmaEducador.fecha.slice(0, 10).split('-').reverse().join('/')}</>
+                        )}
+                    </div>
                 </div>
-                <div style={{ textAlign: 'center', borderTop: '1px solid #000', width: '200px' }}>
-                    Firma del Coordinador/a <br />
-                    Nombre: {ficha.coordinadorNombres} {ficha.coordinadorApellidoPaterno}<br />
-                    DNI: {ficha.coordinadorDNI}
+                <div style={{ textAlign: 'center', width: '220px' }}>
+                    <div style={{ height: '70px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+                        {firmaCoordinador?.imagen && (
+                            <img src={firmaCoordinador.imagen} alt="" style={{ maxHeight: '68px', maxWidth: '200px' }} />
+                        )}
+                    </div>
+                    <div style={{ borderTop: '1px solid #000', paddingTop: '4px' }}>
+                        Firma del Coordinador/a <br />
+                        Nombre: {firmaCoordinador?.nombre
+                            || `${ficha.coordinadorNombres || ''} ${ficha.coordinadorApellidoPaterno || ''}`.trim()}<br />
+                        DNI: {ficha.coordinadorDNI || '—'}
+                        {firmaCoordinador?.fecha && (
+                            <><br />Fecha: {firmaCoordinador.fecha.slice(0, 10).split('-').reverse().join('/')}</>
+                        )}
+                    </div>
                 </div>
             </div>
 

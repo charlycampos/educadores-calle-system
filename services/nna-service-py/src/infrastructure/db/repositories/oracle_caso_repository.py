@@ -251,7 +251,15 @@ class OracleCasoRepository:
                             VICTIMA_EXPLOTACION, DEPARTAMENTO_INTERVENCION, PROVINCIA_INTERVENCION
                         ) VALUES (
                             :codigo, :nna_id, :sede_id, :resp_id,
-                            :perfil, :estado, 'CONTACTO_INICIAL',
+                            -- Fase I: Contacto e Integración. Todo caso nuevo
+                            -- arranca aquí, y la fase solo avanza cuando el
+                            -- educador cierra la fase en el F05.
+                            --
+                            -- Antes decía 'CONTACTO_INICIAL', un vocabulario
+                            -- propio que nadie más entendía: el Resumen del
+                            -- Caso llegaba a imprimir "Fase CONTACTO_INICIAL"
+                            -- bajo el título FASE ACTUAL.
+                            :perfil, :estado, 'I',
                             :zona, :distrito,
                             :situacion_calle,
                             :actividad, :tiempo, :condicion,
@@ -266,6 +274,31 @@ class OracleCasoRepository:
                     new_id = out_id.getvalue()[0]
                 except Exception as e:
                     raise
+
+                # Abrir la Fase I en el tracking. Empieza el día de la
+                # inscripción del NNA: "en esta primera fase, inicio sería el
+                # día que se inscribe al usuario" (reunión SEC 05/08/2026).
+                #
+                # Va aparte del INSERT del caso y con su propio try: si la
+                # migración 013 aún no se ejecutó, el alta del NNA debe
+                # completarse igual. Sin tracking se pierde el cronómetro de
+                # la fase, no el caso.
+                try:
+                    await cur.execute(
+                        """
+                        INSERT INTO CASO_FASE
+                            (CASO_ID, FASE, FECHA_INICIO, PLAZO_MESES, ESTADO)
+                        SELECT :1, 'I',
+                               CAST(NVL(FECHA_INGRESO, FECHA_APERTURA) AS DATE),
+                               3, 'EN_CURSO'
+                          FROM NNA_CASO WHERE ID = :1
+                        """,
+                        [new_id],
+                    )
+                    await conn.commit()
+                except Exception as e:
+                    print(f"No se pudo abrir la Fase I del caso {new_id} (¿falta la migración 013?): {e}")
+
         return await self.find_by_id(new_id)
 
     async def update_estado(self, caso_id: int, nuevo_estado: str) -> None:

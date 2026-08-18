@@ -1,10 +1,12 @@
 import os
+import re
 from datetime import datetime
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.units import inch
+from src.infrastructure.services.texto_rico import html_a_reportlab
 
 
 def generate_f12_pdf(seg_data: dict, nna_data: dict, output_path: str) -> str:
@@ -71,7 +73,7 @@ def generate_f12_pdf(seg_data: dict, nna_data: dict, output_path: str) -> str:
 
     def text_block(content):
         """Tabla de una celda que ocupa todo el ancho, ideal para textos largos."""
-        t = Table([[Paragraph(c(content), body_style)]], colWidths=[doc.width])
+        t = Table([[Paragraph(html_a_reportlab(content), body_style)]], colWidths=[doc.width])
         t.setStyle(TableStyle([
             ("GRID",    (0, 0), (-1, -1), 0.4, BORDER),
             ("PADDING", (0, 0), (-1, -1), 6),

@@ -65,6 +65,25 @@ class OracleFolioRepository:
                 row = await cur.fetchone()
                 return row[0]
 
+    async def existe_folio_inf(self, caso_id: int) -> bool:
+        """
+        Si el caso ya tiene su folio de Informe de Cierre.
+
+        Evita duplicarlo cuando el educador finaliza, el coordinador observa y
+        el educador vuelve a finalizar: el expediente quedaría con dos folios
+        INF del mismo informe.
+        """
+        pool = get_pool()
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    "SELECT COUNT(*) FROM EXP_FOLIO "
+                    "WHERE CASO_ID = :caso AND TIPO_DOCUMENTO = 'INF'",
+                    {"caso": caso_id},
+                )
+                row = await cur.fetchone()
+                return bool(row and row[0] > 0)
+
     async def list_by_taller(self, taller_id: int) -> list[Folio]:
         """Folios generados por un taller: su evidencia archivada."""
         pool = get_pool()

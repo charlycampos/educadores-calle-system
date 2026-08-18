@@ -7,6 +7,7 @@ import { useAuthStore } from '../../../store/auth.store';
 import { INTERVENCION_API_URL } from '../../../config/api';
 import { etiquetaParentesco, OPCIONES_VINCULO } from '../../../utils/parentesco';
 import { CampoDictado } from '../../../components/ui/CampoDictado';
+import { limpiarHtml, htmlAtexto } from '../../../utils/texto-rico';
 import { PanelFirmas } from '../../../components/ui/PanelFirmas';
 import { Formato12Print } from './Formato12Print';
 import { jsPDF } from 'jspdf';
@@ -65,12 +66,20 @@ const SectionTitle = ({ children }: { children: React.ReactNode }) => (
     </div>
 );
 
-/** Bloque de la fila desplegada; se omite si el campo está vacío. */
-const Detalle = ({ titulo, valor }: { titulo: string; valor?: string }) =>
+/**
+ * Bloque de la fila desplegada; se omite si el campo está vacío.
+ *
+ * Los campos largos se guardan con formato, así que se pintan como tal en vez
+ * de mostrar las etiquetas en medio del texto.
+ */
+const Detalle = ({ titulo, valor, rico }: { titulo: string; valor?: string; rico?: boolean }) =>
     !valor ? null : (
         <div>
             <span className="block text-[10px] font-bold uppercase tracking-wider text-fg-muted mb-0.5">{titulo}</span>
-            <p className="text-fg-2 leading-snug whitespace-pre-line">{valor}</p>
+            {rico
+                ? <div className="texto-rico text-fg-2 leading-snug"
+                       dangerouslySetInnerHTML={{ __html: limpiarHtml(valor) }} />
+                : <p className="text-fg-2 leading-snug whitespace-pre-line">{valor}</p>}
         </div>
     );
 
@@ -469,6 +478,10 @@ export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any })
 
     return (
         <div className="space-y-4">
+            {/* El listado se aparta mientras se llena una ficha: el formulario
+                ocupa su lugar, en vez de taparlo con un modal. */}
+            {!showModal && (
+            <>
             {/* Header */}
             <div className="bg-surface border border-border rounded-[8px] shadow-[var(--shadow-1)] px-5 py-4 flex items-center justify-between">
                 <div>
@@ -557,8 +570,11 @@ export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any })
                                                     <span className="block text-[11px] text-fg-muted">{parentesco}</span>
                                                 )}
                                             </td>
-                                            <td className={`px-3 py-2.5 text-fg-muted ${isExpanded ? '' : 'line-clamp-2'}`}>
-                                                {acuerdos || <span className="italic opacity-60">Sin compromisos registrados</span>}
+                                            {/* En la fila va en texto plano: el HTML dentro de
+                                                una celda recortada a dos líneas descuadra la
+                                                tabla, y las viñetas no aportan en el resumen. */}
+                                            <td className={`px-3 py-2.5 text-fg-muted ${isExpanded ? 'whitespace-pre-line' : 'line-clamp-2'}`}>
+                                                {htmlAtexto(acuerdos) || <span className="italic opacity-60">Sin compromisos registrados</span>}
                                             </td>
                                             <td className="px-3 py-2.5" onClick={e => e.stopPropagation()}>
                                                 <div className="flex items-center justify-center gap-1">
@@ -603,9 +619,9 @@ export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any })
                                             <tr className="border-t border-border bg-primary-soft/10">
                                                 <td colSpan={5} className="px-3 py-3">
                                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-[12px]">
-                                                        <Detalle titulo="Antecedentes / Motivo" valor={ficha.antecedentes || ficha.ANTECEDENTES} />
-                                                        <Detalle titulo="Descripción de la visita" valor={ficha.descripcion || ficha.DESCRIPCION} />
-                                                        <Detalle titulo="Observaciones" valor={ficha.observaciones || ficha.OBSERVACIONES} />
+                                                        <Detalle rico titulo="Antecedentes / Motivo" valor={ficha.antecedentes || ficha.ANTECEDENTES} />
+                                                        <Detalle rico titulo="Descripción de la visita" valor={ficha.descripcion || ficha.DESCRIPCION} />
+                                                        <Detalle rico titulo="Observaciones" valor={ficha.observaciones || ficha.OBSERVACIONES} />
                                                         <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                                                             <Detalle titulo="Dirección" valor={ficha.direccion || ficha.DIRECCION} />
                                                             <Detalle titulo="Teléfono" valor={ficha.telefono || ficha.TELEFONO} />
@@ -622,6 +638,8 @@ export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any })
                         </tbody>
                     </table>
                 </div>
+            )}
+            </>
             )}
 
             {/* ─── Firmas ───
@@ -687,12 +705,17 @@ export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any })
                 </div>
             )}
 
-            {/* ─── Modal Crear / Editar ─── */}
+            {/* ─── Formulario Crear / Editar ───
+                Incrustado y no en modal: la ficha creció con el dictado, el
+                formato y las firmas, y un modal con scroll propio dentro de una
+                página que ya scrollea es incómodo — en el celular, inservible.
+                Ocupa el lugar de la tabla mientras se llena, como el asistente
+                del F13. */}
             {showModal && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                    <div className="bg-surface rounded-[10px] shadow-3 w-full max-w-[600px] max-h-[92vh] overflow-hidden flex flex-col border border-border">
+                <div>
+                    <div className="bg-surface rounded-[8px] border border-border shadow-[var(--shadow-1)] overflow-hidden">
 
-                        <div className="px-5 py-3.5 border-b border-border flex items-center justify-between bg-surface">
+                        <div className="px-5 py-3.5 border-b border-border flex items-center justify-between bg-surface-muted">
                             <div>
                                 <h3 className="text-[14px] font-semibold text-fg">
                                     {editingFicha ? 'Editar Ficha de Seguimiento' : 'Nueva Ficha de Seguimiento Familiar'}
@@ -701,12 +724,16 @@ export const SeguimientoFamiliarList = ({ nna, caso }: { nna: any; caso?: any })
                                     Formato F12 · {caso?.codigoCaso || caso?.codigo_caso || 'Sin caso vinculado'}
                                 </p>
                             </div>
-                            <button onClick={closeModal} className="p-1.5 text-fg-muted hover:text-fg hover:bg-surface-muted rounded-[5px] transition-all">
-                                <X size={16} />
+                            <button
+                                onClick={closeModal}
+                                title="Volver al listado"
+                                className="flex items-center gap-1.5 px-2.5 py-1.5 text-[12px] font-medium text-fg-muted hover:text-fg hover:bg-surface rounded-[5px] transition-all"
+                            >
+                                <X size={15} /> Volver al listado
                             </button>
                         </div>
 
-                        <div className="overflow-y-auto p-5 space-y-5 flex-1">
+                        <div className="p-5 space-y-5">
                             {/* Datos de la Visita */}
                             <div>
                                 <SectionTitle>Datos de la Visita</SectionTitle>

@@ -84,7 +84,56 @@ export const cerrarFase = async (logrosId: number, faseNum: 1 | 2 | 3) => {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.detail || `Error al cerrar Fase ${faseNum}`);
     }
-    return res.json() as Promise<{ ok: boolean; logros_id: number; fase_num: number; codigo_f05: string; pdf_url: string }>;
+    return res.json() as Promise<{
+        ok: boolean; logros_id: number; fase_num: number; codigo_f05: string; pdf_url: string;
+        // El cierre ya promovió el caso: no hay que actualizar la fase aparte.
+        fecha_fin: string; fase_vigente: string | null; mensaje: string;
+    }>;
+};
+
+// ── Tracking de fases ────────────────────────────────────────────────────────
+
+export interface FaseTracking {
+    fase: 'I' | 'II' | 'III';
+    nombre: string;
+    nombreCorto: string;
+    etiqueta: string;
+    fechaInicio: string | null;
+    fechaFin: string | null;
+    plazoMeses: number;
+    mesesExtension: number;
+    extensionMaxima: number;
+    estado: 'EN_CURSO' | 'CERRADA' | 'EXTENDIDA' | 'NO_SUPERADA';
+    cerradaPorId: number | null;
+    observacion: string | null;
+    fechaLimite: string | null;
+    diasTranscurridos: number | null;
+    vigente: boolean;
+    vencida: boolean;
+    diasVencida: number;
+}
+
+export interface TrackingFases {
+    casoId: number;
+    faseVigente: FaseTracking | null;
+    historial: FaseTracking[];
+    totalMeses: number;
+}
+
+/**
+ * Línea de tiempo de las fases del caso.
+ *
+ * El cálculo de plazos —días transcurridos, fecha límite, si está vencida—
+ * viene resuelto del backend a propósito: si cada pantalla lo recalculara,
+ * volveríamos al problema que este módulo vino a arreglar, con cinco lugares
+ * dando cinco respuestas distintas sobre la misma fase.
+ */
+export const getTrackingFases = async (casoId: number): Promise<TrackingFases> => {
+    const res = await fetch(`${API_URL}/proceso-logros/caso/${casoId}/fases`, {
+        headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error('Error al obtener el tracking de fases');
+    return res.json();
 };
 
 export const updateLogros = async (id: number, data: ProcesoLogrosPayload) => {

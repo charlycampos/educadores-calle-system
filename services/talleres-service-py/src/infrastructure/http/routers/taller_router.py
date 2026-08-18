@@ -3,7 +3,8 @@ from typing import List
 from src.domain.entities.taller import (
     PlanificarTallerRequest, EjecutarTallerRequest, TallerResponse,
     AgregarParticipanteRequest, ActualizarParticipanteRequest, ParticipanteResponse,
-    AgregarParticipantesBulkRequest, FamiliarCandidatoResponse, NnaCandidatoResponse
+    AgregarParticipantesBulkRequest, FamiliarCandidatoResponse, NnaCandidatoResponse,
+    EvaluacionTallerRequest
 )
 from src.infrastructure.db.repositories.oracle_taller_repository import (
     OracleTallerRepository, familiares_habilitados
@@ -34,6 +35,45 @@ async def ejecutar_taller(taller_id: int, data: EjecutarTallerRequest, request: 
         return await use_case.execute(taller_id, data, request.state.user_id, request.state.rol)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/{taller_id}/evaluacion", response_model=TallerResponse)
+async def guardar_evaluacion(
+    taller_id: int, data: EvaluacionTallerRequest, request: Request,
+    repo: OracleTallerRepository = Depends(get_repository),
+):
+    """
+    Guarda la evaluación del taller — el Formato N° 08.
+
+    Una sola por taller, no una por participante: es lo que pide el formato,
+    cuyo punto 9 lo firma el educador responsable del taller.
+    """
+    try:
+        return await repo.guardar_evaluacion(
+            taller_id, data.model_dump(), request.state.user_id
+        )
+    except Exception as e:
+        # ORA-00904 = faltan las columnas: la migración 004 no se ejecutó.
+        if "ORA-00904" in str(e):
+            raise HTTPException(
+                status_code=503,
+                detail="Falta ejecutar la migración 004_evaluacion_taller_f08.sql",
+            )
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{taller_id}/evaluacion/igualar", response_model=TallerResponse)
+async def igualar_evaluaciones(
+    taller_id: int, repo: OracleTallerRepository = Depends(get_repository),
+):
+    """
+    Quita las evaluaciones personalizadas para que todos hereden la del taller.
+
+    Va aparte y nunca se dispara solo: borrar lo que un educador escribió a
+    mano para un chico concreto tiene que ser una decisión suya.
+    """
+    await repo.igualar_evaluaciones(taller_id)
+    return await repo.get_taller_with_participants(taller_id)
+
 
 @router.get("", response_model=List[TallerResponse])
 async def listar_talleres(request: Request, repo: OracleTallerRepository = Depends(get_repository)):

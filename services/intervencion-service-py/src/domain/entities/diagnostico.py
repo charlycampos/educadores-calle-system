@@ -4,6 +4,16 @@ from pydantic import BaseModel, model_validator
 
 MOTIVO_PRIMERA_INFANCIA = "MENOR DE 3 AÑOS"
 
+# Campos que solo tienen sentido con matrícula vigente.
+#
+# Al marcar que el NNA no estudia se limpian, porque preguntar el turno o el
+# tipo de institución de alguien que no está matriculado no significa nada.
+#
+# LO QUE **NO** SE BORRA: bullying, expulsión, atraso escolar y problemas de
+# aprendizaje o conducta. Esos son antecedentes —y típicamente la CAUSA de la
+# deserción—; borrarlos al registrar que dejó de estudiar elimina justo la
+# explicación de por qué. Además era destructivo hacia atrás: reabrir una ficha
+# antigua y cambiar el combo perdía lo ya capturado.
 EDUCACION_DEPENDIENTE_VACIA = {
     "eduNivel": "",
     "eduGrado": "",
@@ -11,17 +21,8 @@ EDUCACION_DEPENDIENTE_VACIA = {
     "eduTipoIE": "",
     "eduModalidad": "",
     "eduInstitucion": "",
-    "presentaAtraso": False,
-    "tiempoAtraso": "",
-    "motivoAtraso": "",
-    "problemasAprendizaje": False,
-    "problemasConducta": False,
-    "intensidadConducta": "",
-    "expulsado": False,
-    "vecesExpulsado": "",
     "faltasTardanzas": False,
     "seDuermeClase": False,
-    "sufreBullying": False,
     "tutorConversaDocente": False,
 }
 

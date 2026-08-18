@@ -76,11 +76,36 @@ class ParticipanteResponse(BaseModel):
     logros: Optional[str] = None
     limitaciones: Optional[str] = None
     sugerencias: Optional[str] = None
+    # False = los tres campos de arriba vienen heredados del taller.
+    # True  = alguien escribió una evaluación distinta para este participante.
+    evaluacionPropia: bool = False
     nna: Optional[NnaMiniResponse] = None
     familiar: Optional[FamiliarMiniResponse] = None
 
     class Config:
         from_attributes = True
+
+
+class EvaluacionTallerRequest(BaseModel):
+    """
+    Formato N° 08 — Evaluación de Talleres Socioeducativos.
+
+    Solo los tres campos que el educador escribe. Los puntos 1, 2, 3, 8 y 9
+    del formato —taller, dirigido a, objetivo, lugar/fecha y educador— son
+    idénticos al Formato 07 y se heredan de la planificación al imprimir.
+    """
+    logros: Optional[str] = None
+    limitaciones: Optional[str] = None
+    sugerencias: Optional[str] = None
+
+
+class EvaluacionTallerResponse(BaseModel):
+    logros: str = ""
+    limitaciones: str = ""
+    sugerencias: str = ""
+    fecha: Optional[str] = None
+    evaluadaPorId: Optional[int] = None
+    evaluado: bool = False
 
 class FamiliarCandidatoResponse(BaseModel):
     """Familiar sugerido para el taller, derivado de los NNA ya inscritos."""
@@ -164,6 +189,9 @@ class TallerResponse(TallerBase):
     # Asistencia y evaluación del propio NNA en ese taller.
     asiste: Optional[bool] = None
     evaluacion: Optional[str] = None
+    # La evaluación DEL TALLER (Formato 08). Distinta de `evaluacion`, que es
+    # el texto del NNA en el historial: por eso el nombre no se reutiliza.
+    evaluacionTaller: Optional[EvaluacionTallerResponse] = None
 
     # Campos camelCase para compatibilidad con el frontend
     nombre: Optional[str] = None

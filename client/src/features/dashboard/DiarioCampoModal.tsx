@@ -3,7 +3,8 @@ import { GpsCapture } from '../../components/ui/GpsCapture';
 import type { Coordenadas } from '../../utils/geo';
 import { toast } from '../../components/ui/Toast';
 import { useForm } from 'react-hook-form';
-import { X, Search, ChevronLeft, Mic, MicOff, Calendar, MapPin, BookOpen, User, Camera, FileImage, PenTool } from 'lucide-react';
+import { X, Search, ChevronLeft, Calendar, MapPin, BookOpen, User, Camera, FileImage, PenTool } from 'lucide-react';
+import { CampoDictado } from '../../components/ui/CampoDictado';
 import { clsx } from 'clsx';
 import { useNnaStore } from '../../store/nna.store';
 import { createEntradaDiario, updateEntradaDiario } from '../../api/diario.api';
@@ -18,9 +19,6 @@ const TIPOS_ACTIVIDAD = [
     { value: 'VISITA', label: 'Visita Domiciliaria', icon: '🏠', color: 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100' },
     { value: 'RECORRIDO', label: 'Abordaje / Campo', icon: '🚶', color: 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100' },
 ];
-
-const getSpeechAPI = () =>
-    (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition || null;
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -74,11 +72,7 @@ export const DiarioCampoModal: React.FC<Props> = ({ open, onClose, entradaEditar
     const [isDrawing, setIsDrawing] = useState(false);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-    // Voz
-    const [isListening, setIsListening] = useState(false);
-    const [interim, setInterim]         = useState('');
-    const recognitionRef                = useRef<any>(null);
-    const hasSpeech                     = !!getSpeechAPI();
+    // El dictado por voz lo maneja `CampoDictado` en cada campo largo.
 
     const { register, handleSubmit, watch, setValue, reset, getValues } = useForm<DiarioFormValues>({
         defaultValues: {
@@ -206,14 +200,7 @@ export const DiarioCampoModal: React.FC<Props> = ({ open, onClose, entradaEditar
         }
     }, [open, entradaEditar, step]);
 
-    // Detener micrófono al cerrar
-    useEffect(() => {
-        if (!open) {
-            recognitionRef.current?.stop();
-            setIsListening(false);
-            setInterim('');
-        }
-    }, [open]);
+    // El micrófono se apaga solo: `CampoDictado` lo detiene al desmontarse.
 
     // NNAs con caso activo, filtrados por búsqueda
     const opciones: NnaOption[] = nnas
@@ -442,41 +429,8 @@ export const DiarioCampoModal: React.FC<Props> = ({ open, onClose, entradaEditar
         }
     };
 
-    // ── Voz ────────────────────────────────────────────────────────────────────
-
-    const toggleListening = () => {
-        if (isListening) {
-            recognitionRef.current?.stop();
-            return;
-        }
-        const SpeechAPI = getSpeechAPI();
-        if (!SpeechAPI) return;
-        const rec = new SpeechAPI();
-        rec.lang           = 'es-PE';
-        rec.continuous     = true;
-        rec.interimResults = true;
-        recognitionRef.current = rec;
-        rec.onstart  = () => setIsListening(true);
-        rec.onresult = (e: any) => {
-            let finalText = '';
-            let interimText = '';
-            for (let i = e.resultIndex; i < e.results.length; i++) {
-                const t = e.results[i][0].transcript;
-                if (e.results[i].isFinal) finalText += t;
-                else interimText += t;
-            }
-            if (finalText) {
-                const current = getValues('actividad') || '';
-                setValue('actividad', current.trimEnd() + (current ? ' ' : '') + finalText);
-                setInterim('');
-            } else {
-                setInterim(interimText);
-            }
-        };
-        rec.onerror = () => { setIsListening(false); setInterim(''); };
-        rec.onend   = () => { setIsListening(false); setInterim(''); };
-        rec.start();
-    };
+    // El reconocimiento de voz vive ahora en `CampoDictado`; esta copia local
+    // no manejaba el corte por silencio de Chrome ni los permisos denegados.
 
     if (!open) return null;
 
@@ -764,72 +718,34 @@ export const DiarioCampoModal: React.FC<Props> = ({ open, onClose, entradaEditar
                                 </div>
                             </div>
 
-                            {/* Narración */}
-                            <div>
-                                <div className="flex items-center justify-between mb-1.5">
-                                    <label className="text-[11px] font-bold text-gray-500 uppercase">
-                                        Narración / Descripción
-                                    </label>
-                                    {hasSpeech && (
-                                        <button type="button" onClick={toggleListening}
-                                            className={clsx(
-                                                'flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs transition-all active:scale-95',
-                                                isListening
-                                                    ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-200'
-                                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                            )}>
-                                            {isListening ? <><MicOff size={14} /> Detener</> : <><Mic size={14} /> Dictar</>}
-                                        </button>
-                                    )}
-                                </div>
-                                <div className="relative">
-                                    <textarea
-                                        rows={5}
-                                        value={narracion}
-                                        onChange={e => setValue('actividad', e.target.value)}
-                                        placeholder={isListening
-                                            ? '🎤 Escuchando... hable ahora'
-                                            : 'Describa lo observado durante la intervención...'}
-                                        className={clsx(
-                                            'w-full px-3 py-3 border-2 rounded-xl text-sm outline-none resize-none transition-all leading-relaxed',
-                                            isListening
-                                                ? 'border-red-400 bg-red-50 focus:ring-2 focus:ring-red-300'
-                                                : 'border-gray-200 bg-white focus:border-green-400 focus:ring-2 focus:ring-green-100'
-                                        )}
-                                    />
-                                    {interim && (
-                                        <div className="absolute bottom-2 left-3 right-3 text-xs text-red-400 italic pointer-events-none truncate">
-                                            {interim}…
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
+                            {/* Los tres campos largos pasan al componente compartido:
+                                dictado con reconexión y aviso de silencio, más
+                                negrita, cursiva, subrayado y viñetas. Antes solo la
+                                narración tenía micrófono, con su propia copia del
+                                código de reconocimiento. */}
+                            <CampoDictado
+                                label="Narración / Descripción"
+                                value={narracion || ''}
+                                onChange={v => setValue('actividad', v)}
+                                placeholder="Describa lo observado durante la intervención..."
+                                rows={5}
+                            />
 
-                            {/* Resultados Obtenidos */}
-                            <div>
-                                <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">
-                                    Resultados Obtenidos (Logros / Acuerdos)
-                                </label>
-                                <textarea
-                                    rows={3}
-                                    placeholder="Describa los acuerdos, compromisos o resultados logrados..."
-                                    {...register('resultadosObtenidos')}
-                                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none resize-none focus:border-green-400 focus:ring-2 focus:ring-green-100"
-                                />
-                            </div>
+                            <CampoDictado
+                                label="Resultados Obtenidos (Logros / Acuerdos)"
+                                value={watch('resultadosObtenidos') || ''}
+                                onChange={v => setValue('resultadosObtenidos', v)}
+                                placeholder="Describa los acuerdos, compromisos o resultados logrados..."
+                                rows={3}
+                            />
 
-                            {/* Observaciones */}
-                            <div>
-                                <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">
-                                    Observaciones Adicionales
-                                </label>
-                                <textarea
-                                    rows={2}
-                                    placeholder="Comentarios adicionales u observaciones sobre el desarrollo de la sesión..."
-                                    {...register('observacionesTexto')}
-                                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none resize-none focus:border-green-400 focus:ring-2 focus:ring-green-100"
-                                />
-                            </div>
+                            <CampoDictado
+                                label="Observaciones Adicionales"
+                                value={watch('observacionesTexto') || ''}
+                                onChange={v => setValue('observacionesTexto', v)}
+                                placeholder="Comentarios adicionales u observaciones sobre el desarrollo de la sesión..."
+                                rows={2}
+                            />
 
                             {/* Evidencias: Foto y Firma */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-gray-100 pt-4">

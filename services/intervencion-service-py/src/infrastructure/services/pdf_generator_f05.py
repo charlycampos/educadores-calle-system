@@ -5,6 +5,7 @@ from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.units import inch
+from src.infrastructure.services.texto_rico import html_a_reportlab
 
 
 # ── Ítems del protocolo ───────────────────────────────────────────────────────
@@ -207,7 +208,7 @@ def generate_f05_pdf(logros_data: dict, nna_data: dict, output_path: str) -> str
     if f1_obs:
         story.append(Spacer(1, 4))
         story.append(Paragraph("<b>Observaciones:</b>", label_style))
-        story.append(Paragraph(f1_obs, obs_style))
+        story.append(Paragraph(html_a_reportlab(f1_obs), obs_style))
     story.append(Spacer(1, 10))
 
     # ── FASE II ───────────────────────────────────────────────────────────────
@@ -224,7 +225,7 @@ def generate_f05_pdf(logros_data: dict, nna_data: dict, output_path: str) -> str
     if f2_obs:
         story.append(Spacer(1, 4))
         story.append(Paragraph("<b>Observaciones:</b>", label_style))
-        story.append(Paragraph(f2_obs, obs_style))
+        story.append(Paragraph(html_a_reportlab(f2_obs), obs_style))
     story.append(Spacer(1, 10))
 
     # ── FASE III ──────────────────────────────────────────────────────────────
@@ -241,7 +242,7 @@ def generate_f05_pdf(logros_data: dict, nna_data: dict, output_path: str) -> str
     if f3_obs:
         story.append(Spacer(1, 4))
         story.append(Paragraph("<b>Observaciones:</b>", label_style))
-        story.append(Paragraph(f3_obs, obs_style))
+        story.append(Paragraph(html_a_reportlab(f3_obs), obs_style))
     story.append(Spacer(1, 20))
 
     # ── FIRMAS ────────────────────────────────────────────────────────────────
@@ -404,7 +405,7 @@ def generate_f05_fase_pdf(logros_data: dict, nna_data: dict, fase_num: int, outp
     if obs:
         story.append(Spacer(1, 4))
         story.append(Paragraph("<b>Observaciones:</b>", label_style))
-        story.append(Paragraph(obs, obs_style))
+        story.append(Paragraph(html_a_reportlab(obs), obs_style))
     story.append(Spacer(1, 20))
 
     # Firmas

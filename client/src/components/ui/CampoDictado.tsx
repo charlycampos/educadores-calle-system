@@ -1,6 +1,28 @@
 import { useEffect, useRef, useState } from 'react';
-import { Mic, MicOff } from 'lucide-react';
+import { Mic, MicOff, Bold, Italic, Underline, List } from 'lucide-react';
 import { toast } from './Toast';
+import { limpiarHtml } from '../../utils/texto-rico';
+
+/**
+ * Campo de texto largo con formato y dictado por voz.
+ *
+ * Es el mismo comportamiento que ya usaba el Diario de Campo, extraído aquí
+ * para no volver a escribirlo en cada formato: los educadores llenan en campo,
+ * desde el celular, y en la reunión del 11/08/2026 pidieron dictado y formato
+ * (viñetas, negritas) en todas las secciones extensas.
+ *
+ * **Formato:** negrita, cursiva y viñetas, nada más. Es un formato oficial; con
+ * colores y tamaños la ficha impresa dejaría de parecerse al anexo aprobado. El
+ * contenido se guarda como HTML acotado y se limpia al entrar y al salir.
+ *
+ * **Dictado:** se presiona una vez para empezar y otra para detener. Lo
+ * reconocido se agrega al final de lo escrito. Necesita conexión —Chrome
+ * procesa la voz en sus servidores—; si el navegador no lo soporta, el botón no
+ * se muestra y el campo funciona igual.
+ */
+
+const getSpeechAPI = () =>
+    (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition || null;
 
 /**
  * Silencio tras el cual se da por olvidado el micrófono.
@@ -10,26 +32,6 @@ import { toast } from './Toast';
  * escuchando indefinidamente sin que el educador lo note.
  */
 const SILENCIO_MAX_MS = 60_000;
-
-/**
- * Campo de texto con dictado por voz.
- *
- * Es el mismo comportamiento que ya usaba el Diario de Campo, extraído aquí
- * para no volver a escribirlo en cada formato: los educadores llenan en campo,
- * desde el celular, y en la reunión del 11/08/2026 pidieron dictado en todas
- * las secciones extensas.
- *
- * Se presiona una vez para empezar y otra para detener. Lo reconocido se
- * **agrega al final** de lo que ya había escrito: el educador puede escribir un
- * poco, dictar y seguir escribiendo sin perder nada.
- *
- * Necesita conexión: Chrome procesa la voz en sus servidores. Si el navegador
- * no soporta la API, el botón no se muestra y el campo funciona como cualquier
- * otro.
- */
-
-const getSpeechAPI = () =>
-    (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition || null;
 
 interface CampoDictadoProps {
     label: string;
@@ -50,7 +52,9 @@ export const CampoDictado = ({
 }: CampoDictadoProps) => {
     const [isListening, setIsListening] = useState(false);
     const [interim, setInterim]         = useState('');
+    const [vacio, setVacio]             = useState(true);
     const recognitionRef                = useRef<any>(null);
+    const editorRef                     = useRef<HTMLDivElement | null>(null);
     // El texto vive en el componente padre; el reconocimiento es asíncrono y
     // sin esta referencia cada frase dictada pisaría a la anterior.
     const valueRef                      = useRef(value);
@@ -58,6 +62,41 @@ export const CampoDictado = ({
     /** Distingue "el educador pulsó Detener" de "Chrome se cortó solo". */
     const detenidoPorUsuario            = useRef(false);
     const silencioTimer                 = useRef<any>(null);
+
+    const hasSpeech = !!getSpeechAPI();
+
+    /**
+     * El contenido solo se escribe en el editor cuando difiere del que ya
+     * tiene. Reescribirlo en cada tecleo devolvería el cursor al inicio.
+     */
+    useEffect(() => {
+        const editor = editorRef.current;
+        if (!editor) return;
+        if (editor.innerHTML !== (value || '')) editor.innerHTML = value || '';
+        setVacio(!editor.textContent?.trim());
+    }, [value]);
+
+    // Si se cierra el formulario con el micrófono encendido, hay que apagarlo:
+    // con la reconexión automática seguiría escuchando en segundo plano.
+    useEffect(() => () => {
+        detenidoPorUsuario.current = true;
+        clearTimeout(silencioTimer.current);
+        recognitionRef.current?.stop();
+    }, []);
+
+    const emitir = () => {
+        const editor = editorRef.current;
+        if (!editor) return;
+        setVacio(!editor.textContent?.trim());
+        onChange(limpiarHtml(editor.innerHTML));
+    };
+
+    /** Aplica formato a lo seleccionado, sin sacar el foco del editor. */
+    const formatear = (comando: 'bold' | 'italic' | 'underline' | 'insertUnorderedList') => {
+        editorRef.current?.focus();
+        document.execCommand(comando, false);
+        emitir();
+    };
 
     /** Reinicia la cuenta de silencio cada vez que se oye algo. */
     const reiniciarVigilanciaSilencio = () => {
@@ -70,16 +109,6 @@ export const CampoDictado = ({
             toast.info('Se apagó el micrófono: no se escuchó nada durante un minuto.');
         }, SILENCIO_MAX_MS);
     };
-
-    const hasSpeech = !!getSpeechAPI();
-
-    // Si se cierra el formulario con el micrófono encendido, hay que apagarlo:
-    // con la reconexión automática seguiría escuchando en segundo plano.
-    useEffect(() => () => {
-        detenidoPorUsuario.current = true;
-        clearTimeout(silencioTimer.current);
-        recognitionRef.current?.stop();
-    }, []);
 
     const toggleListening = () => {
         if (isListening) {
@@ -112,8 +141,14 @@ export const CampoDictado = ({
                 else interimText += t;
             }
             if (finalText) {
-                const actual = valueRef.current || '';
-                onChange(actual.trimEnd() + (actual ? ' ' : '') + finalText.trim());
+                // Se agrega al final del contenido, respetando el formato que
+                // ya tuviera lo escrito.
+                const editor = editorRef.current;
+                if (editor) {
+                    const separador = editor.textContent?.trim() ? ' ' : '';
+                    editor.innerHTML = (editor.innerHTML || '') + separador + finalText.trim();
+                    emitir();
+                }
                 setInterim('');
             } else {
                 setInterim(interimText);
@@ -164,42 +199,97 @@ export const CampoDictado = ({
         rec.start();
     };
 
+    const botonBarra = 'flex items-center justify-center w-7 h-7 rounded-[6px] transition-all active:scale-95 bg-surface-muted text-fg-muted hover:text-fg hover:bg-border';
+
     return (
         <div>
-            <div className="flex items-center justify-between mb-1">
-                <label className="block text-[11px] font-semibold text-fg-muted uppercase tracking-wider">
-                    {label}
-                </label>
-                {hasSpeech && !disabled && (
-                    <button
-                        type="button"
-                        onClick={toggleListening}
-                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-[6px] font-bold text-[11px] transition-all active:scale-95 ${
-                            isListening
-                                ? 'bg-danger text-white animate-pulse'
-                                : 'bg-surface-muted text-fg-muted hover:text-fg hover:bg-border'
-                        }`}
-                    >
-                        {isListening
-                            ? <><MicOff size={12} /> Detener</>
-                            : <><Mic size={12} /> Dictar por voz</>
-                        }
-                    </button>
+            {/* Sin etiqueta cuando el formulario ya la pone por su cuenta —el
+                informe situacional titula cada sección—: la barra se va sola a
+                la derecha. */}
+            <div className={`flex items-center gap-2 mb-1 ${label ? 'justify-between' : 'justify-end'}`}>
+                {label && (
+                    <label className="block text-[11px] font-semibold text-fg-muted uppercase tracking-wider">
+                        {label}
+                    </label>
+                )}
+
+                {!disabled && (
+                    <div className="flex items-center gap-1">
+                        <button type="button" onClick={() => formatear('bold')}
+                                title="Negrita" aria-label="Negrita" className={botonBarra}>
+                            <Bold size={13} />
+                        </button>
+                        <button type="button" onClick={() => formatear('italic')}
+                                title="Cursiva" aria-label="Cursiva" className={botonBarra}>
+                            <Italic size={13} />
+                        </button>
+                        <button type="button" onClick={() => formatear('underline')}
+                                title="Subrayado" aria-label="Subrayado" className={botonBarra}>
+                            <Underline size={13} />
+                        </button>
+                        <button type="button" onClick={() => formatear('insertUnorderedList')}
+                                title="Viñetas" aria-label="Viñetas" className={botonBarra}>
+                            <List size={13} />
+                        </button>
+
+                        {/* Solo el icono: el texto "Dictar por voz" repetido en
+                            cada casilla competía con la etiqueta del campo. */}
+                        {hasSpeech && (
+                            <button
+                                type="button"
+                                onClick={toggleListening}
+                                title={isListening ? 'Detener el dictado' : 'Dictar por voz'}
+                                aria-label={isListening ? 'Detener el dictado' : 'Dictar por voz'}
+                                className={`flex items-center justify-center w-7 h-7 rounded-[6px] transition-all active:scale-95 ml-1 ${
+                                    isListening
+                                        ? 'bg-danger text-white animate-pulse'
+                                        : 'bg-surface-muted text-fg-muted hover:text-fg hover:bg-border'
+                                }`}
+                            >
+                                {isListening ? <MicOff size={13} /> : <Mic size={13} />}
+                            </button>
+                        )}
+                    </div>
                 )}
             </div>
 
-            <textarea
-                rows={rows}
-                value={value}
-                onChange={e => onChange(e.target.value)}
-                disabled={disabled}
-                placeholder={isListening ? '🎤 Escuchando… hable ahora' : placeholder}
-                className={`w-full px-3 py-2 text-[13px] rounded-[6px] text-fg placeholder:text-fg-muted outline-none resize-none transition-colors border ${
-                    isListening
-                        ? 'border-danger bg-danger-soft/30 focus:ring-2 focus:ring-danger/30'
-                        : 'bg-surface border-border focus:ring-2 focus:ring-primary/30 focus:border-primary'
-                }`}
-            />
+            <div className="relative">
+                <div
+                    ref={editorRef}
+                    contentEditable={!disabled}
+                    suppressContentEditableWarning
+                    onInput={emitir}
+                    onBlur={emitir}
+                    /* Al pegar desde Word se toma solo el texto: el HTML de Word
+                       arrastra fuentes, tamaños y tablas que rompen la ficha. */
+                    onPaste={e => {
+                        e.preventDefault();
+                        const texto = e.clipboardData.getData('text/plain');
+                        document.execCommand('insertText', false, texto);
+                    }}
+                    style={{ minHeight: `${Math.max(rows, 2) * 24 + 16}px` }}
+                    className={`campo-rico w-full px-3 py-2 text-[13px] rounded-[6px] text-fg outline-none overflow-y-auto transition-colors border ${
+                        disabled
+                            ? 'bg-surface-muted text-fg-muted cursor-not-allowed border-border'
+                            : isListening
+                                ? 'border-danger bg-danger-soft/30 ring-2 ring-danger/30'
+                                : 'bg-surface border-border focus:ring-2 focus:ring-primary/30 focus:border-primary'
+                    }`}
+                />
+
+                {/* El marcador de posición va aparte: un contenedor editable no
+                    admite `placeholder`. */}
+                {vacio && !isListening && (
+                    <span className="absolute left-3 top-2 text-[13px] text-fg-muted pointer-events-none">
+                        {placeholder}
+                    </span>
+                )}
+                {vacio && isListening && (
+                    <span className="absolute left-3 top-2 text-[13px] text-fg-muted pointer-events-none">
+                        🎤 Escuchando… hable ahora
+                    </span>
+                )}
+            </div>
 
             {/* Lo que Chrome aún está interpretando: se ve en gris y desaparece
                 en cuanto la frase se da por buena. */}

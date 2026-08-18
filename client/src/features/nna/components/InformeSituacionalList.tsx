@@ -4,7 +4,7 @@ import { toast } from '../../../components/ui/Toast';
 import { getDownloadToken } from '../../../utils/auth';
 import { EXPEDIENTE_API_URL } from '../../../config/api';
 import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, FileText, AlertCircle, RefreshCw, Eye, FileDown, Upload } from 'lucide-react';
+import { Plus, Edit, Trash2, FileText, AlertCircle, RefreshCw, FileDown, Upload, Share2 } from 'lucide-react';
 import { descargarWord, subirInformeFirmado } from '../../../api/informe-situacional.api';
 import { useNnaStore } from '../../../store/nna.store';
 
@@ -171,24 +171,48 @@ export const InformeSituacionalList = ({
                                         </td>
                                         <td className="px-4 py-3 text-right">
                                             <div className="flex justify-end gap-1.5">
+                                                {/* El lápiz va siempre, también en los
+                                                    finalizados: el documento oficial es el
+                                                    Word que se tramita por el SGD, así que
+                                                    la vista HTML no aportaba nada. Lo que sí
+                                                    hace falta es entrar a revisar o corregir
+                                                    lo registrado y volver a bajar el Word. */}
+                                                <button
+                                                    onClick={onEditarInforme}
+                                                    className="p-1.5 text-fg-muted hover:text-primary hover:bg-primary-soft rounded-[4px] transition-colors"
+                                                    title={informe.estado === 'FINALIZADO' ? 'Revisar o corregir' : 'Editar'}
+                                                >
+                                                    <Edit size={15} />
+                                                </button>
                                                 {informe.estado === 'FINALIZADO' ? (
                                                     <>
-                                                    <button
-                                                        onClick={async () => {
-                                                            const token = await getDownloadToken();
-                                                            window.open(`${EXPEDIENTE_API_URL}/informe-situacional/caso/${casoId}/vista?token=${token}`, '_blank');
-                                                        }}
-                                                        className="p-1.5 text-fg-muted hover:text-primary hover:bg-primary-soft rounded-[4px] transition-colors"
-                                                        title="Ver informe"
-                                                    >
-                                                        <Eye size={15} />
-                                                    </button>
                                                     <button
                                                         onClick={() => descargarWord(casoId, informe.id)}
                                                         className="p-1.5 text-fg-muted hover:text-primary hover:bg-primary-soft rounded-[4px] transition-colors"
                                                         title="Descargar Word para el SGD"
                                                     >
                                                         <FileDown size={15} />
+                                                    </button>
+                                                    {/* Derivación — todavía inactiva.
+                                                        Falta definir a quién se deriva
+                                                        exactamente: la idea acordada es un
+                                                        combo DEMUNA / UPE y, según lo elegido,
+                                                        un segundo combo con la instancia
+                                                        concreta (reunión 11/08/2026). Con ese
+                                                        dato, la trabajadora social recibe el
+                                                        informe ya dirigido.
+
+                                                        Se deja visible y deshabilitado a
+                                                        propósito: así el educador sabe que el
+                                                        paso existe y está por venir, en vez de
+                                                        que aparezca un día sin aviso. */}
+                                                    <button
+                                                        type="button"
+                                                        disabled
+                                                        title="Derivar a DEMUNA o UPE — disponible próximamente"
+                                                        className="p-1.5 text-fg-muted/40 rounded-[4px] cursor-not-allowed"
+                                                    >
+                                                        <Share2 size={15} />
                                                     </button>
                                                     <label
                                                         className={`p-1.5 rounded-[4px] transition-colors cursor-pointer ${subiendo ? 'text-fg-muted/40' : 'text-fg-muted hover:text-primary hover:bg-primary-soft'}`}
@@ -205,22 +229,16 @@ export const InformeSituacionalList = ({
                                                     </label>
                                                     </>
                                                 ) : (
-                                                    <>
-                                                        <button
-                                                            onClick={onEditarInforme}
-                                                            className="p-1.5 text-fg-muted hover:text-primary hover:bg-primary-soft rounded-[4px] transition-colors"
-                                                            title="Editar"
-                                                        >
-                                                            <Edit size={15} />
-                                                        </button>
-                                                        <button
-                                                            onClick={handleEliminar}
-                                                            className="p-1.5 text-fg-muted hover:text-danger hover:bg-danger-soft rounded-[4px] transition-colors"
-                                                            title="Eliminar"
-                                                        >
-                                                            <Trash2 size={15} />
-                                                        </button>
-                                                    </>
+                                                    // Eliminar solo en borrador: un informe ya
+                                                    // finalizado salió al SGD y borrarlo dejaría
+                                                    // el expediente sin su rastro.
+                                                    <button
+                                                        onClick={handleEliminar}
+                                                        className="p-1.5 text-fg-muted hover:text-danger hover:bg-danger-soft rounded-[4px] transition-colors"
+                                                        title="Eliminar"
+                                                    >
+                                                        <Trash2 size={15} />
+                                                    </button>
                                                 )}
                                             </div>
                                         </td>
@@ -248,31 +266,22 @@ export const InformeSituacionalList = ({
                                 </div>
                             </div>
                             <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/50">
-                                {informe.estado === 'FINALIZADO' ? (
+                                {/* Misma lógica que en la tabla: entrar a la ficha
+                                    siempre, y eliminar solo mientras sea borrador. */}
+                                <button
+                                    onClick={onEditarInforme}
+                                    className="flex-1 inline-flex items-center justify-center gap-1.5 bg-primary-soft text-primary py-1.5 rounded-lg text-xs font-bold"
+                                >
+                                    <Edit size={14} />
+                                    {informe.estado === 'FINALIZADO' ? 'Revisar' : 'Editar'}
+                                </button>
+                                {informe.estado !== 'FINALIZADO' && (
                                     <button
-                                        onClick={async () => {
-                                            const token = await getDownloadToken();
-                                            window.open(`${EXPEDIENTE_API_URL}/informe-situacional/caso/${casoId}/vista?token=${token}`, '_blank');
-                                        }}
-                                        className="flex-1 inline-flex items-center justify-center gap-1.5 bg-primary-soft text-primary py-1.5 rounded-lg text-xs font-bold"
+                                        onClick={handleEliminar}
+                                        className="flex-1 inline-flex items-center justify-center gap-1.5 bg-danger-soft text-danger py-1.5 rounded-lg text-xs font-bold"
                                     >
-                                        <Eye size={14} /> Ver Informe
+                                        <Trash2 size={14} /> Eliminar
                                     </button>
-                                ) : (
-                                    <>
-                                        <button
-                                            onClick={onEditarInforme}
-                                            className="flex-1 inline-flex items-center justify-center gap-1.5 bg-warning-soft text-warning py-1.5 rounded-lg text-xs font-bold"
-                                        >
-                                            <Edit size={14} /> Editar
-                                        </button>
-                                        <button
-                                            onClick={handleEliminar}
-                                            className="flex-1 inline-flex items-center justify-center gap-1.5 bg-danger-soft text-danger py-1.5 rounded-lg text-xs font-bold"
-                                        >
-                                            <Trash2 size={14} /> Eliminar
-                                        </button>
-                                    </>
                                 )}
                             </div>
                         </div>

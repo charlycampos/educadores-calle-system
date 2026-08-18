@@ -45,15 +45,15 @@ export const cerrarCaso = async (casoId: number, data: Partial<InformeCierre>) =
         body: JSON.stringify(payload)
     });
     if (!response.ok) throw new Error('Error cerrando caso');
-    return response.json();
+    // Se mapea igual que al leer: el backend responde en snake_case y la
+    // pantalla lee camelCase. Sin esto, tras guardar un borrador la fila
+    // mostraba "Borrador / No registrada / No registrado" hasta recargar.
+    return mapInformeCierre(await response.json());
 };
 
-export const getInformeCierre = async (casoId: number): Promise<any> => {
-    const response = await fetch(`${API_URL}/cierre/caso/${casoId}`, { headers: getHeaders() });
-    if (!response.ok) throw new Error('Error fetching informe cierre');
-    const data = await response.json();
+/** El backend responde en snake_case; la pantalla trabaja en camelCase. */
+const mapInformeCierre = (data: any): any => {
     if (!data) return null;
-    // Return mapped object
     return {
         id: data.id,
         casoId: data.caso_id,
@@ -72,4 +72,10 @@ export const getInformeCierre = async (casoId: number): Promise<any> => {
         estado: data.estado,
         detalles: data.detalles
     };
+};
+
+export const getInformeCierre = async (casoId: number): Promise<any> => {
+    const response = await fetch(`${API_URL}/cierre/caso/${casoId}`, { headers: getHeaders() });
+    if (!response.ok) throw new Error('Error fetching informe cierre');
+    return mapInformeCierre(await response.json());
 };

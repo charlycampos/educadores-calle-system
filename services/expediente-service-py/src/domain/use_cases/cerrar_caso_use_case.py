@@ -1,6 +1,12 @@
 """
-Crea el informe de cierre y marca el caso como CERRADO.
-Genera automáticamente el folio INF en el expediente.
+Crea y actualiza la Ficha de Egreso (F13).
+
+NO egresa al NNA ni asigna correlativo: las dos cosas ocurren cuando el
+coordinador firma (ver `cierre_router.firmar_coordinador`). Aquí solo se
+guarda la ficha y, al finalizarla, se crea su folio en el expediente.
+
+La ficha es editable en BORRADOR, OBSERVADO y FINALIZADO. Queda bloqueada
+mientras espera la firma del coordinador y una vez firmada.
 """
 from dataclasses import dataclass
 from typing import Optional
@@ -45,12 +51,22 @@ class CerrarCasoUseCase:
                 f"El caso {input.caso_id} no pertenece a su sede"
             )
 
-        # Verificar que no exista ya un informe de cierre
+        # Verificar en qué estado está el informe de cierre
+        #
+        # Editable en BORRADOR y en OBSERVADO. Lo segundo es el arreglo del
+        # circuito: cuando el coordinador devolvía una ficha con observaciones,
+        # el educador recibía 409 al intentar guardar la corrección. Solo podía
+        # volver a firmar la misma ficha sin cambiar nada, que es justo lo
+        # contrario de lo que se acordó traer desde Zimbra.
         existente = await self._informe_repo.find_by_caso(input.caso_id)
         if existente:
-            if existente.estado == "FINALIZADO":
-                raise CasoYaCerradoError(f"El caso {input.caso_id} ya tiene informe de cierre")
-            elif existente.estado == "BORRADOR":
+            if existente.estado in ("PEND_COORDINADOR", "FIRMADO"):
+                raise CasoYaCerradoError(
+                    "La ficha está en revisión del coordinador y no se puede modificar"
+                    if existente.estado == "PEND_COORDINADOR"
+                    else f"El caso {input.caso_id} ya tiene informe de cierre firmado"
+                )
+            elif existente.estado in ("BORRADOR", "OBSERVADO", "FINALIZADO"):
                 informe = await self._informe_repo.update(
                     id=existente.id,
                     motivo_egreso=input.motivo_egreso,
@@ -66,14 +82,16 @@ class CerrarCasoUseCase:
             else:
                 raise CasoYaCerradoError(f"Estado de informe no reconocido: {existente.estado}")
         else:
-            anio = datetime.now().year
-            siguiente_inf = await self._informe_repo.get_next_correlativo(anio, input.sede_id)
-            sede_codigo = await self._informe_repo.get_sede_codigo(input.sede_id)
-            codigo_informe = f"INF-{sede_codigo}-{anio}-{siguiente_inf:04d}"
-
+            # SIN correlativo todavía.
+            #
+            # Antes se asignaba aquí, en el primer guardado: un borrador que el
+            # educador abría y descartaba se llevaba un número para siempre, y
+            # la numeración quedaba con huecos. El correlativo se asigna al
+            # firmar el coordinador (ver cierre_router.firmar_coordinador), que
+            # es cuando la ficha pasa a ser un documento oficial.
             informe = await self._informe_repo.create(
                 caso_id=input.caso_id,
-                codigo_informe=codigo_informe,
+                codigo_informe=None,
                 motivo_egreso=input.motivo_egreso,
                 fecha_egreso=input.fecha_egreso or datetime.now(),
                 situacion_familiar=input.situacion_familiar,
@@ -87,18 +105,36 @@ class CerrarCasoUseCase:
             )
 
 
-        # Agregar folio INF al expediente automáticamente SOLO si se finaliza el informe
+        # El folio INF se crea al finalizar, sin correlativo todavía: es el
+        # comprobante de que la ficha existe en el expediente. Su título se
+        # completa con el correlativo cuando el coordinador firma.
+        #
+        # `existe_folio_inf` evita duplicarlo si el educador finaliza, el
+        # coordinador observa y el educador vuelve a finalizar.
         if input.estado == "FINALIZADO":
-            siguiente_folio = await self._folio_repo.get_next_numero_folio(input.caso_id)
-            await self._folio_repo.create(
-                caso_id=input.caso_id,
-                sede_id=input.sede_id,
-                numero_folio=siguiente_folio,
-                tipo_documento="INF",
-                titulo=f"Informe de Cierre — {informe.codigo_informe}",
-                archivo_url=input.archivo_url or "",
-                hash_documento=None,
-                creado_por_id=input.creado_por_id,
-            )
+            if not await self._folio_repo.existe_folio_inf(input.caso_id):
+                siguiente_folio = await self._folio_repo.get_next_numero_folio(input.caso_id)
+                await self._folio_repo.create(
+                    caso_id=input.caso_id,
+                    sede_id=input.sede_id,
+                    numero_folio=siguiente_folio,
+                    tipo_documento="INF",
+                    titulo=f"Informe de Cierre — {informe.codigo_informe or 'pendiente de firma'}",
+                    archivo_url=input.archivo_url or "",
+                    hash_documento=None,
+                    creado_por_id=input.creado_por_id,
+                )
+
+        # El NNA NO egresa aquí.
+        #
+        # El egreso lo declara la firma del coordinador, no el educador al
+        # finalizar. Antes se cerraba el caso en este punto y producía un estado
+        # imposible: el educador finalizaba, el NNA salía de todos los tableros,
+        # y si después el coordinador observaba la ficha, quedaba un caso
+        # cerrado con un informe en corrección.
+        #
+        # Ahora el chico sigue contándose en la carga de su educador hasta que
+        # su egreso está aprobado, que es lo que pasa en la realidad.
+        # Ver cierre_router.firmar_coordinador.
 
         return informe

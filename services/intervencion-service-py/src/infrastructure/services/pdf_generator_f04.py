@@ -7,6 +7,7 @@ from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.units import inch
+from src.infrastructure.services.texto_rico import html_a_reportlab
 
 
 # ── Catálogos (mismos values/labels que usa el formulario F04 en el frontend) ──
@@ -223,6 +224,19 @@ def generate_f04_pdf(diag_data: dict, nna_data: dict, output_path: str) -> str:
             return "SÍ"
         return "NO"
 
+    def sino_nd(val):
+        """
+        SÍ / NO / — para las preguntas que admiten "no se sabe".
+
+        `yesno` devuelve "NO" ante `None`, y en un documento oficial eso
+        convierte "nadie respondió" en una negación afirmada. Con explotación
+        sexual eso es especialmente grave: el PDF declaraba que el NNA no es
+        víctima cuando en realidad nunca se preguntó.
+        """
+        if val is None or val == "":
+            return "—"
+        return yesno(val)
+
     def sina(val):
         """SI / NO / A VECES."""
         s = c(val, "")
@@ -252,7 +266,11 @@ def generate_f04_pdf(diag_data: dict, nna_data: dict, output_path: str) -> str:
         return Paragraph(c(text), label_style)
 
     def V(text, default="-"):
-        return Paragraph(c(text, default), value_style)
+        # Pasa por el conversor porque varios campos del F04 —actividad en
+        # calle, motivo, observaciones de salud— se capturan con formato y se
+        # guardan como HTML. Reportlab aborta el PDF entero con una etiqueta que
+        # no conoce; los valores sin etiquetas salen intactos.
+        return Paragraph(html_a_reportlab(c(text, default)), value_style)
 
     # ── datos_extra ───────────────────────────────────────────────────────
     extra = diag_data.get("datos_extra") or {}
@@ -344,7 +362,7 @@ def generate_f04_pdf(diag_data: dict, nna_data: dict, output_path: str) -> str:
         [L("Horarios:"),          V(horarios_str),                         L("Frecuencia:"),           V(frecuencia_str)],
         [L("Ingreso Semanal:"),   V(f"S/ {c(det.get('ingresoSemanal'))}"), L("Uso del Dinero:"),       V(uso_dinero_str)],
         [L("Modalidad Trabajo:"), V(modal_str),                            L("Acompañamiento:"),       V(acomp_str)],
-        [L("Víctima Explotación:"), V(yesno(det.get("explotacionSexual"))), L("¿Obligado?:"),          V(f"{yesno(oblig.get('si'))} — {c(oblig.get('quien'))}".strip("- "))],
+        [L("Víctima Explotación:"), V(sino_nd(det.get("explotacionSexual"))), L("¿Obligado?:"),        V(f"{sino_nd(oblig.get('si'))} — {c(oblig.get('quien'))}".strip("- "))],
         [L("¿Escapó de casa?:"),  V(f"{yesno(escap.get('si'))} — {c(escap.get('veces'))} veces" if escap.get("si") else yesno(escap.get("si"))),
                                                                             L("Consumo Sustancias:"),   V(yesno(consumo.get("si")))],
         [L("Tipo Sustancia:"),    V(consumo.get("tipo")),                  L("Frec. / Tiempo:"),       V(f"{c(consumo.get('frecuencia'))} — {consumo_tiempo}".strip("- "))],

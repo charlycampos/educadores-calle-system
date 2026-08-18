@@ -5,7 +5,10 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse
 from src.domain.entities.proceso_logros import ProcesoLogrosCreate
 from src.infrastructure.db.repositories.oracle_proceso_logros_repository import OracleProcesoLogrosRepository
+from src.infrastructure.db.repositories.oracle_caso_fase_repository import OracleCasoFaseRepository
+from src.infrastructure.http.middleware.jwt_middleware import get_current_user
 from src.domain.use_cases.proceso_logros_use_case import ProcesoLogrosUseCase
+from src.domain import fases as cat
 
 logger = logging.getLogger("proceso_logros_router")
 
@@ -14,6 +17,10 @@ router = APIRouter(prefix="/api/proceso-logros", tags=["Proceso de Logros F05"])
 
 def get_repo():
     return OracleProcesoLogrosRepository()
+
+
+def get_fase_repo():
+    return OracleCasoFaseRepository()
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -176,10 +183,23 @@ async def cerrar_fase(
     logros_id: int,
     fase_num: int,
     repo: OracleProcesoLogrosRepository = Depends(get_repo),
+    fase_repo: OracleCasoFaseRepository = Depends(get_fase_repo),
+    current_user: dict = Depends(get_current_user),
 ):
     """
-    Cierra una fase del F05 (1, 2 ó 3), genera su PDF parcial y devuelve la URL.
+    Cierra una fase del F05 (1, 2 ó 3), promueve el caso a la siguiente fase,
+    genera su PDF parcial y devuelve la URL.
     El frontend registra el folio en EXP_FOLIO tras llamar a este endpoint.
+
+    Este es el ÚNICO punto del sistema donde un caso avanza de fase. El
+    educador da un clic y el resto ocurre solo: se sella la fecha de término,
+    se abre la siguiente fase al día siguiente, se actualiza NNA_CASO.FASE y
+    queda el rastro en NNA_HISTORIAL_ESTADO. No hay ningún campo "fase" que
+    alguien tenga que llenar a mano.
+
+    Lo automático es el registro y el cálculo, nunca la decisión: ningún plazo
+    vencido promueve a nadie. Cuando una fase pasa su límite, aparece como
+    alerta en el tablero y ahí se queda hasta que un educador la cierre.
 
     El cierre NO exige que los indicadores estén cumplidos. Acuerdo con los
     educadores (reunión SEC 05/08/2026, Luis Gutiérrez):
@@ -217,7 +237,36 @@ async def cerrar_fase(
             detail=f"Marca al menos un indicador de la Fase {label} para poder cerrarla.",
         )
 
+    # ── 1. Sellar el dato ANTES de generar el PDF ──────────────────────────
+    # El orden importa: reportlab es frágil y si aborta, el avance de fase no
+    # debe perderse. Antes se generaba el PDF y no se escribía nada, así que
+    # una fase cerrada solo dejaba rastro en el nombre de un archivo.
+    from datetime import date
+    fecha_fin = date.today()
+    caso_id = logros.get("caso_id")
+
+    try:
+        await repo.sellar_fin_fase(logros_id, fase_num, fecha_fin)
+        if caso_id:
+            await fase_repo.cerrar_y_promover(
+                caso_id=caso_id,
+                fase=cat.desde_numero(fase_num),
+                fecha_fin=fecha_fin,
+                cerrada_por_id=current_user.get("userId"),
+            )
+        else:
+            # Un F05 sin caso_id es un dato viejo. Se registra la fecha igual
+            # y se avisa: sin caso no hay a quién promover.
+            logger.warning(f"F05 id={logros_id} sin caso_id: no se promovió la fase")
+    except Exception as e:
+        logger.error(f"Error al cerrar la fase {fase_num} del F05 id={logros_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"No se pudo registrar el cierre de la Fase {label}: {e}")
+
+    # ── 2. Generar el PDF ──────────────────────────────────────────────────
+    # Se relee la ficha para que el PDF salga con la fecha de término recién
+    # sellada; si no, el documento archivado quedaría sin ella.
     from src.infrastructure.services.pdf_generator_f05 import generate_f05_fase_pdf
+    logros = await repo.get_by_id(logros_id)
     nna_data = await _get_nna_data(logros.get("nna_id"))
     filepath = _get_fase_pdf_path(logros, fase_num)
     try:
@@ -227,12 +276,45 @@ async def cerrar_fase(
         logger.error(f"Error generando PDF F05 Fase {fase_num} id={logros_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error al generar el PDF de la Fase {label}: {e}")
 
+    siguiente = cat.SIGUIENTE[cat.desde_numero(fase_num)]
     return {
         "ok": True,
         "logros_id": logros_id,
         "fase_num": fase_num,
         "codigo_f05": logros.get("codigo_f05"),
         "pdf_url": f"/api/proceso-logros/{logros_id}/pdf/fase/{fase_num}",
+        "fecha_fin": fecha_fin.isoformat(),
+        "fase_vigente": siguiente,
+        "mensaje": (
+            f"Fase {label} cerrada. El caso pasa a la Fase {siguiente}."
+            if siguiente else
+            f"Fase {label} cerrada. El NNA está listo para el egreso (Ficha F13)."
+        ),
+    }
+
+
+# ── Tracking de fases ─────────────────────────────────────────────────────────
+
+@router.get("/caso/{caso_id}/fases")
+async def tracking_fases(
+    caso_id: int,
+    fase_repo: OracleCasoFaseRepository = Depends(get_fase_repo),
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Línea de tiempo de las fases del caso: cuándo empezó cada una, cuánto duró,
+    si está vencida y quién la cerró.
+
+    El cálculo de plazos se hace aquí y no en el frontend, para que ninguna
+    pantalla vuelva a inventar su propia versión de la fase.
+    """
+    historial = await fase_repo.historial(caso_id)
+    vigente = next((f for f in historial if f["vigente"]), None)
+    return {
+        "casoId":       caso_id,
+        "faseVigente":  vigente,
+        "historial":    historial,
+        "totalMeses":   sum(cat.PLAZO_MESES.values()),
     }
 
 
@@ -278,14 +360,19 @@ async def get_fase_pdf(
 async def finalizar_logros(
     logros_id: int,
     repo: OracleProcesoLogrosRepository = Depends(get_repo),
+    fase_repo: OracleCasoFaseRepository = Depends(get_fase_repo),
+    current_user: dict = Depends(get_current_user),
 ):
     """
-    Finaliza el F05: genera el PDF de forma síncrona y devuelve la URL.
+    Finaliza el F05: cierra la Fase III, genera el PDF y devuelve la URL.
     El frontend registra el folio en EXP_FOLIO tras llamar a este endpoint.
 
     Igual que al cerrar una fase, no se exige que los indicadores estén
     cumplidos: un NO o un EN PROCESO son evaluaciones válidas. Solo se pide
     que las fases previas estén cerradas y que se haya evaluado algo en la III.
+
+    Cerrar la Fase III NO egresa al NNA: el egreso lo declara el F13. El caso
+    queda en Fase III y sin fase abierta, listo para la Ficha de Egreso.
     """
     logros = await repo.get_by_id(logros_id)
     if not logros:
@@ -300,8 +387,27 @@ async def finalizar_logros(
             detail="Marca al menos un indicador de la Fase III para poder cerrarla.",
         )
 
+    # Sellar la Fase III antes del PDF, igual que en cerrar-fase. Este endpoint
+    # es el que usa el botón "Cerrar Fase III y Egresar", así que sin esto
+    # F3_FIN quedaba en blanco y el tracking mostraba la Fase III abierta —
+    # marcándola como vencida a los 6 meses de un caso ya terminado.
+    from datetime import date
+    fecha_fin = date.today()
+    caso_id = logros.get("caso_id")
+    try:
+        await repo.sellar_fin_fase(logros_id, 3, fecha_fin)
+        if caso_id:
+            await fase_repo.cerrar_y_promover(
+                caso_id=caso_id, fase="III", fecha_fin=fecha_fin,
+                cerrada_por_id=current_user.get("userId"),
+            )
+    except Exception as e:
+        logger.error(f"Error al cerrar la Fase III del F05 id={logros_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"No se pudo registrar el cierre de la Fase III: {e}")
+
     # Generar PDF de forma síncrona (no en background)
     from src.infrastructure.services.pdf_generator_f05 import generate_f05_pdf
+    logros = await repo.get_by_id(logros_id)
     nna_data = await _get_nna_data(logros.get("nna_id"))
     filepath  = _get_pdf_path(logros)
     try:

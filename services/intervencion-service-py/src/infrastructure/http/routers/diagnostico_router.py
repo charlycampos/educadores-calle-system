@@ -257,12 +257,20 @@ async def actualizar_diagnostico(
     diag = await use_case.obtener_diagnostico_por_id(id)
     if not diag:
         raise HTTPException(status_code=404, detail="Diagnóstico no encontrado")
-    result = await use_case.actualizar_diagnostico(id, data)
+
+    try:
+        result = await use_case.actualizar_diagnostico(id, data)
+    except ValueError as e:
+        # La ficha no pertenece al NNA que dice el payload. Se rechaza en vez de
+        # escribir sobre la identidad de otro chico.
+        raise HTTPException(status_code=409, detail=str(e))
+
     if not _es_borrador(data):
         background_tasks.add_task(trigger_f04_pdf_generation, id)
         # Si el registro nació como borrador, la apertura de expediente quedó
-        # pendiente en el POST; se dispara aquí al finalizarlo.
-        await trigger_apertura_expediente(data.nna_id)
+        # pendiente en el POST; se dispara aquí al finalizarlo. Se usa el NNA de
+        # la ficha guardada, no el del payload.
+        await trigger_apertura_expediente(diag.get("nna_id") or data.nna_id)
     return result
 
 

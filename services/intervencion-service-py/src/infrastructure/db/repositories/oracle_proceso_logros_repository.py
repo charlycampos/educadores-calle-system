@@ -118,6 +118,50 @@ class OracleProcesoLogrosRepository:
                 columns = [col[0].lower() for col in cur.description]
                 return await self._row_to_dict(row, columns)
 
+    async def sellar_fin_fase(self, logros_id: int, fase_num: int, fecha_fin) -> None:
+        """
+        Sella la fecha de término de una fase y abre la siguiente al día
+        siguiente, dentro del propio F05.
+
+        Lo llama el botón "Cerrar fase". Antes ese botón solo generaba el PDF:
+        la fecha únicamente se guardaba si el educador además volvía a grabar
+        el formulario completo, así que había fichas con la fase cerrada y sin
+        fecha de término.
+
+        El inicio de la fase siguiente es el día posterior al término, según el
+        acuerdo de la reunión del 05/08/2026 (María del Carmen): "supongamos
+        que terminó el 30 de agosto la fase 1, la fase 2 tendría que empezar el
+        primero de septiembre".
+
+        NVL en los dos casos: no se pisa una fecha que el educador ya escribió
+        a mano en la ficha.
+        """
+        if fase_num not in (1, 2, 3):
+            raise ValueError(f"Número de fase inválido: {fase_num}")
+
+        pool = get_pool()
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    f"""
+                    UPDATE PROCESO_LOGROS
+                       SET F{fase_num}_FIN = NVL(F{fase_num}_FIN, :1),
+                           UPDATED_AT     = SYSTIMESTAMP
+                     WHERE ID = :2
+                    """,
+                    [fecha_fin, logros_id],
+                )
+                if fase_num < 3:
+                    await cur.execute(
+                        f"""
+                        UPDATE PROCESO_LOGROS
+                           SET F{fase_num + 1}_INICIO = NVL(F{fase_num + 1}_INICIO, F{fase_num}_FIN + 1)
+                         WHERE ID = :1 AND F{fase_num}_FIN IS NOT NULL
+                        """,
+                        [logros_id],
+                    )
+                await conn.commit()
+
     async def update(self, logros_id: int, data: ProcesoLogrosCreate) -> dict:
         pool = get_pool()
         async with pool.acquire() as conn:

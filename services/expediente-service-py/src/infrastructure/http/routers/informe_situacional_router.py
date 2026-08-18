@@ -294,6 +294,13 @@ async def vista_informe_situacional(
   .field-label {{ font-size: 10px; font-weight: bold; color: #666; margin-bottom: 3px; text-transform: uppercase; }}
   .field-value {{ background: #f7f7f7; border: 1px solid #e0e0e0; border-radius: 4px; padding: 7px 10px; font-size: 13px; min-height: 34px; }}
   .field-value.multiline {{ white-space: pre-wrap; min-height: 60px; line-height: 1.6; }}
+  /* Los campos largos se capturan con formato y se guardan como HTML; sin
+     estas reglas las viñetas saldrían sin punto y el texto sin sangría. */
+  .field-value ul {{ list-style: disc; padding-left: 20px; margin: 4px 0; }}
+  .field-value li {{ margin: 2px 0; }}
+  .field-value b, .field-value strong {{ font-weight: bold; }}
+  .field-value i, .field-value em {{ font-style: italic; }}
+  .field-value u {{ text-decoration: underline; }}
   .firmas {{ display: grid; grid-template-columns: 1fr 1fr; gap: 60px; margin-top: 60px; }}
   .firma {{ text-align: center; }}
   .firma-linea {{ border-top: 1px solid #333; padding-top: 6px; font-size: 13px; font-weight: bold; }}

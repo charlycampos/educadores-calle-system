@@ -49,7 +49,9 @@ def heal_orphans():
                     "resp_id": 6,
                     "perfil": "TRABAJO_INFANTIL",
                     "estado": "BORRADOR",
-                    "fase": "CONTACTO_INICIAL"
+                    # 'I' = Fase I: Contacto e Integración. El vocabulario viejo
+                    # ('CONTACTO_INICIAL') dejó de usarse en la migración 013.
+                    "fase": "I"
                 })
                 print(f"Healed: Created case {codigo_caso} in state 'BORRADOR' for {nombres} {paterno} (ID: {nna_id})")
                 

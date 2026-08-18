@@ -60,6 +60,18 @@ async def list_casos(user: dict = Depends(get_current_user)):
     ]
 
 
+# Fases del servicio (RDE 069-2021). Ver GUIA_OPERATIVA_SEC.md y
+# services/intervencion-service-py/src/domain/fases.py.
+_FASE_NOMBRE = {
+    "I":   "Contacto e Integración",
+    "II":  "Restitución de Derechos",
+    "III": "Seguimiento y Egreso",
+}
+
+# Plazo de cada fase en días, para los casos sin tracking abierto.
+_PLAZO_DIAS = {"I": 90, "II": 450, "III": 180}
+
+
 @router.get("/supervision/sede")
 async def supervision_sede(user: dict = Depends(get_current_user)):
     """Bandeja del coordinador: semáforo metodológico con datos reales
@@ -73,35 +85,69 @@ async def supervision_sede(user: dict = Depends(get_current_user)):
     pool = get_pool()
     async with pool.acquire() as conn:
         async with conn.cursor() as cur:
-            # Casos activos con indicadores reales
-            await cur.execute(
-                """SELECT c.ID, c.CODIGO_CASO, c.PERFIL, c.RESPONSABLE_ID,
+            # Casos activos con indicadores reales.
+            #
+            # Las dos subconsultas a CASO_FASE se intentan primero y, si la
+            # tabla no existe todavía (migración 013 sin ejecutar), se repite
+            # la consulta sin ellas. Una bandeja de coordinador caída es peor
+            # que una bandeja con el semáforo calculado a la antigua.
+            _SQL_FASE = """,
+                          c.FASE,
+                          -- Días que lleva en la fase ACTUAL, no desde la
+                          -- apertura del caso: un NNA en Fase III con 20 meses
+                          -- encima no está retrasado, está donde debe estar.
+                          (SELECT TRUNC(SYSDATE - f.FECHA_INICIO)
+                             FROM CASO_FASE f
+                            WHERE f.CASO_ID = c.ID AND f.FECHA_FIN IS NULL
+                              AND ROWNUM = 1) AS DIAS_EN_FASE,
+                          (SELECT (f.PLAZO_MESES + f.MESES_EXTENSION) * 30
+                             FROM CASO_FASE f
+                            WHERE f.CASO_ID = c.ID AND f.FECHA_FIN IS NULL
+                              AND ROWNUM = 1) AS PLAZO_FASE_DIAS"""
+            _SQL_SIN_FASE = ", c.FASE, NULL AS DIAS_EN_FASE, NULL AS PLAZO_FASE_DIAS"
+
+            _SQL_BASE = """SELECT c.ID, c.CODIGO_CASO, c.PERFIL, c.RESPONSABLE_ID,
                           u.NOMBRE_COMPLETO AS RESPONSABLE_NOMBRE,
                           TRIM(n.NOMBRES || ' ' || n.APELLIDO_PATERNO || ' ' || NVL(n.APELLIDO_MATERNO, '')) AS NNA_NOMBRE,
                           n.EDAD, n.ID AS NNA_ID, n.CARPETA_ID,
                           TRUNC(SYSDATE - CAST(c.FECHA_APERTURA AS DATE)) AS DIAS,
-                          (SELECT COUNT(*) FROM DIAGNOSTICO_SOCIAL d WHERE d.NNA_ID = n.ID) AS N_F04,
+                          (SELECT COUNT(*) FROM DIAGNOSTICO_SOCIAL d WHERE d.NNA_ID = n.ID AND d.ESTADO = 'COMPLETO') AS N_F04,
                           (SELECT COUNT(*) FROM PLAN_TRABAJO p WHERE p.CASO_ID = c.ID AND p.ESTADO = 'ACTIVO') AS N_PTI,
                           (SELECT MAX(NVL(p.VIGENCIA_DIAS, 90)) FROM PLAN_TRABAJO p WHERE p.CASO_ID = c.ID AND p.ESTADO = 'ACTIVO') AS PTI_VIGENCIA,
-                          (SELECT MAX(p.ID) FROM PLAN_TRABAJO p WHERE p.CASO_ID = c.ID AND p.ESTADO = 'ACTIVO') AS PTI_ID
+                          (SELECT MAX(p.ID) FROM PLAN_TRABAJO p WHERE p.CASO_ID = c.ID AND p.ESTADO = 'ACTIVO') AS PTI_ID{fase}
                      FROM NNA_CASO c
                      JOIN NNA n ON n.ID = c.NNA_ID
                      LEFT JOIN SEC_USUARIO u ON u.ID = c.RESPONSABLE_ID
                     WHERE c.SEDE_ID = :sede AND c.ESTADO != 'CERRADO'
                     ORDER BY c.FECHA_APERTURA ASC
-                    FETCH FIRST 500 ROWS ONLY""",
-                {"sede": sede_id},
-            )
+                    FETCH FIRST 500 ROWS ONLY"""
+
+            try:
+                await cur.execute(_SQL_BASE.format(fase=_SQL_FASE), {"sede": sede_id})
+            except Exception as e:
+                print(f"CASO_FASE no disponible (¿falta la migración 013?): {e}")
+                await cur.execute(_SQL_BASE.format(fase=_SQL_SIN_FASE), {"sede": sede_id})
             casos = []
             for r in await cur.fetchall():
                 (cid, codigo, perfil, resp_id, resp_nombre, nna_nombre,
-                 edad, nna_id, carpeta_id, dias, n_f04, n_pti, pti_vig, pti_id) = r
+                 edad, nna_id, carpeta_id, dias, n_f04, n_pti, pti_vig, pti_id,
+                 fase_cod, dias_en_fase, plazo_fase) = r
                 dias = int(dias or 0)
                 tiene_pti = (n_pti or 0) > 0
-                # Fase real: con PTI activo => Fase 2; sin PTI => Fase 1 (contacto/diagnóstico)
-                fase = "Fase 2: Intervención" if tiene_pti else "Fase 1: Contacto y Diagnóstico"
-                # Límite: Fase 1 = 90 días desde apertura; Fase 2 = 90 + vigencia del PTI
-                dias_limite = 90 if not tiene_pti else 90 + int(pti_vig or 90)
+
+                # La fase sale de NNA_CASO.FASE, que escribe el cierre de fase
+                # del F05. Antes se deducía de si el caso tenía PTI activo, un
+                # proxy que además contradecía al resto del sistema: el mismo
+                # NNA podía verse en Fase 2 aquí y en Fase 1 en su expediente.
+                fase_cod = fase_cod if fase_cod in _FASE_NOMBRE else "I"
+                fase = f"Fase {fase_cod}: {_FASE_NOMBRE[fase_cod]}"
+
+                # El semáforo mide el plazo de la FASE ACTUAL, no la antigüedad
+                # del caso. Con el criterio viejo, todo NNA con más de 90 días
+                # salía en rojo aunque estuviera en la Fase II, que dura 15
+                # meses por norma.
+                dias = int(dias_en_fase) if dias_en_fase is not None else dias
+                dias_limite = int(plazo_fase) if plazo_fase else _PLAZO_DIAS.get(fase_cod, 90)
                 pct = dias / dias_limite if dias_limite else 0
                 estado_plazo = "CRÍTICO" if pct >= 1 else "ADVERTENCIA" if pct >= 0.8 else "ÓPTIMO"
                 casos.append({

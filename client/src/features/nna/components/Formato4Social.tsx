@@ -11,6 +11,7 @@ import { DISCAPACIDADES_CONADIS } from '../../../data/ubigeo';
 import clsx from 'clsx';
 
 import { AvisoHermanos } from './AvisoHermanos';
+import { CampoDictado } from '../../../components/ui/CampoDictado';
 import { detectarHermanos } from '../../../api/hermanos.api';
 import type { DeteccionHermanos } from '../../../api/hermanos.api';
 
@@ -34,6 +35,17 @@ const FORM_TABS: Array<{ id: FormTabId; label: string; icon: typeof User }> = [
 
 const MOTIVO_PRIMERA_INFANCIA = 'MENOR DE 3 AÑOS';
 
+/**
+ * Campos que solo tienen sentido con matrícula vigente.
+ *
+ * Debe coincidir con `EDUCACION_DEPENDIENTE_VACIA` del backend
+ * (`services/intervencion-service-py/src/domain/entities/diagnostico.py`).
+ *
+ * Bullying, expulsión, atraso escolar y problemas de aprendizaje o conducta
+ * **no se borran**: son antecedentes y normalmente la causa de la deserción.
+ * Vaciarlos al marcar "no estudia" eliminaba la explicación de por qué dejó de
+ * estudiar, justo en el momento de registrarlo.
+ */
 const EDUCACION_DEPENDIENTE_VACIA = {
     eduNivel: '',
     eduGrado: '',
@@ -41,17 +53,8 @@ const EDUCACION_DEPENDIENTE_VACIA = {
     eduTipoIE: '',
     eduModalidad: '',
     eduInstitucion: '',
-    presentaAtraso: false,
-    tiempoAtraso: '',
-    motivoAtraso: '',
-    problemasAprendizaje: false,
-    problemasConducta: false,
-    intensidadConducta: '',
-    expulsado: false,
-    vecesExpulsado: '',
     faltasTardanzas: false,
     seDuermeClase: false,
-    sufreBullying: false,
     tutorConversaDocente: false,
 };
 
@@ -787,7 +790,10 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
         situacionCalleDetalle: {
             perfil: perfilCalle,
             tiempo: tiempoSituacionDesdeInscripcion,
-            explotacionSexual: null as boolean | null,
+            // Se precarga desde el F03: el dato ya lo dio el educador al
+            // inscribir al NNA y estaba calculándose para nada. Queda editable
+            // porque el diagnóstico puede corregir lo que se supo al inicio.
+            explotacionSexual: explotacionSexualF03,
             ingresoSemanal: '',
             usoDinero: { gastosFamiliares: false, gastosPropios: false, entregaOtraPersona: false },
             horarios:  { ...HORARIOS_VACIOS },
@@ -972,11 +978,8 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
         vecesJuegaSemana:             '',
         lugarJuego:                   '',
         lugarJuegoOtroDetalle:        '',
-        participaInstitucion:         false,
-        tipoInstitucion:              '',
         interesesDeportivos:          false,
         interesesArtisticos:          false,
-        actividadesFamilia:           false,
         recreacionActividadFamilia:   '',
         recreacionInteresDeporte:     '',
         recreacionInteresArte:        '',
@@ -2752,18 +2755,18 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                             </div>
 
                             <div className="col-span-12">
-                                <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Actividad que realiza en calle</label>
-                                <textarea
-                                    className="w-full px-3 py-2 border border-border rounded-[6px] text-xs focus:ring-2 focus:ring-primary/40 focus:border-primary min-h-[64px]"
+                                <CampoDictado
+                                    label="Actividad que realiza en calle"
                                     placeholder="Se completará con las actividades desglosadas..."
-                                    value={formData.situacionCalleDetalle.actividad}
-                                    onChange={(e) => {
+                                    value={formData.situacionCalleDetalle.actividad || ''}
+                                    rows={2}
+                                    onChange={(v) => {
                                         actividadEditadaManualmenteRef.current = true;
                                         setFormData({
                                             ...formData,
                                             situacionCalleDetalle: {
                                                 ...formData.situacionCalleDetalle,
-                                                actividad: e.target.value,
+                                                actividad: v,
                                             },
                                         });
                                     }}
@@ -2835,12 +2838,12 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
 
                             {/* Motivo, Modalidad y Lugar */}
                             <div className="col-span-12 md:col-span-4">
-                                <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Motivo de su Situación de Calle</label>
-                                <textarea
-                                    className="w-full px-3 py-2 border border-border rounded-[6px] text-xs focus:ring-2 focus:ring-primary/40 focus:border-primary min-h-[80px]"
+                                <CampoDictado
+                                    label="Motivo de su Situación de Calle"
                                     placeholder="Describa el motivo..."
-                                    value={formData.situacionCalleDetalle.motivo}
-                                    onChange={e => setFormData({ ...formData, situacionCalleDetalle: { ...formData.situacionCalleDetalle, motivo: e.target.value } })}
+                                    value={formData.situacionCalleDetalle.motivo || ''}
+                                    rows={3}
+                                    onChange={v => setFormData({ ...formData, situacionCalleDetalle: { ...formData.situacionCalleDetalle, motivo: v } })}
                                 />
                             </div>
                             <div className="col-span-12 md:col-span-4">
@@ -4327,12 +4330,12 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
 
                             {/* Observaciones */}
                             <div>
-                                <label className="block text-[10px] font-bold text-fg-muted uppercase mb-1">Observaciones de Salud</label>
-                                <textarea
-                                    className="w-full px-3 py-2 border border-border rounded-[6px] text-xs focus:ring-2 focus:ring-primary/40 focus:border-primary min-h-[80px]"
+                                <CampoDictado
+                                    label="Observaciones de Salud"
                                     placeholder="Observaciones adicionales..."
-                                    value={formData.observacionesSalud}
-                                    onChange={(e) => setFormData({ ...formData, observacionesSalud: e.target.value })}
+                                    value={formData.observacionesSalud || ''}
+                                    rows={3}
+                                    onChange={v => setFormData({ ...formData, observacionesSalud: v })}
                                 />
                             </div>
                         </div>
@@ -5495,16 +5498,16 @@ export const Formato4Social = ({ nna, caso, initialData, onClose, onSuccess }: F
                         </tr>
                         <tr>
                             <td style={{ ...tdStyle, backgroundColor: '#f9fafb' }}><b>Participa en Institución:</b></td>
-                            <td style={tdStyle}>SI [{formData.participaInstitucion ? 'X' : ' '}] NO [{!formData.participaInstitucion ? 'X' : ' '}]</td>
+                            <td style={tdStyle}>SI [{formData.recreacionParticipaInstitucion ? 'X' : ' '}] NO [{!formData.recreacionParticipaInstitucion ? 'X' : ' '}]</td>
                             <td style={tdStyle} colSpan={2}>
                                 <span style={labelStyle as any}>Tipo</span>
-                                {formData.tipoInstitucion || '---'}
+                                {formData.recreacionTipoInstitucion || '---'}
                             </td>
                         </tr>
                         <tr>
                             <td style={tdStyle}><span style={labelStyle as any}>Intereses Deportivos</span> SI [{formData.interesesDeportivos ? 'X' : ' '}] NO [{!formData.interesesDeportivos ? 'X' : ' '}] {formData.interesesDeportivos && `(${formData.recreacionInteresDeporte || '---'})`}</td>
                             <td style={tdStyle}><span style={labelStyle as any}>Intereses Artísticos</span> SI [{formData.interesesArtisticos ? 'X' : ' '}] NO [{!formData.interesesArtisticos ? 'X' : ' '}] {formData.interesesArtisticos && `(${formData.recreacionInteresArte || '---'})`}</td>
-                            <td style={tdStyle} colSpan={2}><span style={labelStyle as any}>Actividades con Familia</span> SI [{formData.actividadesFamilia ? 'X' : ' '}] NO [{!formData.actividadesFamilia ? 'X' : ' '}]</td>
+                            <td style={tdStyle} colSpan={2}><span style={labelStyle as any}>Actividades con Familia</span> SI [{formData.recreacionActividadFamilia ? 'X' : ' '}] NO [{!formData.recreacionActividadFamilia ? 'X' : ' '}]</td>
                         </tr>
                     </tbody>
                 </table>

@@ -159,6 +159,23 @@ class OracleTallerRepository:
         if "cierre_materiales" in d:
             d["cierreMateriales"] = d.get("cierre_materiales")
 
+        # Evaluación del taller (F08). Puede no existir si la migración 004
+        # aún no se ejecutó: en ese caso el bloque queda vacío y el módulo
+        # sigue funcionando con la planificación.
+        # OJO con el nombre: `evaluacion` ya existe en TallerResponse como el
+        # texto de evaluación del propio NNA en el historial. Este bloque es
+        # otra cosa —la del taller— y necesita su propia clave.
+        d["evaluacionTaller"] = {
+            "logros":       d.get("eval_logros") or "",
+            "limitaciones": d.get("eval_limitaciones") or "",
+            "sugerencias":  d.get("eval_sugerencias") or "",
+            "fecha":        d["eval_fecha"].isoformat() if d.get("eval_fecha") and hasattr(d["eval_fecha"], "isoformat") else None,
+            "evaluadaPorId": d.get("eval_por_id"),
+            # El taller está evaluado cuando tiene logros: es el único campo
+            # del formato que no puede quedar vacío si de verdad se evaluó.
+            "evaluado":     bool(d.get("eval_logros")),
+        }
+
         # Parse metodologia back into inicioActividad/procesoActividad/cierreActividad
         inicio, proceso, cierre = _parse_metodologia(d.get("metodologia") or "")
         d["inicioActividad"] = inicio
@@ -227,6 +244,79 @@ class OracleTallerRepository:
                     return None
                 columns = [col[0].lower() for col in cur.description]
                 return self._row_to_dict(row, columns)
+
+    # ── Evaluación del taller (Formato 08) ──────────────────────────────────
+
+    async def guardar_evaluacion(self, taller_id: int, data: dict, usuario_id: int | None = None) -> dict:
+        """
+        Guarda la evaluación del taller: una sola, no una por participante.
+
+        Es lo que pide el Formato N° 08. Los puntos 1, 2, 3 y 8 —taller,
+        dirigido a, objetivo, lugar y fecha— se heredan del Formato 07 al
+        imprimir; aquí solo se guarda lo que el educador escribe de nuevo.
+        """
+        pool = get_pool()
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    """
+                    UPDATE TALLER
+                       SET EVAL_LOGROS       = :logros,
+                           EVAL_LIMITACIONES = :limitaciones,
+                           EVAL_SUGERENCIAS  = :sugerencias,
+                           EVAL_FECHA        = SYSTIMESTAMP,
+                           EVAL_POR_ID       = NVL(:usuario, EVAL_POR_ID)
+                     WHERE ID = :taller_id
+                    """,
+                    {
+                        "logros":       (data.get("logros") or "")[:2000],
+                        "limitaciones": (data.get("limitaciones") or "")[:2000],
+                        "sugerencias":  (data.get("sugerencias") or "")[:2000],
+                        "usuario":      usuario_id,
+                        "taller_id":    taller_id,
+                    },
+                )
+                await conn.commit()
+        return await self.get_taller_with_participants(taller_id)
+
+    async def igualar_evaluaciones(self, taller_id: int) -> int:
+        """
+        Borra las evaluaciones personalizadas para que todos hereden la del
+        taller. Lo dispara el botón "igualar" cuando el educador escribe la
+        evaluación general y ya había textos por participante.
+
+        Nunca se ejecuta solo: pisar lo que alguien escribió a mano tiene que
+        ser una decisión explícita.
+        """
+        pool = get_pool()
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    "UPDATE PARTICIPANTE_TALLER SET EVALUACION = NULL WHERE TALLER_ID = :1",
+                    [taller_id],
+                )
+                afectados = cur.rowcount
+                await conn.commit()
+        return afectados
+
+    def _aplicar_herencia_evaluacion(self, taller: dict) -> dict:
+        """
+        Rellena la evaluación de cada participante con la del taller cuando no
+        tiene una propia.
+
+        Así el F08 que se archiva en el expediente de cada NNA sale completo
+        aunque el educador solo haya escrito una vez, que es justo el punto:
+        el formato es del taller, el archivado es por chico.
+        """
+        ev = taller.get("evaluacionTaller") or {}
+        if not ev.get("evaluado"):
+            return taller
+        for p in taller.get("participantes") or []:
+            if not p.get("evaluacionPropia"):
+                p["logros"]       = ev.get("logros", "")
+                p["limitaciones"] = ev.get("limitaciones", "")
+                p["sugerencias"]  = ev.get("sugerencias", "")
+        return taller
 
     async def ejecutar_taller(self, taller_id: int, data: EjecutarTallerRequest) -> dict:
         # Se resuelve ANTES de tomar la conexión: familiares_habilitados()
@@ -323,6 +413,10 @@ class OracleTallerRepository:
             "logros": logros,
             "limitaciones": limitaciones,
             "sugerencias": sugerencias,
+            # Un participante tiene evaluación PROPIA solo si alguien la
+            # escribió para él. Si no, hereda la del taller: lo resuelve
+            # `_aplicar_herencia_evaluacion` cuando ya se conoce el taller.
+            "evaluacionPropia": bool(row[6]),
             "nna": None,
             "familiar": None,
         }
@@ -490,7 +584,7 @@ class OracleTallerRepository:
         if not taller:
             return None
         taller["participantes"] = await self._get_participantes_for_taller(taller_id)
-        return taller
+        return self._aplicar_herencia_evaluacion(taller)
 
     def _parse_evaluacion(self, eval_str: str) -> tuple[str, str, str]:
         if not eval_str:
@@ -517,6 +611,7 @@ class OracleTallerRepository:
                 talleres = [self._row_to_dict(row, columns) for row in await cur.fetchall()]
         for t in talleres:
             t["participantes"] = await self._get_participantes_for_taller(t["id"])
+            self._aplicar_herencia_evaluacion(t)
         return talleres
 
     async def list_by_sede(self, sede_id: int, limit: int = 500, offset: int = 0) -> list:
@@ -531,6 +626,7 @@ class OracleTallerRepository:
                 talleres = [self._row_to_dict(row, columns) for row in await cur.fetchall()]
         for t in talleres:
             t["participantes"] = await self._get_participantes_for_taller(t["id"])
+            self._aplicar_herencia_evaluacion(t)
         return talleres
 
     async def list_by_educador(self, educador_id: int, limit: int = 500, offset: int = 0) -> list:
@@ -545,6 +641,7 @@ class OracleTallerRepository:
                 talleres = [self._row_to_dict(row, columns) for row in await cur.fetchall()]
         for t in talleres:
             t["participantes"] = await self._get_participantes_for_taller(t["id"])
+            self._aplicar_herencia_evaluacion(t)
         return talleres
 
     async def list_by_nna(self, nna_id: int) -> list:

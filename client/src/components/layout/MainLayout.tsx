@@ -17,6 +17,7 @@ import {
     Siren,
     BookOpen,
     Calendar,
+    FileSignature,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import clsx from 'clsx';
@@ -96,6 +97,9 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
             });
             if (isSedeSupervisor) {
                 items.push({ label: 'Bandeja Derivaciones', icon: Shield, path: '/coordinador/derivaciones' });
+                // El coordinador firma y sella la ficha de egreso: aquí le
+                // llegan las que el educador ya firmó (reunión del 11/08/2026).
+                items.push({ label: 'Fichas por Firmar', icon: FileSignature, path: '/coordinador/firmas' });
                 if (user.rol === ROLES.COORDINADOR) {
                     items.push({ label: 'Monitoreo de Diarios', icon: Presentation, path: '/coordinador/diarios' });
                 }

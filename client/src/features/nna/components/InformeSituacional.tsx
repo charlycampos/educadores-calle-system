@@ -10,6 +10,12 @@ import { EXPEDIENTE_API_URL } from '../../../config/api';
 import { formatTipoDoc } from '../../../data/ubigeo';
 import { useNnaStore } from '../../../store/nna.store';
 import { SEXO_MAP, gradoInstruccion, lugarNacimiento } from '../../../data/catalogos-sec';
+import { CampoDictado } from '../../../components/ui/CampoDictado';
+import {
+    TIPOS_INSTITUCION, institucionesPorTipo, fraseDerivacion,
+    etiquetaInstitucion, detalleInstitucion, insigniaInstitucion, buscarInstitucion,
+} from '../../../data/instituciones-derivacion';
+import { ComboBusqueda } from '../../../components/ui/ComboBusqueda';
 
 /**
  * Informe Situacional — estructura del modelo oficial que usan los educadores
@@ -115,6 +121,10 @@ export const InformeSituacional = ({ nna, caso, familia, onClose }: InformeSitua
         piiFase3:           '',
         conclusiones:       '',   // VII. Apreciación profesional
         recomendaciones:    '',   // VIII
+        // Derivación institucional (VIII). Todo informe se deriva: no hay un
+        // "¿requiere derivar?" porque en la reunión quedó que llegan todos.
+        tipoInstitucion:    '',   // DEMUNA | UPE
+        institucionCodigo:  '',
     });
 
     useEffect(() => {
@@ -149,6 +159,8 @@ export const InformeSituacional = ({ nna, caso, familia, onClose }: InformeSitua
                 piiFase3: data.pii_fase3 || '',
                 conclusiones: data.conclusiones || '',
                 recomendaciones: data.recomendaciones || '',
+                tipoInstitucion: data.tipo_institucion || '',
+                institucionCodigo: data.institucion_codigo || '',
             });
         })
         .catch(err => console.log(err.message));
@@ -156,8 +168,24 @@ export const InformeSituacional = ({ nna, caso, familia, onClose }: InformeSitua
 
     const bloqueado = estadoActual === 'FINALIZADO';
 
+    // Opciones del combo de derivación. El filtrado por texto lo hace el
+    // propio ComboBusqueda; aquí solo se traduce el catálogo a su formato.
+    // Nombre oficial arriba; debajo, la ubicación y —en DEMUNAs— si está
+    // acreditada. En las UPEs, debajo va la dirección de la sede.
+    const opcionesInstitucion = institucionesPorTipo(formData.tipoInstitucion as any)
+        .map(i => ({
+            valor: i.codigo,
+            etiqueta: etiquetaInstitucion(i),
+            detalle: detalleInstitucion(i),
+            insignia: insigniaInstitucion(i),
+        }));
+
     const up = (key: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
         setFormData(prev => ({ ...prev, [key]: e.target.value }));
+
+    /** Igual que `up`, pero recibe el valor ya listo (lo usan los campos con formato). */
+    const setCampo = (key: string) => (valor: string) =>
+        setFormData(prev => ({ ...prev, [key]: valor }));
 
     const toggleNna = (id: number) => {
         if (bloqueado) return;
@@ -184,6 +212,8 @@ export const InformeSituacional = ({ nna, caso, familia, onClose }: InformeSitua
         pii_fase3: formData.piiFase3,
         conclusiones: formData.conclusiones,
         recomendaciones: formData.recomendaciones,
+        tipo_institucion: formData.tipoInstitucion || null,
+        institucion_codigo: formData.institucionCodigo || null,
         nna_ids: nnaIds,
         estado,
     });
@@ -341,33 +371,33 @@ export const InformeSituacional = ({ nna, caso, familia, onClose }: InformeSitua
             {/* ── II. Antecedentes ── */}
             <Seccion icon={MapPin} titulo="II. Antecedentes del Caso"
                 ayuda="¿En qué circunstancias y condiciones se encontró al NNA? ¿Cómo llegó al servicio y cuándo se inscribió?">
-                <textarea value={formData.antecedentes} onChange={up('antecedentes')} rows={5} disabled={bloqueado}
-                    placeholder="Redacte aquí las circunstancias del contacto inicial y la inscripción..."
-                    className={areaClass} style={{ lineHeight: 1.6 }} />
+                <CampoDictado label="" value={formData.antecedentes} onChange={setCampo('antecedentes')}
+                    rows={5} disabled={bloqueado}
+                    placeholder="Redacte aquí las circunstancias del contacto inicial y la inscripción..." />
             </Seccion>
 
             {/* ── III. Acciones realizadas ── */}
             <Seccion icon={Users} titulo="III. Acciones Realizadas"
                 ayuda="Estrategias de acercamiento, visitas domiciliarias, orientaciones, consejerías, coordinaciones.">
-                <textarea value={formData.estrategias} onChange={up('estrategias')} rows={5} disabled={bloqueado}
-                    placeholder="Detalle las acciones desarrolladas con el NNA y su familia..."
-                    className={areaClass} style={{ lineHeight: 1.6 }} />
+                <CampoDictado label="" value={formData.estrategias} onChange={setCampo('estrategias')}
+                    rows={5} disabled={bloqueado}
+                    placeholder="Detalle las acciones desarrolladas con el NNA y su familia..." />
             </Seccion>
 
             {/* ── IV. Situación familiar ── */}
             <Seccion icon={FileSignature} titulo="IV. Situación Familiar"
                 ayuda="Composición y dinámica familiar, situación económica, vivienda, salud y educación de los NNA.">
-                <textarea value={formData.situacionFamiliar} onChange={up('situacionFamiliar')} rows={10} disabled={bloqueado}
-                    placeholder="Describa la situación a nivel personal, familiar y social..."
-                    className={areaClass} style={{ lineHeight: 1.6 }} />
+                <CampoDictado label="" value={formData.situacionFamiliar} onChange={setCampo('situacionFamiliar')}
+                    rows={10} disabled={bloqueado}
+                    placeholder="Describa la situación a nivel personal, familiar y social..." />
             </Seccion>
 
             {/* ── V. Indicadores de vulnerabilidad ── */}
             <Seccion icon={AlertTriangle} titulo="V. Indicadores de Vulnerabilidad"
-                ayuda="Un factor por línea. Se imprimen como viñetas en el informe.">
-                <textarea value={formData.indicadores} onChange={up('indicadores')} rows={6} disabled={bloqueado}
-                    placeholder={'Familia nuclear con recursos económicos muy limitados\nExposición de menores a la mendicidad\nLimitaciones de espacio y condiciones precarias de vivienda'}
-                    className={areaClass} style={{ lineHeight: 1.6 }} />
+                ayuda="Un factor por línea o con el botón de viñetas. Se imprimen como viñetas en el informe.">
+                <CampoDictado label="" value={formData.indicadores} onChange={setCampo('indicadores')}
+                    rows={6} disabled={bloqueado}
+                    placeholder="Familia nuclear con recursos económicos muy limitados" />
             </Seccion>
 
             {/* ── VI. Plan de Intervención Individual ── */}
@@ -388,14 +418,13 @@ export const InformeSituacional = ({ nna, caso, familia, onClose }: InformeSitua
                             <label className="text-[12px] font-bold text-fg-2 block mb-1">
                                 Fase {fase} <span className="font-normal text-fg-muted">({MESES_FASE[fase]} meses)</span>
                             </label>
-                            <textarea
+                            <CampoDictado
+                                label=""
                                 value={formData[`piiFase${fase}` as keyof typeof formData] as string}
-                                onChange={up(`piiFase${fase}`)}
+                                onChange={setCampo(`piiFase${fase}`)}
                                 rows={4}
                                 disabled={bloqueado}
                                 placeholder={`Objetivos y actividades de la Fase ${fase}...`}
-                                className={areaClass}
-                                style={{ lineHeight: 1.6 }}
                             />
                         </div>
                     ))}
@@ -405,17 +434,104 @@ export const InformeSituacional = ({ nna, caso, familia, onClose }: InformeSitua
             {/* ── VII. Apreciación profesional ── */}
             <Seccion icon={PenLine} titulo="VII. Apreciación Profesional"
                 ayuda="Valoración del educador sobre la familia, su disposición al cambio y los avances observados.">
-                <textarea value={formData.conclusiones} onChange={up('conclusiones')} rows={6} disabled={bloqueado}
-                    placeholder="Redacte su apreciación profesional del caso..."
-                    className={areaClass} style={{ lineHeight: 1.6 }} />
+                <CampoDictado label="" value={formData.conclusiones} onChange={setCampo('conclusiones')}
+                    rows={6} disabled={bloqueado}
+                    placeholder="Redacte su apreciación profesional del caso..." />
             </Seccion>
 
             {/* ── VIII. Recomendación ── */}
             <Seccion icon={CheckIcon} titulo="VIII. Recomendación"
                 ayuda="A quién se informa y qué se recomienda: continuar en el servicio, derivar o egresar.">
-                <textarea value={formData.recomendaciones} onChange={up('recomendaciones')} rows={5} disabled={bloqueado}
-                    placeholder="Se informa a... y se recomienda..."
-                    className={areaClass} style={{ lineHeight: 1.6 }} />
+                <CampoDictado label="" value={formData.recomendaciones} onChange={setCampo('recomendaciones')}
+                    rows={5} disabled={bloqueado}
+                    placeholder="Se informa a... y se recomienda..." />
+
+                {/* Derivación institucional.
+                    Va aquí, al final y dentro de Recomendación, porque es donde
+                    los educadores lo escriben en su documento real. Luis, en la
+                    reunión del 11/08/2026: "eso normalmente lo ponemos en el
+                    informe al final, en recomendaciones".
+
+                    Y resuelve el olvido que describió María del Carmen: "en la
+                    última parte ahí dice: se deriva a la DEMUNA tal. Si no lo
+                    colocamos, urgente nos llaman: ¿a qué DEMUNA?". */}
+                <div className="mt-4 pt-4 border-t border-border">
+                    <p className="text-[11px] font-semibold text-fg-muted uppercase mb-2">
+                        Derivación institucional
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label className="text-[11px] font-medium text-fg-muted block mb-1">
+                                Institución
+                            </label>
+                            <select
+                                value={formData.tipoInstitucion}
+                                disabled={bloqueado}
+                                onChange={e => {
+                                    setFormData(p => ({
+                                        ...p,
+                                        tipoInstitucion: e.target.value,
+                                        // Al cambiar de tipo se limpia la específica:
+                                        // dejar una UPE seleccionada bajo "DEMUNA"
+                                        // guardaría un destino que no existe.
+                                        institucionCodigo: '',
+                                    }));
+                                }}
+                                className={`w-full text-[13px] px-3 py-2 border border-border-strong rounded-[6px] text-fg outline-none focus:border-primary ${bloqueado ? 'bg-surface-muted cursor-default' : 'bg-surface cursor-pointer'}`}
+                            >
+                                <option value="">Seleccione…</option>
+                                {TIPOS_INSTITUCION.map(t => (
+                                    <option key={t.valor} value={t.valor}>
+                                        {t.etiqueta} — {t.descripcion}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="text-[11px] font-medium text-fg-muted block mb-1">
+                                {formData.tipoInstitucion === 'UPE' ? 'UPE específica' : 'DEMUNA específica'}
+                            </label>
+                            {/* Combo con búsqueda: son 844 DEMUNAs acreditadas y
+                                el educador conoce su distrito, no la posición en
+                                la lista. Escribe y se filtra solo. */}
+                            <ComboBusqueda
+                                opciones={opcionesInstitucion}
+                                value={formData.institucionCodigo}
+                                onChange={valor => setFormData(p => ({ ...p, institucionCodigo: valor }))}
+                                disabled={bloqueado || !formData.tipoInstitucion}
+                                placeholder={
+                                    formData.tipoInstitucion === 'DEMUNA' ? 'Escriba el distrito o la provincia…'
+                                    : formData.tipoInstitucion === 'UPE'  ? 'Escriba la región…'
+                                    : 'Elija primero el tipo'
+                                }
+                                sinResultados="Ninguna coincide con ese texto"
+                            />
+                        </div>
+                    </div>
+
+                    {formData.institucionCodigo && (
+                        <p className="text-[12px] text-fg-secondary mt-2.5 italic">
+                            {fraseDerivacion(formData.institucionCodigo)}
+                            <span className="not-italic text-fg-muted"> — se agrega al informe.</span>
+                        </p>
+                    )}
+
+                    {/* Aviso, no bloqueo: la no acreditada puede ser la que
+                        corresponde por zona y el educador decide. Solo se le
+                        recuerda que los casos de riesgo van a las acreditadas. */}
+                    {formData.institucionCodigo &&
+                     buscarInstitucion(formData.institucionCodigo)?.tipo === 'DEMUNA' &&
+                     buscarInstitucion(formData.institucionCodigo)?.acreditada === false && (
+                        <p className="text-[12px] text-warning mt-1.5">
+                            Esta DEMUNA no cuenta con acreditación vigente. Los casos de riesgo
+                            de desprotección deben derivarse a una DEMUNA acreditada.
+                        </p>
+                    )}
+                    {/* Respiro al final de la ficha: sin él, la lista del combo
+                        se abre pegada al borde del panel y queda cortada. */}
+                    <div className="h-2" />
+                </div>
             </Seccion>
 
             {/* ── Barra de acciones ── */}

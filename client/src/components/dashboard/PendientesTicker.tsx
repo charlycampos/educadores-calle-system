@@ -9,6 +9,7 @@ const API_URL = AUTH_API_URL;
 interface Pendiente {
     id: number;
     nnaId: number;
+    carpetaId?: number;
     tipo: string;
     titulo: string;
     descripcion: string;
@@ -16,6 +17,23 @@ interface Pendiente {
     dias: number;
     icono: string;
 }
+
+/**
+ * Pestaña del expediente donde se resuelve cada tipo de pendiente.
+ *
+ * El aviso lleva a la ficha que falta, no a la portada: si el sistema ya sabe
+ * qué le falta a este NNA, dejar al educador buscándolo es trabajo de más.
+ */
+const TAB_POR_TIPO: Record<string, string> = {
+    estancado:   'social',   // Sin F04 → Ficha de Diagnóstico Social
+    DIAGNOSTICO: 'social',
+    FASE:        'logros',   // Fase vencida → F05, donde está "Cerrar fase"
+    EVALUACION:  'logros',
+    OBSERVADO:   'egreso',   // Ficha observada por el coordinador → F13
+    BORRADOR:    'egreso',
+    SEGUIMIENTO: 'seguimiento_familiar',
+    TALLER:      'talleres',
+};
 
 const getHeaders = () => {
     const token = getToken();
@@ -62,8 +80,17 @@ export const PendientesTicker = () => {
     };
 
     const handleClick = (pendiente: Pendiente) => {
-        // Navegar al expediente del NNA
-        navigate(`/nna/${pendiente.nnaId}`);
+        // Antes navegaba a `/nna/${nnaId}`, una ruta que NO existe: las reales
+        // son /nna/expediente/:id, /nna/ficha/:id y /nna/editar/:id. Sin match,
+        // React Router caía en `path="*"` y redirigía al dashboard — el clic
+        // parecía muerto cuando en realidad te devolvía al mismo sitio.
+        //
+        // La ruta lleva el ID de CARPETA y el NNA va en el query param. Son
+        // datos distintos y usar uno por el otro abre el expediente de otro
+        // chico cuando los ids coinciden.
+        const carpeta = pendiente.carpetaId ?? pendiente.nnaId;
+        const tab = TAB_POR_TIPO[pendiente.tipo] || 'dashboard';
+        navigate(`/nna/expediente/${carpeta}?nnaId=${pendiente.nnaId}&tab=${tab}`);
     };
 
     if (loading) {

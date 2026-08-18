@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { toast } from '../../../components/ui/Toast';
-import { AlertTriangle, Lock, Printer, ChevronDown, ChevronUp, User, FileText, Plus, Edit, Eye, Download } from 'lucide-react';
+import { CampoDictado } from '../../../components/ui/CampoDictado';
+import { PanelFirmas } from '../../../components/ui/PanelFirmas';
+import { firmarComoEducador } from '../../../api/cierre.api';
+import { AlertTriangle, FileSignature, Lock, Printer, ChevronDown, ChevronUp, User, FileText, Plus, Edit, Eye, Download } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { Formato13Print } from './Formato13Print';
@@ -10,6 +13,7 @@ import { EXPEDIENTE_API_URL } from '../../../config/api';
 import { PdfViewerModal } from './PdfViewerModal';
 import { useAuthStore } from '../../../store/auth.store';
 import { getUsuariosBySede } from '../../../api/sedes.api';
+import { normalizarFase } from '../../../utils/fases';
 
 /* ── Clases helper para inputs/selects ─────────────────────────────── */
 const INP = 'w-full px-3 py-2 border border-border-strong rounded-[6px] text-[13px] bg-surface text-fg outline-none focus:border-primary transition-colors';
@@ -29,6 +33,43 @@ const getTextareaClass = (disabled?: boolean) => disabled ? INP_DISABLED + ' res
  * grupo sí pueden concurrir varias (se puede cumplir fases y además llegar a la
  * mayoría de edad), por eso el bloqueo es de grupo y no de casilla.
  */
+/**
+ * Estados de la ficha en el circuito de firma.
+ *
+ * `FINALIZADO` es el estado con el que nacía la ficha antes de que existieran
+ * las firmas: significa completa pero todavía sin firmar.
+ */
+const ESTADO_ETIQUETA: Record<string, string> = {
+    BORRADOR:         'Borrador',
+    FINALIZADO:       'Sin firmar',
+    PEND_COORDINADOR: 'Esperando al coordinador',
+    OBSERVADO:        'Observada',
+    FIRMADO:          'Firmada',
+};
+
+const ESTADO_ESTILO: Record<string, string> = {
+    BORRADOR:         'bg-amber-100 text-amber-700',
+    FINALIZADO:       'bg-info-soft text-info',
+    PEND_COORDINADOR: 'bg-warning-soft text-warning',
+    OBSERVADO:        'bg-danger-soft text-danger',
+    FIRMADO:          'bg-success-soft text-success',
+};
+
+/**
+ * Estados en los que la ficha se puede modificar.
+ *
+ * OBSERVADO entra porque el coordinador la devolvió justamente para que se
+ * corrija. Mientras espera su firma —PEND_COORDINADOR— queda bloqueada: nadie
+ * cambia un documento que otro está revisando. Y una vez FIRMADO, se cierra.
+ */
+const EDITABLES = ['BORRADOR', 'OBSERVADO'];
+
+/** Quien firma es quien tiene la sesión abierta; no se escribe a mano. */
+const educadorDeLaSesion = () => {
+    const u = useAuthStore.getState().user;
+    return u?.nombreCompleto || u?.nombre || '';
+};
+
 const MODALIDADES_EGRESO = ['cumplioFases', 'mayoriaEdad', 'derivacionServicios'] as const;
 const MODALIDADES_RETIRO = ['interesSuperior', 'noUbicado', 'noDeseaParticipar'] as const;
 
@@ -125,6 +166,8 @@ interface CasoData {
     situacion_calle?: string;
     fechaIngreso?: string;
     fecha_ingreso?: string;
+    /** Fase vigente del caso: 'I' | 'II' | 'III' | 'EGRESADO'. */
+    fase?: string;
 }
 
 interface FichaFormato13 {
@@ -143,13 +186,11 @@ interface FichaFormato13 {
     derivacionServicios: boolean;
     /** Primera opción de MODALIDAD DE RETIRO en el formato oficial. */
     interesSuperior: boolean;
-    modalidadRetiro: string;
     interesSuperiorTrata: boolean;
     interesSuperiorDelincuencia: boolean;
     interesSuperiorOtro: string;
     noUbicado: boolean;
     noDeseaParticipar: boolean;
-    noResuelveUPE: boolean;
     cuentaResolucionUPE: string;
     situacionResolucionUPE: string;
     recibeDefensaPublica: string;
@@ -201,6 +242,21 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
     const [showForm, setShowForm] = useState(false);
     const [isViewing, setIsViewing] = useState(false);
     const [informe, setInforme] = useState<any | null>(null);
+    /** Panel de firma del educador abierto. */
+    const [firmando, setFirmando] = useState(false);
+
+    /**
+     * Las firmas y la observación del coordinador viajan dentro de `detalles`,
+     * el mismo JSON donde vive el formulario: son datos de la ficha.
+     */
+    const detallesGuardados = (() => {
+        try {
+            return informe?.detalles ? JSON.parse(informe.detalles) : {};
+        } catch {
+            return {};
+        }
+    })();
+    const observacionCoordinador = detallesGuardados.observacionCoordinador;
     const [loading, setLoading] = useState(false);
     const [pdfModalOpen, setPdfModalOpen] = useState(false);
     const [currentStep, setCurrentStep] = useState(1);
@@ -261,13 +317,11 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
             mayoriaEdad: false,
             derivacionServicios: false,
             interesSuperior: false,
-            modalidadRetiro: '',
             interesSuperiorTrata: false,
             interesSuperiorDelincuencia: false,
             interesSuperiorOtro: '',
             noUbicado: false,
             noDeseaParticipar: false,
-            noResuelveUPE: false,
             cuentaResolucionUPE: '',
             situacionResolucionUPE: '',
             recibeDefensaPublica: '',
@@ -312,10 +366,31 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
                 if (data && data.detalles) {
                     try {
                         const parsed = JSON.parse(data.detalles);
-                        setFicha(parsed);
+                        // La fase al egreso se guardó un tiempo en
+                        // `situacionEducativa`, un campo que semánticamente es
+                        // otra cosa. Se lee de ahí solo si falta en `detalles`,
+                        // para que los informes antiguos no pierdan el dato.
+                        if (!parsed.faseAlEgreso && data.situacionEducativa) {
+                            parsed.faseAlEgreso = data.situacionEducativa;
+                        }
+                        // Se mezcla con los valores por omisión: una ficha
+                        // guardada antes de que existiera un campo lo dejaba
+                        // `undefined`, y con `logros` eso rompía el render y
+                        // la pantalla quedaba en blanco.
+                        setFicha({ ...getInitialFicha(), ...parsed });
                     } catch (e) {
                         console.error('Error parsing details JSON:', e);
                     }
+                } else if (caso?.fase && caso.fase !== 'EGRESADO') {
+                    // Ficha nueva: se propone la fase en la que el caso está
+                    // ahora mismo, según el Resumen del Caso. Queda editable
+                    // porque el F13 registra un hecho puntual —en qué fase
+                    // estaba al egresar— y hay egresos excepcionales que
+                    // ocurren antes de terminar el recorrido.
+                    setFicha((p: FichaFormato13) => ({
+                        ...p,
+                        faseAlEgreso: `FASE ${normalizarFase(caso.fase)}`,
+                    }));
                 }
             } catch (err) {
                 // If it fails/404, set to null
@@ -338,7 +413,10 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
                         const res = await getUsuariosBySede(currentUser.sedeId);
                         const list = Array.isArray(res) ? res : (res.data || []);
                         const coord = list.find((u: any) => u.rol === 'COORDINADOR');
-                        if (coord) {
+                        // Si mientras se pedía la lista terminó de cargar una
+                        // ficha guardada, no se pisa: este prellenado es solo
+                        // para fichas nuevas.
+                        if (coord && !informe) {
                             const cWords = (coord.nombreCompleto || coord.nombre || '').trim().split(/\s+/);
                             let coordN = '';
                             let coordAP = '';
@@ -374,6 +452,10 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
     const upF = (key: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
         setFicha((p: FichaFormato13) => ({ ...p, [key]: e.target.value }));
     const upBool = (key: string, val: boolean) => setFicha((p: FichaFormato13) => ({ ...p, [key]: val }));
+
+    /** Igual que `upF`, pero recibe el valor ya listo (lo usan los campos con formato). */
+    const setCampo = (key: string, valor: string) =>
+        setFicha((p: FichaFormato13) => ({ ...p, [key]: valor }));
     /**
      * Marca o desmarca una modalidad.
      *
@@ -441,10 +523,19 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
             const data = await cerrarCaso(caso.id, {
                 motivoEgreso,
                 fechaEgreso: ficha.fechaEgreso,
-                situacionFamiliar: ficha.observacionesMayoriaEdad || '',
-                situacionEducativa: ficha.faseAlEgreso || '',
+                // Estos textos ya no van a columnas que no les corresponden:
+                // `observacionesMayoriaEdad` iba a SITUACION_FAMILIAR, que es
+                // VARCHAR2(100), y con el dictado —que emite HTML— reventaba
+                // con ORA-12899 mostrando solo "Error al guardar borrador".
+                // El dato completo viaja en `detalles`, que es un CLOB.
+                situacionFamiliar: '',
+                // La fase al egreso viaja en `detalles`, junto al resto de la
+                // ficha. Dejó de escribirse aquí: `situacionEducativa` es la
+                // situación educativa del NNA, no su fase, y guardarla ahí
+                // hacía que dos datos distintos compitieran por una columna.
+                situacionEducativa: '',
                 logrosAlcanzados: JSON.stringify(ficha.logros),
-                recomendaciones: ficha.observacionesDerivacion || '',
+                recomendaciones: '',
                 estado: 'BORRADOR',
                 detalles: JSON.stringify(ficha)
             });
@@ -505,10 +596,19 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
             const data = await cerrarCaso(caso.id, {
                 motivoEgreso,
                 fechaEgreso: ficha.fechaEgreso,
-                situacionFamiliar: ficha.observacionesMayoriaEdad || '',
-                situacionEducativa: ficha.faseAlEgreso || '',
+                // Estos textos ya no van a columnas que no les corresponden:
+                // `observacionesMayoriaEdad` iba a SITUACION_FAMILIAR, que es
+                // VARCHAR2(100), y con el dictado —que emite HTML— reventaba
+                // con ORA-12899 mostrando solo "Error al guardar borrador".
+                // El dato completo viaja en `detalles`, que es un CLOB.
+                situacionFamiliar: '',
+                // La fase al egreso viaja en `detalles`, junto al resto de la
+                // ficha. Dejó de escribirse aquí: `situacionEducativa` es la
+                // situación educativa del NNA, no su fase, y guardarla ahí
+                // hacía que dos datos distintos compitieran por una columna.
+                situacionEducativa: '',
                 logrosAlcanzados: JSON.stringify(ficha.logros),
-                recomendaciones: ficha.observacionesDerivacion || '',
+                recomendaciones: '',
                 archivoUrl,
                 estado: 'FINALIZADO',
                 detalles: JSON.stringify(ficha)
@@ -612,21 +712,42 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
                                 <td className="px-4 py-3 text-fg-2">{informe.fechaEgreso ? informe.fechaEgreso.split('T')[0] : 'No registrada'}</td>
                                 <td className="px-4 py-3 text-fg-2 font-medium">{informe.motivoEgreso || 'No registrado'}</td>
                                 <td className="px-4 py-3">
-                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-[12px] text-[11px] font-semibold ${
-                                        informe.estado === 'FINALIZADO'
-                                            ? 'bg-success-soft text-success'
-                                            : 'bg-amber-100 text-amber-700'
-                                    }`}>
-                                        {informe.estado || 'BORRADOR'}
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-[12px] text-[11px] font-semibold ${ESTADO_ESTILO[informe.estado] || 'bg-amber-100 text-amber-700'}`}>
+                                        {ESTADO_ETIQUETA[informe.estado] || informe.estado || 'BORRADOR'}
                                     </span>
+                                    {/* La observación del coordinador se muestra aquí
+                                        mismo: antes llegaba por correo o por Zimbra y
+                                        el educador tenía que buscarla fuera. */}
+                                    {observacionCoordinador && (
+                                        <p className="mt-1 text-[11px] text-danger max-w-[280px]">
+                                            <strong>Observado:</strong> {observacionCoordinador.texto}
+                                        </p>
+                                    )}
                                 </td>
                                 <td className="px-4 py-3 text-right">
                                     <div className="flex items-center justify-end gap-2">
-                                        {informe.estado === 'BORRADOR' ? (
+                                        {/* Firma del educador: disponible mientras la
+                                            ficha no esté esperando al coordinador ni
+                                            firmada por él. */}
+                                        {!isViewing && ['FINALIZADO', 'OBSERVADO'].includes(informe.estado) && (
+                                            <button
+                                                onClick={() => setFirmando(true)}
+                                                className="p-1.5 text-primary hover:bg-primary-soft rounded-[4px] transition-colors"
+                                                title="Firmar y enviar al coordinador"
+                                            >
+                                                <FileSignature size={16} />
+                                            </button>
+                                        )}
+                                        {/* Editable en borrador y también cuando el
+                                            coordinador la devolvió con observaciones.
+                                            Sin esto el educador solo podía volver a
+                                            firmar la misma ficha sin corregir nada, que
+                                            es lo contrario de lo que se acordó. */}
+                                        {EDITABLES.includes(informe.estado) ? (
                                             <button
                                                 onClick={() => { setShowForm(true); setIsViewing(false); setCurrentStep(1); }}
                                                 className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-[4px] transition-colors"
-                                                title="Editar Borrador"
+                                                title={informe.estado === 'OBSERVADO' ? 'Corregir lo observado' : 'Editar Borrador'}
                                             >
                                                 <Edit size={16} />
                                             </button>
@@ -665,9 +786,15 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
                 {/* Vista Móvil */}
                 <div className="md:hidden border border-border rounded-xl p-4 space-y-3 bg-surface">
                     <div className="flex justify-between items-start">
-                        <span className="font-bold text-primary text-sm">{informe.codigoInforme || 'Borrador'}</span>
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${informe.estado === 'FINALIZADO' ? 'bg-success-soft text-success' : 'bg-amber-100 text-amber-700'}`}>
-                            {informe.estado || 'BORRADOR'}
+                        <span className="font-bold text-primary text-sm">
+                            {informe.codigoInforme || 'Sin numerar'}
+                        </span>
+                        {/* Mismo mapa que la tabla: antes esta vista pintaba
+                            cualquier estado distinto de FINALIZADO en ámbar con
+                            el código crudo, así que una ficha firmada se veía
+                            igual que un borrador. */}
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${ESTADO_ESTILO[informe.estado] || 'bg-amber-100 text-amber-700'}`}>
+                            {ESTADO_ETIQUETA[informe.estado] || informe.estado || 'Borrador'}
                         </span>
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-xs">
@@ -681,12 +808,13 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
                         </div>
                     </div>
                     <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/50">
-                        {informe.estado === 'BORRADOR' ? (
+                        {EDITABLES.includes(informe.estado) ? (
                             <button
                                 onClick={() => { setShowForm(true); setIsViewing(false); setCurrentStep(1); }}
                                 className="flex-1 inline-flex items-center justify-center gap-1 bg-amber-500 text-white py-1.5 rounded-lg text-xs font-bold"
                             >
-                                <Edit size={14} /> Editar Borrador
+                                <Edit size={14} />
+                                {informe.estado === 'OBSERVADO' ? 'Corregir' : 'Editar Borrador'}
                             </button>
                         ) : (
                             <>
@@ -722,10 +850,47 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
                     title="Ficha de Egreso – Retiro (Formato 13)"
                 />
 
+                {/* Firma del educador. Solo su recuadro: el coordinador firma
+                    después, desde su bandeja. */}
+                {firmando && informe && (
+                    <PanelFirmas
+                        titulo="Firmar Ficha de Egreso – Retiro"
+                        subtitulo="Al firmar, la ficha se envía al coordinador para su firma y sello"
+                        firmantes={[{
+                            clave: 'educador',
+                            etiqueta: 'Educador/a',
+                            rol: 'Nombre y firma del educador/a responsable',
+                            nombre: educadorDeLaSesion(),
+                            conHuella: false,
+                        }]}
+                        onFirmar={async (firmas) => {
+                            if (!firmas.educador) {
+                                toast.error('Dibuje su firma antes de continuar.');
+                                return;
+                            }
+                            try {
+                                await firmarComoEducador(informe.id, firmas.educador);
+                                setInforme({ ...informe, estado: 'PEND_COORDINADOR' });
+                                toast.success('Ficha firmada y enviada al coordinador.');
+                                setFirmando(false);
+                            } catch (e: any) {
+                                toast.error(e.message || 'No se pudo firmar la ficha.');
+                            }
+                        }}
+                        onDescargarParaFirmar={handlePreviewPDF}
+                        onSubirFirmado={async () => {
+                            toast.info('Para el proceso en papel, descargue la ficha y súbala desde el expediente digital.');
+                        }}
+                        onClose={() => setFirmando(false)}
+                    />
+                )}
+
                 {/* Hidden Print */}
                 {currentPrintFicha && (
                     <div style={{ position: 'fixed', left: '-9999px', top: 0 }}>
-                        <Formato13Print id="formato-13-hidden-print" nna={nna} ficha={currentPrintFicha} />
+                        <Formato13Print id="formato-13-hidden-print" nna={nna} ficha={currentPrintFicha}
+                            firmaEducador={detallesGuardados.firmaEducador}
+                            firmaCoordinador={detallesGuardados.firmaCoordinador} />
                     </div>
                 )}
             </div>
@@ -759,7 +924,9 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
 
             {/* Stepper Progress Bar */}
             <div className="flex justify-between items-center bg-surface p-4 rounded-[8px] border border-border shadow-sm">
-                {[1, 2, 3].map(s => (
+                {/* Dos pasos: el tercero se fue con los datos de educador y
+                    coordinador, que ahora salen de la firma. */}
+                {[1, 2].map(s => (
                     <button
                         key={s}
                         type="button"
@@ -778,9 +945,8 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
                         <span className={`ml-2 text-xs font-semibold hidden md:inline transition-colors ${currentStep === s ? 'text-primary' : 'text-fg-muted hover:text-fg'}`}>
                             {s === 1 && "Datos Generales"}
                             {s === 2 && "Modalidad Egreso / Retiro"}
-                            {s === 3 && "Firmas y Cierre"}
                         </span>
-                        {s < 3 && <div className="flex-1 h-0.5 mx-4 bg-border" />}
+                        {s < 2 && <div className="flex-1 h-0.5 mx-4 bg-border" />}
                     </button>
                 ))}
             </div>
@@ -851,6 +1017,48 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
                                 <label className={LBL}>Fecha Egreso del Servicio</label>
                                 <input type="date" className={getInputClass(isViewing)} value={ficha.fechaEgreso} onChange={upF('fechaEgreso')} disabled={isViewing} />
                             </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 mt-4 border-t border-border">
+                            <div>
+                                <label className={LBL}>Cuenta con Resolución UPE</label>
+                                <select className={getSelectClass(isViewing)} value={ficha.cuentaResolucionUPE} onChange={upF('cuentaResolucionUPE')} disabled={isViewing}>
+                                    <option value="">Seleccionar…</option><option value="SI">SÍ</option><option value="NO">NO</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className={LBL}>Situación Resolución UPE</label>
+                                <select className={getSelectClass(isViewing)} value={ficha.situacionResolucionUPE} onChange={upF('situacionResolucionUPE')} disabled={isViewing}>
+                                    <option value="">Seleccionar…</option><option value="SI">SÍ</option><option value="NO">NO</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className={LBL}>Recibe servicio de defensa pública</label>
+                                <select className={getSelectClass(isViewing)} value={ficha.recibeDefensaPublica} onChange={upF('recibeDefensaPublica')} disabled={isViewing}>
+                                    <option value="">Seleccionar…</option><option value="SI">SÍ</option><option value="NO">NO</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className={LBL}>En qué fase del servicio se encuentra al momento del egreso o retiro</label>
+                                <select className={getSelectClass(isViewing)} value={ficha.faseAlEgreso} onChange={upF('faseAlEgreso')} disabled={isViewing}>
+                                    <option value="">Seleccionar…</option>
+                                    <option value="FASE I">FASE I</option>
+                                    <option value="FASE II">FASE II</option>
+                                    <option value="FASE III">FASE III</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="mt-4">
+                            <label className={LBL}>Descripción (Defensa Pública)</label>
+                            <CampoDictado
+                                label=""
+                                value={ficha.descripcionDefensa || ''}
+                                onChange={v => setCampo('descripcionDefensa', v)}
+                                rows={3}
+                                placeholder="Detalles del servicio de defensa pública…"
+                                disabled={isViewing}
+                            />
                         </div>
                     </div>
                 </div>
@@ -935,16 +1143,13 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
                                                     </tbody>
                                                 </table>
                                             </div>
-                                            <div>
-                                                <label className={LBL}>Observaciones</label>
-                                                <textarea
-                                                    className={getTextareaClass(isViewing)}
-                                                    rows={3}
-                                                    value={ficha.observacionesLogros || ''}
-                                                    onChange={upF('observacionesLogros')}
-                                                    disabled={isViewing}
-                                                />
-                                            </div>
+                                            <CampoDictado
+                                                label="Observaciones"
+                                                value={ficha.observacionesLogros || ''}
+                                                onChange={v => setCampo('observacionesLogros', v)}
+                                                rows={3}
+                                                disabled={isViewing}
+                                            />
                                         </div>
                                     )}
                                 </div>
@@ -962,10 +1167,13 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
                                                 </div>
                                                 <input className={getInputClass(isViewing)} placeholder="Otros derechos…" value={ficha.derechosOtros} onChange={upF('derechosOtros')} disabled={isViewing} />
                                             </div>
-                                            <div>
-                                                <label className={LBL}>Observaciones</label>
-                                                <textarea className={getTextareaClass(isViewing)} rows={2} value={ficha.observacionesMayoriaEdad || ''} onChange={upF('observacionesMayoriaEdad')} disabled={isViewing} />
-                                            </div>
+                                            <CampoDictado
+                                                label="Observaciones"
+                                                value={ficha.observacionesMayoriaEdad || ''}
+                                                onChange={v => setCampo('observacionesMayoriaEdad', v)}
+                                                rows={2}
+                                                disabled={isViewing}
+                                            />
                                             <div>
                                                 <label className={LBL}>Se entrega directorio de instituciones al usuario</label>
                                                 <select className={getSelectClass(isViewing)} value={ficha.entregaDirectorio} onChange={upF('entregaDirectorio')} disabled={isViewing}>
@@ -985,10 +1193,13 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
                                                 <label className={LBL}>Institución derivada</label>
                                                 <input className={getInputClass(isViewing)} value={ficha.institucionDerivada} onChange={upF('institucionDerivada')} disabled={isViewing} />
                                             </div>
-                                            <div>
-                                                <label className={LBL}>Observaciones</label>
-                                                <textarea className={getTextareaClass(isViewing)} rows={2} value={ficha.observacionesDerivacion} onChange={upF('observacionesDerivacion')} disabled={isViewing} />
-                                            </div>
+                                            <CampoDictado
+                                                label="Observaciones"
+                                                value={ficha.observacionesDerivacion || ''}
+                                                onChange={v => setCampo('observacionesDerivacion', v)}
+                                                rows={2}
+                                                disabled={isViewing}
+                                            />
                                             <p className="text-[11px] text-fg-muted italic">Adjuntar evidencia de derivación al expediente digital.</p>
                                         </div>
                                     )}
@@ -1022,8 +1233,13 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
                                             </div>
                                             <input className={getInputClass(isViewing)} placeholder="Otros…" value={ficha.interesSuperiorOtro} onChange={upF('interesSuperiorOtro')} disabled={isViewing} />
                                             <div>
-                                                <label className={LBL}>Acciones realizadas</label>
-                                                <textarea className={getTextareaClass(isViewing)} rows={2} value={ficha.retiInterSuperiorAcciones} onChange={upF('retiInterSuperiorAcciones')} disabled={isViewing} />
+                                                <CampoDictado
+                                                    label="Acciones realizadas"
+                                                    value={ficha.retiInterSuperiorAcciones || ''}
+                                                    onChange={v => setCampo('retiInterSuperiorAcciones', v)}
+                                                    rows={2}
+                                                    disabled={isViewing}
+                                                />
                                                 <p className="text-[11px] text-fg-muted italic mt-1">Adjuntar evidencia al expediente digital.</p>
                                             </div>
                                         </div>
@@ -1034,8 +1250,13 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
                                     <CheckCard label="No ubicado (3 meses o más de no ubicado)" checked={ficha.noUbicado} onChange={v => marcarModalidad('noUbicado', v)} disabled={isViewing || hayEgreso} />
                                     {ficha.noUbicado && (
                                         <div className="ml-6 mt-3">
-                                            <label className={LBL}>Acciones realizadas para ubicarlo</label>
-                                            <textarea className={getTextareaClass(isViewing)} rows={2} value={ficha.accionesBusqueda} onChange={upF('accionesBusqueda')} disabled={isViewing} />
+                                            <CampoDictado
+                                                label="Acciones realizadas para ubicarlo"
+                                                value={ficha.accionesBusqueda || ''}
+                                                onChange={v => setCampo('accionesBusqueda', v)}
+                                                rows={2}
+                                                disabled={isViewing}
+                                            />
                                             <p className="text-[11px] text-fg-muted italic mt-1">Adjuntar evidencia en el cuaderno de campo.</p>
                                         </div>
                                     )}
@@ -1045,8 +1266,13 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
                                     <CheckCard label="No desea participar" checked={ficha.noDeseaParticipar} onChange={v => marcarModalidad('noDeseaParticipar', v)} disabled={isViewing || hayEgreso} />
                                     {ficha.noDeseaParticipar && (
                                         <div className="ml-6 mt-3">
-                                            <label className={LBL}>Motivo y acciones realizadas para motivarlo</label>
-                                            <textarea className={getTextareaClass(isViewing)} rows={2} value={ficha.motivoNoDesea} onChange={upF('motivoNoDesea')} disabled={isViewing} />
+                                            <CampoDictado
+                                                label="Motivo y acciones realizadas para motivarlo"
+                                                value={ficha.motivoNoDesea || ''}
+                                                onChange={v => setCampo('motivoNoDesea', v)}
+                                                rows={2}
+                                                disabled={isViewing}
+                                            />
                                             <p className="text-[11px] text-fg-muted italic mt-1">Adjuntar evidencia en el cuaderno de campo.</p>
                                         </div>
                                     )}
@@ -1054,96 +1280,14 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-border">
-                            <div>
-                                <label className={LBL}>Cuenta con Resolución UPE</label>
-                                <select className={getSelectClass(isViewing)} value={ficha.cuentaResolucionUPE} onChange={upF('cuentaResolucionUPE')} disabled={isViewing}>
-                                    <option value="">Seleccionar…</option><option value="SI">SÍ</option><option value="NO">NO</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className={LBL}>Situación Resolución UPE</label>
-                                <select className={getSelectClass(isViewing)} value={ficha.situacionResolucionUPE} onChange={upF('situacionResolucionUPE')} disabled={isViewing}>
-                                    <option value="">Seleccionar…</option><option value="SI">SÍ</option><option value="NO">NO</option>
-                                </select>
-                            </div>
-                        </div>
                     </div>
                 </div>
             )}
 
-            {/* ── Step 3: Logros, Firmas y Cierre ────────────────────────────────── */}
-            {currentStep === 3 && (
-                <div className="space-y-3">
-                    <div className="bg-surface border border-border rounded-[8px] overflow-hidden">
-                        <div className="px-4 py-3 bg-surface-muted border-b border-border flex items-center gap-2">
-                            <FileText size={16} className="text-success" />
-                            <h3 className="font-semibold text-[13px] text-fg">Defensa Pública</h3>
-                        </div>
-                        <div className="p-5 space-y-4">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div>
-                                    <label className={LBL}>Recibe servicio de defensa pública</label>
-                                    <select className={getSelectClass(isViewing)} value={ficha.recibeDefensaPublica} onChange={upF('recibeDefensaPublica')} disabled={isViewing}>
-                                        <option value="">Seleccionar…</option><option value="SI">SÍ</option><option value="NO">NO</option>
-                                    </select>
-                                </div>
-                                {/* En el formato oficial esta pregunta va en la misma
-                                    fila que defensa pública y es una sola por NNA: no
-                                    se pregunta por cada logro. */}
-                                <div>
-                                    <label className={LBL}>En qué fase del servicio se encuentra al momento del egreso o retiro</label>
-                                    <select className={getSelectClass(isViewing)} value={ficha.faseAlEgreso} onChange={upF('faseAlEgreso')} disabled={isViewing}>
-                                        <option value="">Seleccionar…</option>
-                                        <option value="FASE I">FASE I</option>
-                                        <option value="FASE II">FASE II</option>
-                                        <option value="FASE III">FASE III</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div>
-                                <label className={LBL}>Descripción (Defensa Pública)</label>
-                                <textarea className={getTextareaClass(isViewing)} rows={3} value={ficha.descripcionDefensa} onChange={upF('descripcionDefensa')} placeholder="Detalles del servicio de defensa pública…" disabled={isViewing} />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="bg-surface border border-border rounded-[8px] overflow-hidden">
-                        <div className="px-4 py-3 bg-surface-muted border-b border-border flex items-center gap-2">
-                            <FileText size={16} className="text-success" />
-                            <h3 className="font-semibold text-[13px] text-fg">Datos del Educador/a y Coordinador/a</h3>
-                        </div>
-                        <div className="p-5 space-y-4">
-                            {[
-                                { prefix: 'educador', label: 'Educador/a Responsable', colorCls: 'bg-info-soft border-info/20', titleCls: 'text-info' },
-                                { prefix: 'coordinador', label: 'Coordinador/a', colorCls: 'bg-primary-soft border-primary/20', titleCls: 'text-primary' },
-                            ].map(({ prefix, label, colorCls, titleCls }) => (
-                                <div key={prefix} className={`p-4 rounded-[8px] border ${colorCls}`}>
-                                    <h4 className={`font-bold text-[13px] uppercase mb-3 ${titleCls}`}>{label}</h4>
-                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                        {['ApellidoPaterno','ApellidoMaterno','Nombres'].map(f => (
-                                            <div key={f}>
-                                                <label className={LBL}>{f.replace(/([A-Z])/g, ' $1').trim()}</label>
-                                                <input className={getInputClass(isViewing)} value={ficha[`${prefix}${f}`] || ''} onChange={upF(`${prefix}${f}`)} disabled={isViewing} />
-                                            </div>
-                                        ))}
-                                    </div>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-                                        <div>
-                                            <label className={LBL}>DNI</label>
-                                            <input className={getInputClass(isViewing)} maxLength={8} value={ficha[`${prefix}DNI`] || ''} onChange={upF(`${prefix}DNI`)} disabled={isViewing} />
-                                        </div>
-                                        <div>
-                                            <label className={LBL}>Lugar / Fecha</label>
-                                            <input className={getInputClass(isViewing)} placeholder="Lima, 09/02/2026" value={ficha[`${prefix}LugarFecha`] || ''} onChange={upF(`${prefix}LugarFecha`)} disabled={isViewing} />
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* El paso 3 desapareció: los datos del educador y del coordinador
+                ya no se escriben. Cada uno firma desde la tabla de fichas y su
+                nombre sale de su cuenta, así que una ficha no puede salir
+                firmada a nombre de otra persona. */}
 
             {/* ── Form Actions ──────────────────────────────────────── */}
             <div className="flex justify-between items-center gap-3 mt-4 pt-4 border-t border-border bg-surface px-5 py-4 rounded-[8px] border border-border">
@@ -1177,7 +1321,7 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
                             Anterior
                         </button>
                     )}
-                    {currentStep < 3 ? (
+                    {currentStep < 2 ? (
                         <button
                             type="button"
                             onClick={() => setCurrentStep(prev => prev + 1)}
@@ -1202,7 +1346,9 @@ export const InformeEgresoList = ({ nna, caso }: { nna: NnaData; caso?: CasoData
             {/* Hidden Print */}
             {currentPrintFicha && (
                 <div style={{ position: 'fixed', left: '-9999px', top: 0 }}>
-                    <Formato13Print id="formato-13-hidden-print" nna={nna} ficha={currentPrintFicha} />
+                    <Formato13Print id="formato-13-hidden-print" nna={nna} ficha={currentPrintFicha}
+                            firmaEducador={detallesGuardados.firmaEducador}
+                            firmaCoordinador={detallesGuardados.firmaCoordinador} />
                 </div>
             )}
         </div>

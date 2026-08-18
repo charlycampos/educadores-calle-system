@@ -72,7 +72,25 @@ export const ExpedientePage = () => {
     const { id } = useParams();
     const [searchParams] = useSearchParams();
     const { selectedExpediente, isLoading, fetchExpediente, fetchAllNnas } = useNnaStore();
-    const [activeTab, setActiveTab] = useState('dashboard');
+
+    /**
+     * La pestaña inicial puede venir en la URL (`?tab=social`).
+     *
+     * Sirve para enlazar directo a la ficha que hace falta en vez de dejar al
+     * educador en la portada del expediente buscándola. Lo usan los pendientes
+     * del tablero: si el aviso dice "sin F04", el clic abre el Diagnóstico.
+     *
+     * Se valida contra la lista de pestañas reales: un `?tab=` inventado en la
+     * URL no debe dejar la vista en blanco.
+     */
+    const TABS_VALIDAS = [
+        'dashboard', 'social', 'logros', 'informe', 'pti',
+        'talleres', 'seguimiento_familiar', 'egreso',
+    ];
+    const tabInicial = searchParams.get('tab');
+    const [activeTab, setActiveTab] = useState(
+        tabInicial && TABS_VALIDAS.includes(tabInicial) ? tabInicial : 'dashboard'
+    );
     const [showDiagnosticoForm, setShowDiagnosticoForm] = useState(false);
     const [currentDiagnosticoId, setCurrentDiagnosticoId] = useState<number | null>(null);
     const [currentDiagnosticoData, setCurrentDiagnosticoData] = useState<any>(null);

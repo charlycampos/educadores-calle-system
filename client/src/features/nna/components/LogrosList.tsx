@@ -176,10 +176,20 @@ export const LogrosList = ({ nnaId, refreshKey, onNuevoLogro, onEditarLogro, onF
     const fase2Done = FASE_2_KEYS.some(evaluado);
     const fase3Done = FASE_3_KEYS.some(evaluado);
 
-    // Detectar fases ya cerradas desde los folios reales del expediente (persiste entre recargas)
-    const fase1Cerrada = cerradas.has(1) || documents.some(d => d.pdfUrl?.includes('/pdf/fase/1'));
-    const fase2Cerrada = cerradas.has(2) || documents.some(d => d.pdfUrl?.includes('/pdf/fase/2'));
-    const fase3Cerrada = isFinalized || cerradas.has(3) || documents.some(d => d.type === 'FICHA DE LOGROS (FORMATO 5)');
+    // Una fase está cerrada si tiene fecha de término sellada en la ficha.
+    //
+    // Antes esto se deducía de si la URL del folio contenía '/pdf/fase/1', o
+    // sea: el estado de la intervención dependía del nombre de un archivo. Si
+    // la llamada que registraba el folio fallaba —o alguien lo borraba— la
+    // fase volvía a figurar como abierta aunque estuviera cerrada.
+    //
+    // `cerradas` sigue en la expresión para que el cambio se vea de inmediato
+    // tras pulsar el botón, sin esperar a que se recargue el registro. Y los
+    // folios se conservan como respaldo para las fichas cerradas antes de que
+    // el cierre empezara a sellar la fecha.
+    const fase1Cerrada = !!record?.f1Fin || cerradas.has(1) || documents.some(d => d.pdfUrl?.includes('/pdf/fase/1'));
+    const fase2Cerrada = !!record?.f2Fin || cerradas.has(2) || documents.some(d => d.pdfUrl?.includes('/pdf/fase/2'));
+    const fase3Cerrada = !!record?.f3Fin || isFinalized || cerradas.has(3) || documents.some(d => d.type === 'FICHA DE LOGROS (FORMATO 5)');
 
     return (
         <div className="bg-surface rounded-[8px] border border-border shadow-1 overflow-hidden">

@@ -1,18 +1,22 @@
 import { useState, useEffect, useRef, Fragment } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { confirmar } from '../../components/ui/ConfirmDialog';
 import { toast } from '../../components/ui/Toast';
+import { CampoDictado } from '../../components/ui/CampoDictado';
 import {
     Presentation, Plus, X, Edit, LayoutGrid, List as ListIcon,
     Calendar as CalendarIcon, Clock, Users, MapPin, CheckCircle2,
     Save, BookOpen, AlertTriangle, Lightbulb, StickyNote,
-    FileDown, Loader2, ListChecks, Check, ChevronDown, Upload
+    FileDown, Loader2, ListChecks, Check, ChevronDown, Upload,
+    FileText, ClipboardCheck, Search
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import {
     getTalleres, createTaller, updateTaller,
     updateParticipante, removeParticipante, getTallerById,
-    getCandidatos, addParticipantesBulk, updateFamiliar, removeFamiliar
+    getCandidatos, addParticipantesBulk, updateFamiliar, removeFamiliar,
+    guardarEvaluacionTaller, igualarEvaluaciones
 } from '../../api/talleres.api';
 import type { Taller, ParticipanteTaller, NnaCandidato } from '../../api/talleres.api';
 import { useNnaStore } from '../../store/nna.store';
@@ -30,12 +34,53 @@ import type { EvidenciaAgrupada } from '../../api/evidencias.api';
 
 export const TalleresPage = () => {
     const [talleres, setTalleres] = useState<Taller[]>([]);
+
+    /**
+     * Taller que llega señalado por la URL (`/talleres?tallerId=N`).
+     *
+     * Lo usa el bloque "Hoy" del tablero: en vez de soltar al educador en la
+     * lista completa, la vista baja hasta ese taller y lo resalta.
+     */
+    const [searchParamsTalleres] = useSearchParams();
+    const tallerDestacado = Number(searchParamsTalleres.get('tallerId')) || null;
+
+    useEffect(() => {
+        if (!tallerDestacado || talleres.length === 0) return;
+        // Tras el render de las tarjetas: sin la espera, el nodo aún no existe.
+        const t = setTimeout(() => {
+            document.getElementById(`taller-${tallerDestacado}`)
+                ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 150);
+        return () => clearTimeout(t);
+    }, [tallerDestacado, talleres.length]);
     const [loading, setLoading] = useState(false);
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [currentTaller, setCurrentTaller] = useState<Partial<Taller> | null>(null);
-    const [activeTab, setActiveTab] = useState<'planificacion' | 'ejecucion'>('planificacion');
-    const [viewMode, setViewMode] = useState<'lista' | 'calendario'>('calendario');
+    /**
+     * Tres fichas, no dos pestañas de un mismo trámite.
+     *
+     * El F07 y el F08 son formatos oficiales distintos, cada uno con su
+     * impreso, y ocurren en momentos separados: uno antes del taller y otro
+     * después. En medio va el registro de asistencia (F10/F11), que es lo del
+     * día. Tenerlos todos en una sola pantalla era lo que hacía sentir el
+     * módulo amontonado.
+     */
+    const [activeTab, setActiveTab] = useState<'planificacion' | 'ejecucion' | 'evaluacion'>('planificacion');
+
+    // Evaluación del taller (F08). Se escribe una vez y la heredan todos los
+    // participantes que no tengan una propia.
+    const [evalTaller, setEvalTaller] = useState({ logros: '', limitaciones: '', sugerencias: '' });
+    const [guardandoEval, setGuardandoEval] = useState(false);
+
+    // Filtros del listado.
+    const [busqueda, setBusqueda] = useState('');
+    const [educadorFiltro, setEducadorFiltro] = useState('TODOS');
+    const [estadoFiltro, setEstadoFiltro] = useState('TODOS');
+    // El listado es la vista por defecto: al entrar, lo primero que se busca es
+    // qué talleres hay. El calendario sirve para programar, que es un momento
+    // posterior y se elige a propósito.
+    const [viewMode, setViewMode] = useState<'lista' | 'calendario'>('lista');
     const [evaluatingParticipantId, setEvaluatingParticipantId] = useState<number | null>(null);
     // Selector único: NNA (F10) y sus padres/tutores (F11) en una sola lista.
     // Todos los nombres vienen de la base; el educador solo marca.
@@ -82,9 +127,67 @@ export const TalleresPage = () => {
         const fullTaller = await getTallerById(taller.id);
         setCurrentTaller(fullTaller);
         setIsFormOpen(true);
-        setActiveTab('planificacion');
+
+        // Abrir donde el educador tiene trabajo, no siempre en la portada:
+        // si el taller ya se dio y falta evaluarlo, arranca en la evaluación.
+        const ev = fullTaller.evaluacionTaller;
+        setEvalTaller({
+            logros: ev?.logros || '',
+            limitaciones: ev?.limitaciones || '',
+            sugerencias: ev?.sugerencias || '',
+        });
+        const yaPaso = fullTaller.fecha && fullTaller.fecha.slice(0, 10) < new Date().toISOString().slice(0, 10);
+        setActiveTab(yaPaso && !ev?.evaluado ? 'evaluacion' : 'planificacion');
+
         setDescargados(new Set());
         cargarEvidencias(taller.id);
+    };
+
+    /**
+     * Abre un taller directamente en la ficha indicada.
+     *
+     * Lo usan los botones del listado: el educador va a la asistencia o a la
+     * evaluación de un clic, sin entrar y buscar la pestaña.
+     */
+    const abrirTallerEn = async (taller: Taller, tab: 'planificacion' | 'ejecucion' | 'evaluacion') => {
+        await handleSelectFromCalendar(taller);
+        setActiveTab(tab);
+    };
+
+    /** Guarda el Formato 08. Una sola evaluación para todo el taller. */
+    const handleGuardarEvaluacion = async () => {
+        if (!currentTaller?.id) return;
+        if (!evalTaller.logros.trim()) {
+            toast.error('Escribe al menos los logros: es el punto 5 del formato.');
+            return;
+        }
+        setGuardandoEval(true);
+        try {
+            const actualizado = await guardarEvaluacionTaller(currentTaller.id, evalTaller);
+            setCurrentTaller(actualizado);
+            toast.success('Evaluación del taller guardada.');
+            await loadData();
+        } catch (e: any) {
+            toast.error(e.message || 'No se pudo guardar la evaluación.');
+        } finally {
+            setGuardandoEval(false);
+        }
+    };
+
+    /** Quita las evaluaciones personalizadas para que todos hereden la del taller. */
+    const handleIgualarEvaluaciones = async () => {
+        if (!currentTaller?.id) return;
+        const ok = await confirmar(
+            'Se borrarán las evaluaciones escritas para participantes concretos y todos quedarán con la del taller. Esto no se puede deshacer.',
+            { titulo: 'Igualar evaluaciones', textoConfirmar: 'Sí, igualar', peligro: true },
+        );
+        if (!ok) return;
+        try {
+            setCurrentTaller(await igualarEvaluaciones(currentTaller.id));
+            toast.success('Todos los participantes quedaron con la evaluación del taller.');
+        } catch {
+            toast.error('No se pudieron igualar las evaluaciones.');
+        }
     };
 
     const handleNewTaller = (prefilledDate?: string) => {
@@ -136,7 +239,12 @@ export const TalleresPage = () => {
 
         try {
             if (currentTaller.id) {
-                await updateTaller(currentTaller.id, currentTaller, activeTab);
+                // La ficha de evaluación tiene su propio endpoint: aquí solo
+                // viajan planificación y asistencia.
+                await updateTaller(
+                    currentTaller.id, currentTaller,
+                    activeTab === 'evaluacion' ? 'ejecucion' : activeTab,
+                );
                 toast.success("Taller actualizado correctamente.");
             } else {
                 const created = await createTaller(currentTaller);
@@ -745,10 +853,10 @@ export const TalleresPage = () => {
                                     <label className="block text-[11px] font-semibold text-fg-muted uppercase mb-1 flex items-center gap-1">
                                         <StickyNote size={14} className="text-warning" /> 5. Logros alcanzados
                                     </label>
-                                    <textarea
+                                    <CampoDictado
+                                        label=""
                                         value={evaluatingParticipant.logros || ''}
-                                        onChange={e => updateLocalEvaluation(evaluatingParticipant.nnaId!,'logros', e.target.value)}
-                                        className="w-full p-3 bg-surface border border-border rounded-xl text-xs outline-none focus:border-primary transition-all"
+                                        onChange={v => updateLocalEvaluation(evaluatingParticipant.nnaId!,'logros', v)}
                                         rows={3}
                                         placeholder="¿Qué cambios u objetivos logró el NNA durante el taller?"
                                     />
@@ -759,10 +867,10 @@ export const TalleresPage = () => {
                                         <label className="block text-[11px] font-semibold text-fg-muted uppercase mb-1 flex items-center gap-1">
                                             <AlertTriangle size={14} className="text-warning" /> 6. Limitaciones
                                         </label>
-                                        <textarea
+                                        <CampoDictado
+                                            label=""
                                             value={evaluatingParticipant.limitaciones || ''}
-                                            onChange={e => updateLocalEvaluation(evaluatingParticipant.nnaId!,'limitaciones', e.target.value)}
-                                            className="w-full p-3 bg-surface border border-border rounded-xl text-xs outline-none focus:border-primary transition-all"
+                                            onChange={v => updateLocalEvaluation(evaluatingParticipant.nnaId!,'limitaciones', v)}
                                             rows={3}
                                             placeholder="Dificultades o barreras observadas..."
                                         />
@@ -771,10 +879,10 @@ export const TalleresPage = () => {
                                         <label className="block text-[11px] font-semibold text-fg-muted uppercase mb-1 flex items-center gap-1">
                                             <Lightbulb size={14} className="text-info" /> 7. Sugerencias
                                         </label>
-                                        <textarea
+                                        <CampoDictado
+                                            label=""
                                             value={evaluatingParticipant.sugerencias || ''}
-                                            onChange={e => updateLocalEvaluation(evaluatingParticipant.nnaId!,'sugerencias', e.target.value)}
-                                            className="w-full p-3 bg-surface border border-border rounded-xl text-xs outline-none focus:border-primary transition-all"
+                                            onChange={v => updateLocalEvaluation(evaluatingParticipant.nnaId!,'sugerencias', v)}
                                             rows={3}
                                             placeholder="Recomendaciones para próximas sesiones..."
                                         />
@@ -851,7 +959,19 @@ export const TalleresPage = () => {
                             }}
                             className={`pb-3 text-sm font-semibold transition-colors ${activeTab === 'ejecucion' ? 'text-primary border-b-2 border-primary' : 'text-fg-muted'}`}
                         >
-                            2. Ejecución y Evaluación (F8)
+                            2. Asistencia (F10/F11)
+                        </button>
+                        <button
+                            onClick={() => {
+                                if (!currentTaller.id) {
+                                    toast.info("Guarda la planificación primero.");
+                                    return;
+                                }
+                                setActiveTab('evaluacion');
+                            }}
+                            className={`pb-3 text-sm font-semibold transition-colors ${activeTab === 'evaluacion' ? 'text-primary border-b-2 border-primary' : 'text-fg-muted'}`}
+                        >
+                            3. Evaluación (F8)
                         </button>
                     </div>
 
@@ -927,21 +1047,21 @@ export const TalleresPage = () => {
                             <div className="grid grid-cols-2 gap-6">
                                 <div>
                                     <label className="block text-[11px] font-semibold text-fg-muted uppercase mb-1">3. OBJETIVO GENERAL</label>
-                                    <textarea
+                                    <CampoDictado
+                                        label=""
                                         value={currentTaller.objetivo || ''}
-                                        onChange={e => setCurrentTaller({ ...currentTaller, objetivo: e.target.value })}
+                                        onChange={v => setCurrentTaller({ ...currentTaller, objetivo: v })}
                                         rows={3}
-                                        className="w-full p-3 bg-surface border border-border rounded-xl text-xs outline-none focus:border-primary resize-none"
                                         placeholder="¿Qué queremos lograr con el grupo?"
                                     />
                                 </div>
                                 <div>
                                     <label className="block text-[11px] font-semibold text-fg-muted uppercase mb-1">5. ACCIONES PREVIAS AL TALLER</label>
-                                    <textarea
+                                    <CampoDictado
+                                        label=""
                                         value={currentTaller.accionesPrevias || ''}
-                                        onChange={e => setCurrentTaller({ ...currentTaller, accionesPrevias: e.target.value })}
+                                        onChange={v => setCurrentTaller({ ...currentTaller, accionesPrevias: v })}
                                         rows={3}
-                                        className="w-full p-3 bg-surface border border-border rounded-xl text-xs outline-none focus:border-primary resize-none"
                                         placeholder="Acciones de coordinación, preparación de materiales, convocatoria..."
                                     />
                                 </div>
@@ -980,11 +1100,11 @@ export const TalleresPage = () => {
                                         </div>
                                         <div>
                                             <label className="block text-[10px] font-semibold text-fg-muted uppercase mb-1">ACTIVIDAD</label>
-                                            <textarea
+                                            <CampoDictado
+                                                label=""
                                                 value={currentTaller.inicioActividad || ''}
-                                                onChange={e => setCurrentTaller({ ...currentTaller, inicioActividad: e.target.value })}
+                                                onChange={v => setCurrentTaller({ ...currentTaller, inicioActividad: v })}
                                                 rows={3}
-                                                className="w-full p-2 bg-surface border border-success/20 rounded-lg text-xs outline-none resize-none"
                                                 placeholder="Describe la actividad..."
                                             />
                                         </div>
@@ -1012,11 +1132,11 @@ export const TalleresPage = () => {
                                         </div>
                                         <div>
                                             <label className="block text-[10px] font-semibold text-fg-muted uppercase mb-1">ACTIVIDAD</label>
-                                            <textarea
+                                            <CampoDictado
+                                                label=""
                                                 value={currentTaller.procesoActividad || ''}
-                                                onChange={e => setCurrentTaller({ ...currentTaller, procesoActividad: e.target.value })}
+                                                onChange={v => setCurrentTaller({ ...currentTaller, procesoActividad: v })}
                                                 rows={3}
-                                                className="w-full p-2 bg-surface border border-info/20 rounded-lg text-xs outline-none resize-none"
                                                 placeholder="Describe la actividad..."
                                             />
                                         </div>
@@ -1044,11 +1164,11 @@ export const TalleresPage = () => {
                                         </div>
                                         <div>
                                             <label className="block text-[10px] font-semibold text-fg-muted uppercase mb-1">ACTIVIDAD</label>
-                                            <textarea
+                                            <CampoDictado
+                                                label=""
                                                 value={currentTaller.cierreActividad || ''}
-                                                onChange={e => setCurrentTaller({ ...currentTaller, cierreActividad: e.target.value })}
+                                                onChange={v => setCurrentTaller({ ...currentTaller, cierreActividad: v })}
                                                 rows={3}
-                                                className="w-full p-2 bg-surface border border-primary/20 rounded-lg text-xs outline-none resize-none"
                                                 placeholder="Describe la actividad..."
                                             />
                                         </div>
@@ -1067,6 +1187,125 @@ export const TalleresPage = () => {
                         </div>
                     )}
 
+                    {activeTab === 'evaluacion' && (
+                        <div className="max-w-4xl mx-auto space-y-6">
+                            {/* Cabecera del F08: los puntos 1, 2, 3 y 8 del formato
+                                son idénticos al F07, así que se heredan. El
+                                educador no los vuelve a escribir. */}
+                            <div className="bg-surface-muted/40 border border-border rounded-xl p-4">
+                                <p className="text-[11px] font-semibold text-fg-muted uppercase mb-3">
+                                    Datos heredados de la planificación (F7)
+                                </p>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-[13px]">
+                                    <div>
+                                        <p className="text-[11px] text-fg-muted">Taller</p>
+                                        <p className="text-fg font-medium">{currentTaller.nombre || '—'}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[11px] text-fg-muted">Dirigido a</p>
+                                        <p className="text-fg font-medium">{currentTaller.dirigidoA || '—'}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[11px] text-fg-muted">Lugar, fecha y hora</p>
+                                        <p className="text-fg font-medium">
+                                            {[currentTaller.lugar, currentTaller.fecha?.slice(0, 10), currentTaller.hora]
+                                                .filter(Boolean).join(' · ') || '—'}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        {/* Punto 4 del formato: no se escribe, se cuenta.
+                                            Pedirlo a mano invita a que no cuadre con el F10. */}
+                                        <p className="text-[11px] text-fg-muted">Personas asistentes</p>
+                                        <p className="text-fg font-semibold text-[16px]">
+                                            {(currentTaller.participantes || []).filter(p => p.asistio).length}
+                                            <span className="text-[12px] text-fg-muted font-normal">
+                                                {' '}de {currentTaller.numeroPersonasPlanificadas || (currentTaller.participantes || []).length} previstas
+                                            </span>
+                                        </p>
+                                    </div>
+                                </div>
+                                {currentTaller.objetivo && (
+                                    <div className="mt-3 pt-3 border-t border-border">
+                                        <p className="text-[11px] text-fg-muted">Objetivo planificado</p>
+                                        <p className="text-[13px] text-fg-2">{currentTaller.objetivo}</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div>
+                                <label className="block text-[11px] font-semibold text-fg-muted uppercase mb-1">
+                                    5. Logros <span className="text-danger">*</span>
+                                </label>
+                                <CampoDictado
+                                    label=""
+                                    value={evalTaller.logros}
+                                    onChange={v => setEvalTaller({ ...evalTaller, logros: v })}
+                                    rows={4}
+                                    placeholder="Indicar los cambios obtenidos luego de recibir el taller"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-[11px] font-semibold text-fg-muted uppercase mb-1">
+                                    6. Limitaciones encontradas
+                                </label>
+                                <CampoDictado
+                                    label=""
+                                    value={evalTaller.limitaciones}
+                                    onChange={v => setEvalTaller({ ...evalTaller, limitaciones: v })}
+                                    rows={4}
+                                    placeholder="Dificultades encontradas en función a la planificación del taller"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-[11px] font-semibold text-fg-muted uppercase mb-1">
+                                    7. Sugerencias y recomendaciones
+                                </label>
+                                <CampoDictado
+                                    label=""
+                                    value={evalTaller.sugerencias}
+                                    onChange={v => setEvalTaller({ ...evalTaller, sugerencias: v })}
+                                    rows={4}
+                                    placeholder="Qué recomendar para la próxima vez"
+                                />
+                            </div>
+
+                            {/* Aviso de evaluaciones personalizadas. Nunca se pisan
+                                solas: borrar lo que alguien escribió a mano para un
+                                chico concreto tiene que ser una decisión suya. */}
+                            {(currentTaller.participantes || []).some(p => p.evaluacionPropia) && (
+                                <div className="bg-warning-soft border border-warning/30 rounded-xl p-3 flex items-start gap-3">
+                                    <AlertTriangle size={16} className="text-warning shrink-0 mt-0.5" />
+                                    <div className="flex-1">
+                                        <p className="text-[12px] text-warning font-medium">
+                                            {(currentTaller.participantes || []).filter(p => p.evaluacionPropia).length} participante(s)
+                                            tienen una evaluación escrita aparte.
+                                        </p>
+                                        <p className="text-[11px] text-fg-muted mt-0.5">
+                                            No se van a sobrescribir. Si quieres que todos queden con esta misma evaluación, iguálalas.
+                                        </p>
+                                    </div>
+                                    <Button size="sm" variant="ghost" onClick={handleIgualarEvaluaciones}>
+                                        Igualar todas
+                                    </Button>
+                                </div>
+                            )}
+
+                            <div className="flex items-center justify-between pt-2 border-t border-border">
+                                <p className="text-[11px] text-fg-muted italic max-w-md">
+                                    Esta evaluación es del taller, no de cada participante. Se archiva
+                                    en el expediente de cada NNA que asistió. Recuerda adjuntar la lista
+                                    de asistencia firmada y las fotografías.
+                                </p>
+                                <Button onClick={handleGuardarEvaluacion} disabled={guardandoEval}>
+                                    {guardandoEval ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                                    Guardar evaluación
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+
                     {activeTab === 'ejecucion' && (
                         <div className="max-w-5xl mx-auto space-y-8">
                             <div className="bg-warning-soft/30 p-4 rounded-xl border border-warning/20 flex gap-4 items-start shadow-sm">
@@ -1075,12 +1314,12 @@ export const TalleresPage = () => {
                                     <label className="block text-[11px] font-semibold text-warning uppercase mb-1 tracking-wider">
                                         INFORME DE ASUNTOS GLOBALES / INCIDENCIAS
                                     </label>
-                                    <textarea
+                                    <CampoDictado
+                                        label=""
                                         value={currentTaller.incidenciasLogisticas || ''}
-                                        onChange={e => setCurrentTaller({ ...currentTaller, incidenciasLogisticas: e.target.value })}
-                                        className="w-full bg-surface border border-warning/25 rounded-xl p-3 text-xs text-fg focus:ring-2 focus:ring-warning/10 outline-none transition-all shadow-sm"
-                                        placeholder="Ej: Retraso por lluvia, falta de materiales, interrupciones externas..."
+                                        onChange={v => setCurrentTaller({ ...currentTaller, incidenciasLogisticas: v })}
                                         rows={2}
+                                        placeholder="Ej: Retraso por lluvia, falta de materiales, interrupciones externas..."
                                     />
                                 </div>
                             </div>
@@ -1307,6 +1546,31 @@ export const TalleresPage = () => {
         );
     }
 
+    // Educadores que aparecen en los talleres cargados. Se saca de los datos
+    // en vez de pedir la lista de usuarios: así el combo solo ofrece a quien
+    // de verdad tiene talleres, y no una lista larga con opciones vacías.
+    const educadoresDisponibles = Array.from(
+        new Set(
+            talleres
+                .map(t => t.educadorResponsable?.nombreCompleto)
+                .filter((n): n is string => !!n)
+        )
+    ).sort();
+
+    const talleresFiltrados = talleres.filter(t => {
+        if (educadorFiltro !== 'TODOS' && t.educadorResponsable?.nombreCompleto !== educadorFiltro) {
+            return false;
+        }
+        if (estadoFiltro !== 'TODOS' && t.estado !== estadoFiltro) return false;
+
+        if (!busqueda.trim()) return true;
+        // La búsqueda cubre también al educador: quien escribe un apellido
+        // espera encontrar sus talleres sin tener que usar el combo.
+        const q = busqueda.toLowerCase();
+        return [t.nombre, t.lugar, t.objetivo, t.educadorResponsable?.nombreCompleto]
+            .some(campo => (campo || '').toLowerCase().includes(q));
+    });
+
     return (
         <div className="space-y-6 max-w-7xl mx-auto pb-12">
             <div className="flex flex-wrap justify-between items-center gap-3">
@@ -1349,34 +1613,161 @@ export const TalleresPage = () => {
                     onNewTaller={date => handleNewTaller(date)}
                 />
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {talleres.map(taller => (
-                        <div key={taller.id} className="bg-surface border border-border rounded-2xl p-5 hover:border-primary/50 transition-all shadow-sm flex flex-col justify-between">
-                            <div>
-                                <div className="flex justify-between items-start mb-3">
-                                    <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider bg-primary-soft text-primary">
-                                        {taller.estado}
-                                    </span>
-                                    <span className="text-xs text-fg-muted flex items-center gap-1">
-                                        <CalendarIcon size={12} />
-                                        {taller.fecha ? new Date(taller.fecha).toLocaleDateString('es-PE', { day: '2-digit', month: 'short' }) : 'S/F'}
-                                    </span>
-                                </div>
-                                <h3 className="font-bold text-fg mb-1">{taller.nombre}</h3>
-                                <p className="text-xs text-fg-muted line-clamp-2 mb-4">{taller.objetivo || 'Sin objetivo'}</p>
-                            </div>
-                            <div className="pt-4 border-t border-border flex items-center justify-between">
-                                <div className="flex items-center gap-3 text-xs text-fg-muted">
-                                    <span className="flex items-center gap-1"><MapPin size={12} /> {taller.lugar || '—'}</span>
-                                    <span className="flex items-center gap-1"><Clock size={12} /> {taller.hora || '—'}</span>
-                                </div>
-                                <Button size="sm" variant="ghost" onClick={() => handleSelectFromCalendar(taller)}>
-                                    Ver taller →
-                                </Button>
-                            </div>
-                        </div>
-                    ))}
+                /* Listado, no tarjetas: en una tabla los talleres se comparan
+                   por fecha de un vistazo y entran muchos más en pantalla.
+                   Las tarjetas gastaban un tercio del ancho por taller para
+                   mostrar los mismos cinco datos. */
+                <>
+                <div className="bg-surface border border-border rounded-[12px] p-3 flex flex-col sm:flex-row gap-2.5 mb-3">
+                    <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-muted" size={15} />
+                        <input
+                            type="text"
+                            value={busqueda}
+                            onChange={e => setBusqueda(e.target.value)}
+                            placeholder="Buscar por taller, educador, lugar u objetivo…"
+                            className="w-full pl-9 pr-3 py-2 bg-surface border border-border rounded-md text-[13px] text-fg focus:outline-none focus:border-primary transition-colors placeholder:text-fg-muted"
+                        />
+                    </div>
+
+                    {/* El combo solo aparece si hay más de un educador: para un
+                        educador que ve sus propios talleres, elegirse a sí
+                        mismo no aporta nada. */}
+                    {educadoresDisponibles.length > 1 && (
+                        <select
+                            value={educadorFiltro}
+                            onChange={e => setEducadorFiltro(e.target.value)}
+                            className="bg-surface border border-border rounded-md px-3 py-2 text-[13px] text-fg focus:outline-none focus:border-primary cursor-pointer"
+                        >
+                            <option value="TODOS">Todos los educadores</option>
+                            {educadoresDisponibles.map(n => <option key={n} value={n}>{n}</option>)}
+                        </select>
+                    )}
+
+                    <select
+                        value={estadoFiltro}
+                        onChange={e => setEstadoFiltro(e.target.value)}
+                        className="bg-surface border border-border rounded-md px-3 py-2 text-[13px] text-fg focus:outline-none focus:border-primary cursor-pointer"
+                    >
+                        <option value="TODOS">Todos los estados</option>
+                        <option value="PLANIFICADO">Planificado</option>
+                        <option value="EJECUTADO">Ejecutado</option>
+                        <option value="EVALUADO">Evaluado</option>
+                    </select>
+
+                    {(busqueda || educadorFiltro !== 'TODOS' || estadoFiltro !== 'TODOS') && (
+                        <button
+                            type="button"
+                            onClick={() => { setBusqueda(''); setEducadorFiltro('TODOS'); setEstadoFiltro('TODOS'); }}
+                            className="px-3 py-2 text-[12px] text-fg-secondary hover:text-fg border border-border rounded-md hover:bg-surface-muted transition-colors whitespace-nowrap"
+                        >
+                            Limpiar · {talleresFiltrados.length} de {talleres.length}
+                        </button>
+                    )}
                 </div>
+
+                <div className="bg-surface border border-border rounded-[12px] overflow-hidden">
+                    {talleresFiltrados.length === 0 ? (
+                        <p className="px-4 py-12 text-center text-[13px] text-fg-muted">
+                            {talleres.length === 0
+                                ? 'No hay talleres registrados todavía.'
+                                : 'Ningún taller coincide con los filtros.'}
+                        </p>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left">
+                                <thead>
+                                    <tr className="border-b border-border bg-surface-muted/40">
+                                        <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-fg-muted">Fecha</th>
+                                        <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-fg-muted">Taller</th>
+                                        <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-fg-muted hidden md:table-cell">Lugar</th>
+                                        <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-fg-muted hidden sm:table-cell">Hora</th>
+                                        <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-fg-muted hidden lg:table-cell">Educador</th>
+                                        <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-fg-muted">Estado</th>
+                                        <th className="px-4 py-2.5" />
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {talleresFiltrados.map(taller => (
+                                        <tr
+                                            key={taller.id}
+                                            // El ancla permite enlazar a un taller concreto
+                                            // desde el bloque "Hoy" del tablero:
+                                            // /talleres?tallerId=N baja hasta esta fila.
+                                            id={`taller-${taller.id}`}
+                                            className={`border-b border-border last:border-b-0 transition-colors ${
+                                                tallerDestacado === taller.id
+                                                    ? 'bg-primary-soft'
+                                                    : 'hover:bg-surface-muted/50'
+                                            }`}
+                                        >
+                                            <td className="px-4 py-3 text-[13px] text-fg-secondary whitespace-nowrap">
+                                                {taller.fecha
+                                                    ? new Date(taller.fecha).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: '2-digit' })
+                                                    : 'S/F'}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <p className="text-[14px] font-medium text-fg">{taller.nombre}</p>
+                                                <p className="text-[12px] text-fg-muted line-clamp-1">{taller.objetivo || 'Sin objetivo'}</p>
+                                            </td>
+                                            <td className="px-4 py-3 text-[13px] text-fg-secondary hidden md:table-cell">
+                                                {taller.lugar || '—'}
+                                            </td>
+                                            <td className="px-4 py-3 text-[13px] text-fg-secondary hidden sm:table-cell whitespace-nowrap">
+                                                {taller.hora || '—'}
+                                            </td>
+                                            <td className="px-4 py-3 text-[13px] text-fg-secondary hidden lg:table-cell">
+                                                {taller.educadorResponsable?.nombreCompleto || '—'}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-primary-soft text-primary whitespace-nowrap">
+                                                    {taller.estado}
+                                                </span>
+                                            </td>
+                                            {/* Acciones: llevan a la ficha que toca, sin
+                                                obligar a entrar y buscar la pestaña. */}
+                                            <td className="px-4 py-3 text-right whitespace-nowrap">
+                                                <div className="flex items-center justify-end gap-1">
+                                                    <button
+                                                        type="button"
+                                                        title="Planificación (F7)"
+                                                        onClick={() => abrirTallerEn(taller, 'planificacion')}
+                                                        className="p-1.5 rounded-md text-fg-muted hover:text-primary hover:bg-surface-muted transition-colors"
+                                                    >
+                                                        <FileText size={16} />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        title="Asistencia (F10/F11)"
+                                                        onClick={() => abrirTallerEn(taller, 'ejecucion')}
+                                                        className="p-1.5 rounded-md text-fg-muted hover:text-primary hover:bg-surface-muted transition-colors"
+                                                    >
+                                                        <Users size={16} />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        title={taller.evaluacionTaller?.evaluado
+                                                            ? 'Evaluación (F8) — ya registrada'
+                                                            : 'Evaluar el taller (F8)'}
+                                                        onClick={() => abrirTallerEn(taller, 'evaluacion')}
+                                                        className={`p-1.5 rounded-md transition-colors hover:bg-surface-muted ${
+                                                            taller.evaluacionTaller?.evaluado
+                                                                ? 'text-success'
+                                                                : 'text-fg-muted hover:text-primary'
+                                                        }`}
+                                                    >
+                                                        <ClipboardCheck size={16} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+                </>
             )}
         </div>
     );

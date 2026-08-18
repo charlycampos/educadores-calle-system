@@ -4,6 +4,7 @@ import { createLogros, updateLogros, cerrarFase, type ProcesoLogrosPayload } fro
 import { useAuthStore } from '../../../store/auth.store';
 import { useNnaStore } from '../../../store/nna.store';
 import { EXPEDIENTE_API_URL, INTERVENCION_API_URL } from '../../../config/api';
+import { CampoDictado } from '../../../components/ui/CampoDictado';
 
 interface Formato5LogrosProps {
     nna: any;
@@ -521,12 +522,15 @@ export const Formato5Logros = ({ nna, caso, initialData, onClose, onSuccess }: F
                             <AlertCircle size={15} />
                             Observaciones — Fase {activeFase === 1 ? 'I' : activeFase === 2 ? 'II' : 'III'}
                         </label>
-                        <textarea
-                            value={observaciones[activeFase]}
-                            onChange={e => !faseCerradaActual && setObservaciones({ ...observaciones, [activeFase]: e.target.value })}
+                        {/* Con formato y dictado, como el resto de campos largos.
+                            Al cerrar la fase queda en solo lectura pero se sigue
+                            viendo lo escrito. */}
+                        <CampoDictado
+                            label=""
+                            value={observaciones[activeFase] || ''}
+                            onChange={v => !faseCerradaActual && setObservaciones({ ...observaciones, [activeFase]: v })}
                             disabled={faseCerradaActual}
                             rows={4}
-                            className={`w-full px-4 py-3 border border-border rounded-[8px] focus:ring-2 focus:ring-primary focus:border-transparent outline-none resize-none text-sm ${faseCerradaActual ? 'bg-surface-muted cursor-default' : 'bg-surface'}`}
                             placeholder={faseCerradaActual ? 'Fase cerrada oficialmente — solo lectura' : 'Observaciones, dificultades encontradas o logros específicos...'}
                         />
                     </div>

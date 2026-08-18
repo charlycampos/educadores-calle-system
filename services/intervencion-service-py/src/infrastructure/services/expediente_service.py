@@ -52,7 +52,7 @@ async def _intentar_abrir_expediente(nna_id: int) -> None:
         # 3. F04
         async with conn.cursor() as cur:
             await cur.execute(
-                "SELECT COUNT(1) FROM DIAGNOSTICO_SOCIAL WHERE NNA_ID = :1", [nna_id]
+                "SELECT COUNT(1) FROM DIAGNOSTICO_SOCIAL WHERE NNA_ID = :1 AND ESTADO = 'COMPLETO'", [nna_id]
             )
             count_f04 = (await cur.fetchone())[0]
         if count_f04 == 0:

@@ -23,6 +23,9 @@ import {
     TIPO_DOC_MAP, SEXO_MAP, TIPO_DISCAPACIDAD_MAP,
     MODALIDAD_ESTUDIO_MAP, GRADO_ESTUDIO_MAP, NIVEL_EDUCATIVO_MAP,
 } from '../../../data/catalogos-sec';
+import { normalizarFase, etiquetaFase, NOMBRE_CORTO_FASE } from '../../../utils/fases';
+import { TrackingFases } from './TrackingFases';
+
 interface ResumenCasoProps {
     nna: any;
     caso: any;
@@ -196,7 +199,9 @@ const TabAtendidos = ({ nnaActual, familia }: { nnaActual: any; familia: any[] }
                                 <div className="flex flex-col items-end gap-2">
                                     {estadoBadge(casoActivo?.estado)}
                                     <span className="text-[10px] font-bold text-fg-muted uppercase tracking-tighter">
-                                        Fase {casoActivo?.fase || 'I'}
+                                        {normalizarFase(casoActivo?.fase) === 'EGRESADO'
+                                            ? 'Egresado'
+                                            : `Fase ${normalizarFase(casoActivo?.fase)}`}
                                     </span>
                                 </div>
                             </div>
@@ -604,9 +609,17 @@ const TabIntervencion = ({ nna, caso }: { nna: any; caso: any }) => {
                         <InfoRow label="Profesional Responsable Actual" value={caso?.responsableNombre} highlight icon={User} />
                         <div className="pt-4 border-t border-border">
                             <p className="text-[10px] font-black uppercase tracking-widest text-fg-muted mb-2">Estado del Expediente</p>
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-3 flex-wrap">
                                 {estadoBadge(caso?.estado)}
-                                <span className="text-[13px] font-bold text-fg-2">Fase {caso?.fase || 'I'}</span>
+                                <span className="text-[13px] font-bold text-fg-2">
+                                    {etiquetaFase(normalizarFase(caso?.fase))}
+                                </span>
+                            </div>
+                            {/* El estado es la situación administrativa; la fase, el
+                                avance metodológico. Van juntos porque un NNA puede
+                                estar derivado y seguir en Fase II. */}
+                            <div className="mt-4">
+                                <TrackingFases casoId={caso?.id} />
                             </div>
                         </div>
                     </div>
@@ -675,7 +688,14 @@ export const ResumenCaso = ({ nna, caso, familia }: ResumenCasoProps) => {
                             </div>
                             <div className="flex flex-col">
                                 <span className="text-[9px] md:text-[10px] font-black text-fg-muted uppercase tracking-widest">Fase Actual</span>
-                                <span className="text-[12px] md:text-[14px] font-black text-primary uppercase">Fase {caso?.fase || 'I'}</span>
+                                <span className="text-[12px] md:text-[14px] font-black text-primary uppercase">
+                                    {normalizarFase(caso?.fase) === 'EGRESADO'
+                                        ? 'Egresado'
+                                        : `Fase ${normalizarFase(caso?.fase)}`}
+                                </span>
+                                <span className="text-[10px] text-fg-muted truncate">
+                                    {NOMBRE_CORTO_FASE[normalizarFase(caso?.fase)]}
+                                </span>
                             </div>
                         </div>
                     </div>

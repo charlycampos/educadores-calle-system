@@ -1,6 +1,7 @@
 import inspect
 import oracledb
 import json
+import re
 import uuid
 from datetime import datetime, date
 from src.infrastructure.db.connection import get_pool
@@ -10,22 +11,103 @@ class DiagnosticoSocialAlreadyExistsError(ValueError):
     """El NNA ya cuenta con su única Ficha de Diagnóstico Social F04."""
 
 
+def _resumen(valor, largo: int = 500):
+    """
+    Deja un texto en condiciones de entrar en una columna corta.
+
+    Los campos largos del F04 se capturan con dictado por voz y guardan HTML:
+    "motivo de su situación de calle" o "actividad que realiza" pueden ser tres
+    frases con viñetas. Esas dos van a columnas VARCHAR2(500), así que un texto
+    normal reventaba el guardado con ORA-12899 y el educador perdía toda la
+    sesión de captura viendo solo "ocurrió un error al guardar".
+
+    El texto íntegro no se pierde: viaja completo en DATOS_EXTRA, que es un CLOB.
+    Estas columnas son la copia corta para consultar por SQL.
+    """
+    if valor is None:
+        return None
+    texto = str(valor)
+    # Sin etiquetas: 500 bytes se van rápido en <p><b></b></p>, y el HTML no
+    # aporta nada a una columna que solo se lee en reportes.
+    texto = re.sub(r"<br\s*/?>|</p>|</li>|</div>", " ", texto, flags=re.I)
+    texto = re.sub(r"<[^>]+>", "", texto)
+    texto = (texto.replace("&nbsp;", " ").replace("&amp;", "&")
+                  .replace("&lt;", "<").replace("&gt;", ">"))
+    texto = " ".join(texto.split())
+    # El corte se mide en BYTES: la columna es VARCHAR2(500) en bytes y una
+    # tilde ocupa dos en AL32UTF8.
+    codificado = texto.encode("utf-8")
+    if len(codificado) <= largo:
+        return texto or None
+    return codificado[:largo - 3].decode("utf-8", errors="ignore").rstrip() + "..."
+
+
+def _estado_desde(datos_extra) -> str:
+    """
+    BORRADOR o COMPLETO, leído del payload.
+
+    El estado también sigue viajando dentro del CLOB porque el formulario lo
+    usa, pero la columna es la que vale para el resto del sistema: las
+    consultas SQL no pueden mirar dentro del JSON, y por eso los borradores
+    llegaban a abrir el expediente digital.
+    """
+    if datos_extra and (datos_extra.get("es_borrador") or datos_extra.get("esBorrador")):
+        return "BORRADOR"
+    return "COMPLETO"
+
+
 class OracleDiagnosticoRepository:
 
+    # Datos del F04 que pertenecen al Resumen del Caso.
+    #
+    # Regla del proyecto (PRINCIPIO_RESUMEN_DEL_CASO.md): si una ficha captura
+    # un dato que otras van a necesitar, ese dato SUBE al Resumen. El F04
+    # corregía cuarenta datos reutilizables y solo devolvía seis: el resto
+    # quedaba encerrado en el CLOB, invisible para el informe situacional, para
+    # los formatos impresos y para la ficha siguiente.
+    #
+    # Solo se suben los campos NO vacíos: el F04 se llena progresivamente
+    # durante toda la Fase I y un guardado intermedio no debe borrar en el
+    # Resumen lo que ya estaba.
+    CAMPOS_A_NNA = {
+        # Identidad
+        'apellidoPaterno':           'APELLIDO_PATERNO',
+        'apellidoMaterno':           'APELLIDO_MATERNO',
+        'nombres':                   'NOMBRES',
+        'numeroDoc':                 'NUMERO_DOC',
+        'tipoDoc':                   'TIPO_DOC',
+        'detalleSinDoc':             'DETALLE_SIN_DOC',
+        'sexo':                      'SEXO',
+        # Domicilio y contacto
+        'direccionActual':           'DOMICILIO_ACTUAL',
+        'referenciaDireccion':       'REFERENCIA_DOMICILIO',
+        'telefonoContacto':          'TELEFONO_CONTACTO',
+        # Educación
+        'eduNivel':                  'NIVEL_EDUCATIVO',
+        'eduGrado':                  'GRADO_ESTUDIO',
+        'eduModalidad':              'MODALIDAD_ESTUDIO',
+        'eduInstitucion':            'INSTITUCION_EDUCATIVA',
+        # Salud
+        'afiliadoSIS':               'AFILIADO_SIS',
+        'afiliadoOtroSeguro':        'AFILIADO_OTRO_SEGURO',
+        'tipoDiscapacidad':          'TIPO_DISCAPACIDAD',
+        'observacionesSalud':        'OBSERVACIONES_SALUD',
+        # Pernocte y antecedentes
+        'lugarPernocte':             'LUGAR_PERNOCTE',
+        'detalleLugarPernocte':      'DETALLE_LUGAR_PERNOCTE',
+        'detalleAntecedenteAlbergue': 'DETALLE_ANTECEDENTE_ALBERGUE',
+    }
+
     async def _sync_nna_datos_basicos(self, cur, nna_id: int, datos_extra: dict):
-        """Sincroniza campos básicos del NNA cuando son modificados en el F04."""
+        """Sincroniza al Resumen del Caso los datos que el F04 corrige."""
         if not datos_extra or not nna_id:
             return
 
         fields = {}
-        if datos_extra.get('apellidoPaterno'):
-            fields['APELLIDO_PATERNO'] = datos_extra['apellidoPaterno']
-        if datos_extra.get('apellidoMaterno'):
-            fields['APELLIDO_MATERNO'] = datos_extra['apellidoMaterno']
-        if datos_extra.get('nombres'):
-            fields['NOMBRES'] = datos_extra['nombres']
-        if datos_extra.get('numeroDoc'):
-            fields['NUMERO_DOC'] = datos_extra['numeroDoc']
+        for clave, columna in self.CAMPOS_A_NNA.items():
+            valor = datos_extra.get(clave)
+            if valor not in (None, '', []):
+                fields[columna] = _resumen(valor, 500)
         if datos_extra.get('fechaNacimiento'):
             try:
                 fecha = datetime.strptime(datos_extra['fechaNacimiento'], '%Y-%m-%d').date()
@@ -58,6 +140,105 @@ class OracleDiagnosticoRepository:
             vals
         )
 
+    async def _sync_caso(self, cur, nna_id: int, datos_extra: dict):
+        """
+        Sube al caso el perfil y la situación de calle corregidos en el F04.
+
+        Sin esto, el Resumen del Caso seguía mostrando el perfil con el que se
+        inscribió al NNA mientras el F04 y el informe situacional mostraban otro
+        — el mismo chico con dos perfiles distintos según dónde se mirara.
+        """
+        det = (datos_extra or {}).get('situacionCalleDetalle') or {}
+        perfil = det.get('perfil') or {}
+        if not perfil:
+            return
+
+        # El perfil se captura como casillas; el caso guarda un código.
+        codigo = None
+        if perfil.get('trabajoInfantil'):
+            codigo = 'TRABAJO_INFANTIL'
+        elif perfil.get('mendicidad'):
+            codigo = 'MENDICIDAD'
+        elif perfil.get('vidaEnCalle'):
+            codigo = 'VIDA_EN_CALLE'
+        if not codigo:
+            return
+
+        await cur.execute(
+            """
+            UPDATE NNA_CASO
+               SET PERFIL = :perfil, UPDATED_AT = SYSTIMESTAMP
+             WHERE NNA_ID = :nna AND ESTADO <> 'CERRADO'
+            """,
+            {"perfil": codigo, "nna": nna_id},
+        )
+
+    async def _sync_familiares(self, cur, nna_id: int, datos_extra: dict):
+        """
+        Guarda en la familia del NNA los integrantes que el F04 registró.
+
+        Antes se quedaban solo en el CLOB: el educador los cargaba y la ficha
+        siguiente se los volvía a pedir. Es el caso más claro de la regla del
+        Resumen del Caso — un dato reutilizable capturado en una ficha tiene que
+        subir para que las demás lo jalen.
+
+        Se emparejan por DNI, y por nombre completo cuando no hay documento.
+        Nunca se borra nada: solo se agregan los que faltan.
+        """
+        familiares = (datos_extra or {}).get('familiares') or []
+        if not familiares:
+            return
+
+        await cur.execute("SELECT CARPETA_ID FROM NNA WHERE ID = :1", [nna_id])
+        fila = await cur.fetchone()
+        carpeta_id = fila[0] if fila else None
+        if not carpeta_id:
+            return  # sin carpeta todavía; se sincronizará al volver a guardar
+
+        await cur.execute(
+            "SELECT UPPER(TRIM(NOMBRES)), TRIM(DNI) FROM NNA_FAMILIAR WHERE CARPETA_ID = :1",
+            [carpeta_id],
+        )
+        existentes = await cur.fetchall()
+        nombres_previos = {r[0] for r in existentes if r[0]}
+        dnis_previos = {r[1] for r in existentes if r[1]}
+
+        for f in familiares:
+            nombre = " ".join(str(x or "").strip() for x in (
+                f.get('primerApellido'), f.get('segundoApellido'), f.get('nombres')
+            )).strip()
+            nombre = " ".join(nombre.split())
+            dni = str(f.get('dni') or '').strip()
+            if not nombre:
+                continue
+            if (dni and dni in dnis_previos) or nombre.upper() in nombres_previos:
+                continue
+
+            try:
+                await cur.execute(
+                    """
+                    INSERT INTO NNA_FAMILIAR
+                        (CARPETA_ID, NOMBRES, PARENTESCO, DNI, TELEFONO, OCUPACION, VIVE_CON)
+                    VALUES (:carpeta, :nombres, :parentesco, :dni, :telefono, :ocupacion, :vive)
+                    """,
+                    {
+                        "carpeta":    carpeta_id,
+                        "nombres":    _resumen(nombre, 200),
+                        "parentesco": _resumen(f.get('parentesco') or 'OTRO', 50),
+                        "dni":        _resumen(dni, 20) if dni else None,
+                        "telefono":   _resumen(f.get('telefono'), 50),
+                        "ocupacion":  _resumen(f.get('ocupacion'), 100),
+                        "vive":       '1' if f.get('viveConNna') else '0',
+                    },
+                )
+                nombres_previos.add(nombre.upper())
+                if dni:
+                    dnis_previos.add(dni)
+            except Exception as e:
+                # Un familiar que no entra no debe tumbar el guardado de la
+                # ficha entera: el dato sigue en el CLOB.
+                print(f"No se pudo subir el familiar '{nombre}' del NNA {nna_id}: {e}")
+
     async def _row_to_dict(self, row, columns) -> dict:
         d = dict(zip(columns, row))
         if 'datos_extra' in d and d['datos_extra']:
@@ -69,8 +250,19 @@ class OracleDiagnosticoRepository:
                     extra_data = json.loads(raw)
                 else:
                     extra_data = json.loads(d['datos_extra'])
-            except:
-                extra_data = {}
+            except (json.JSONDecodeError, TypeError, ValueError) as exc:
+                # NO se devuelve la ficha con {} — ahí está el 90% de los datos.
+                #
+                # Antes se seguía adelante con un diccionario vacío: el
+                # formulario se rehidrataba con solo las 15 columnas base y el
+                # siguiente "Guardar" sobrescribía el CLOB con el formulario en
+                # blanco. Pérdida total y silenciosa de la ficha.
+                #
+                # Mejor fallar y que alguien lo mire: el dato sigue en la base.
+                raise ValueError(
+                    f"Los datos de la ficha F04 (id {d.get('id')}) no se pueden leer: {exc}. "
+                    "No se cargó nada para no arriesgar sobrescribirla."
+                )
             
             # Combinar datos extra directamente al nivel raíz para el frontend
             if isinstance(extra_data, dict):
@@ -152,11 +344,16 @@ class OracleDiagnosticoRepository:
                 codigo_f04 = f"F04-{sede_codigo}-{anio}-{num:04d}"
                 sql = """
                     INSERT INTO DIAGNOSTICO_SOCIAL (
-                        CODIGO_FICHA_04, NNA_ID, SITUACION_CALLE, TIEMPO_EN_CALLE, MOTIVO_INGRESO, LUGAR_PERNOTA,
-                        ACTIVIDAD_CALLE, CONSUMO_SUSTANCIAS, NOMBRE_TUTOR, DNI_TUTOR, DIRECCION_TUTOR, TELEFONO_TUTOR, DATOS_EXTRA
+                        CODIGO_FICHA_04, NNA_ID, ESTADO,
+                        SITUACION_CALLE, TIEMPO_EN_CALLE, MOTIVO_INGRESO, LUGAR_PERNOTA,
+                        ACTIVIDAD_CALLE, CONSUMO_SUSTANCIAS, NOMBRE_TUTOR, DNI_TUTOR,
+                        DIRECCION_TUTOR, TELEFONO_TUTOR, DATOS_EXTRA
                     )
-                    VALUES (:1, :2, :3, :4, :5, :6, :7, :8, :9, :10, :11, :12, :13)
-                    RETURNING ID, CREATED_AT, UPDATED_AT INTO :14, :15, :16
+                    VALUES (:codigo, :nna, :estado,
+                            :situacion, :tiempo, :motivo, :lugar,
+                            :actividad, :consumo, :tutor, :dni,
+                            :direccion, :telefono, :extra)
+                    RETURNING ID, CREATED_AT, UPDATED_AT INTO :id_out, :created, :updated
                 """
                 id_var = cur.var(int)
                 created_var = cur.var(oracledb.DB_TYPE_TIMESTAMP)
@@ -167,19 +364,39 @@ class OracleDiagnosticoRepository:
                 consumo_val = None if data.consumo_sustancias is None else (1 if data.consumo_sustancias else 0)
 
                 try:
-                    await cur.execute(sql, [
-                        codigo_f04, nna_id, data.situacion_calle, data.tiempo_en_calle, data.motivo_ingreso, data.lugar_pernota,
-                        data.actividad_calle, consumo_val, data.nombre_tutor, data.dni_tutor,
-                        data.direccion_tutor, data.telefono_tutor, datos_extra_str,
-                        id_var, created_var, updated_var
-                    ])
+                    # Mismo criterio que en el UPDATE: las columnas cortas
+                    # reciben el resumen y el texto íntegro va en datos_extra.
+                    await cur.execute(sql, {
+                        "codigo":    codigo_f04,
+                        "nna":       nna_id,
+                        "estado":    _estado_desde(data.datos_extra),
+                        "situacion": _resumen(data.situacion_calle, 100),
+                        "tiempo":    _resumen(data.tiempo_en_calle, 100),
+                        "motivo":    _resumen(data.motivo_ingreso, 500),
+                        "lugar":     _resumen(data.lugar_pernota, 500),
+                        "actividad": _resumen(data.actividad_calle, 500),
+                        "consumo":   consumo_val,
+                        "tutor":     _resumen(data.nombre_tutor, 200),
+                        "dni":       _resumen(data.dni_tutor, 20),
+                        "direccion": _resumen(data.direccion_tutor, 500),
+                        "telefono":  _resumen(data.telefono_tutor, 50),
+                        "extra":     datos_extra_str,
+                        "id_out":    id_var,
+                        "created":   created_var,
+                        "updated":   updated_var,
+                    })
                 except oracledb.IntegrityError as exc:
                     if "UQ_DIAGNOSTICO_SOCIAL_NNA" in str(exc):
                         raise DiagnosticoSocialAlreadyExistsError(
                             "El NNA ya cuenta con un Diagnóstico Social F04."
                         ) from exc
                     raise
+                # El F04 devuelve al Resumen del Caso lo reutilizable que
+                # capturó: datos del NNA, el perfil del caso y los familiares
+                # nuevos. Antes se quedaba todo encerrado en el CLOB.
                 await self._sync_nna_datos_basicos(cur, nna_id, data.datos_extra)
+                await self._sync_caso(cur, nna_id, data.datos_extra)
+                await self._sync_familiares(cur, nna_id, data.datos_extra)
                 await conn.commit()
                 
                 result = data.model_dump()
@@ -501,7 +718,14 @@ class OracleDiagnosticoRepository:
                         "eduNivel": nna_dict.get('nivel_educativo') or '',
                         "eduGrado": nna_dict.get('grado_estudio') or '',
                         "eduModalidad": nna_dict.get('modalidad_estudio') or '',
-                        "eduEstudia": "SI" if str(nna_dict.get('estudia_actualmente') or '').strip().upper() in ('1', 'SI') else "NO",
+                        # El código crudo, sin colapsar a SI/NO.
+                        #
+                        # Antes todo lo que no fuera 1 o SI se convertía en "NO",
+                        # y eso perdía dos estados que el formulario sí entiende:
+                        # PROCESO (en trámite de matrícula) y NO_APLICA (menor de
+                        # 3 años). Un NNA en trámite llegaba al F04 como "no
+                        # matriculado", que es otra cosa.
+                        "eduEstudia": str(nna_dict.get('estudia_actualmente') or '').strip().upper(),
                         "eduInstitucion": nna_dict.get('institucion_educativa') or '',
                         "eduMotivoNoEstudia": nna_dict.get('detalle_no_estudia') or '',
                         "afiliadoSIS": nna_dict.get('afiliado_sis') or 'NO',
@@ -561,35 +785,85 @@ class OracleDiagnosticoRepository:
         pool = get_pool()
         async with pool.acquire() as conn:
             async with conn.cursor() as cur:
+                # A qué NNA pertenece REALMENTE esta ficha.
+                #
+                # La sincronización de datos básicos escribe sobre la tabla NNA
+                # —apellidos, nombres, documento, fecha de nacimiento, edad— y
+                # antes usaba el `nnaId` que mandaba el navegador, sin verificar
+                # que fuera el de la ficha. Un id equivocado sobrescribía la
+                # identidad de OTRO chico, en silencio y sin dejar rastro.
+                #
+                # No es hipotético: este sistema ya tuvo una confusión entre el
+                # id de carpeta y el id de NNA.
+                await cur.execute(
+                    "SELECT NNA_ID FROM DIAGNOSTICO_SOCIAL WHERE ID = :1", [diag_id]
+                )
+                fila = await cur.fetchone()
+                if not fila:
+                    raise ValueError(f"No existe el diagnóstico {diag_id}")
+                nna_id_real = fila[0]
+
+                if data.nna_id and data.nna_id != nna_id_real:
+                    raise ValueError(
+                        f"La ficha {diag_id} pertenece al NNA {nna_id_real}, "
+                        f"no al {data.nna_id}. No se guardó nada."
+                    )
+
+                # El estado va a columna propia, no solo dentro del CLOB: las
+                # consultas SQL no pueden leer el JSON, y por eso siete lugares
+                # del sistema contaban los borradores como F04 terminados —entre
+                # ellos el que abre el expediente digital.
+                estado = _estado_desde(data.datos_extra)
+
+                # Binds por nombre: con 13 posiciones, agregar una columna en el
+                # medio desplazaba todas las siguientes en silencio.
                 sql = """
                     UPDATE DIAGNOSTICO_SOCIAL
-                    SET SITUACION_CALLE = :1,
-                        TIEMPO_EN_CALLE = :2,
-                        MOTIVO_INGRESO = :3,
-                        LUGAR_PERNOTA = :4,
-                        ACTIVIDAD_CALLE = :5,
-                        CONSUMO_SUSTANCIAS = :6,
-                        NOMBRE_TUTOR = :7,
-                        DNI_TUTOR = :8,
-                        DIRECCION_TUTOR = :9,
-                        TELEFONO_TUTOR = :10,
-                        DATOS_EXTRA = :11,
-                        UPDATED_AT = SYSTIMESTAMP
-                    WHERE ID = :12
-                    RETURNING UPDATED_AT INTO :13
+                    SET ESTADO             = :estado,
+                        SITUACION_CALLE    = :situacion,
+                        TIEMPO_EN_CALLE    = :tiempo,
+                        MOTIVO_INGRESO     = :motivo,
+                        LUGAR_PERNOTA      = :lugar,
+                        ACTIVIDAD_CALLE    = :actividad,
+                        CONSUMO_SUSTANCIAS = :consumo,
+                        NOMBRE_TUTOR       = :tutor,
+                        DNI_TUTOR          = :dni,
+                        DIRECCION_TUTOR    = :direccion,
+                        TELEFONO_TUTOR     = :telefono,
+                        DATOS_EXTRA        = :extra,
+                        UPDATED_AT         = SYSTIMESTAMP
+                    WHERE ID = :diag_id
+                    RETURNING UPDATED_AT INTO :updated
                 """
                 updated_var = cur.var(oracledb.DB_TYPE_TIMESTAMP)
                 datos_extra_str = json.dumps(data.datos_extra) if data.datos_extra else None
                 
                 consumo_val = None if data.consumo_sustancias is None else (1 if data.consumo_sustancias else 0)
                 
-                await cur.execute(sql, [
-                    data.situacion_calle, data.tiempo_en_calle, data.motivo_ingreso, data.lugar_pernota,
-                    data.actividad_calle, consumo_val, data.nombre_tutor, data.dni_tutor,
-                    data.direccion_tutor, data.telefono_tutor, datos_extra_str,
-                    diag_id, updated_var
-                ])
-                await self._sync_nna_datos_basicos(cur, data.nna_id, data.datos_extra)
+                # Las columnas de texto pasan por _resumen: son VARCHAR2 cortas
+                # y reciben campos dictados sin tope. El texto completo ya viaja
+                # en datos_extra.
+                await cur.execute(sql, {
+                    "estado":    estado,
+                    "situacion": _resumen(data.situacion_calle, 100),
+                    "tiempo":    _resumen(data.tiempo_en_calle, 100),
+                    "motivo":    _resumen(data.motivo_ingreso, 500),
+                    "lugar":     _resumen(data.lugar_pernota, 500),
+                    "actividad": _resumen(data.actividad_calle, 500),
+                    "consumo":   consumo_val,
+                    "tutor":     _resumen(data.nombre_tutor, 200),
+                    "dni":       _resumen(data.dni_tutor, 20),
+                    "direccion": _resumen(data.direccion_tutor, 500),
+                    "telefono":  _resumen(data.telefono_tutor, 50),
+                    "extra":     datos_extra_str,
+                    "diag_id":   diag_id,
+                    "updated":   updated_var,
+                })
+                # Se sincroniza contra el NNA de la ficha, nunca contra el que
+                # venga en el payload.
+                await self._sync_nna_datos_basicos(cur, nna_id_real, data.datos_extra)
+                await self._sync_caso(cur, nna_id_real, data.datos_extra)
+                await self._sync_familiares(cur, nna_id_real, data.datos_extra)
                 await conn.commit()
                 
                 updated_time = updated_var.getvalue()[0]

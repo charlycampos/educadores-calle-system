@@ -7,14 +7,25 @@ from src.infrastructure.db.connection import get_pool
 class OracleStatsRepository:
 
     async def casos_por_estado(self, sede_id: int = None, responsable_id: int = None) -> list[dict]:
+        """
+        Casos agrupados por FASE, no por ESTADO.
+
+        Antes agrupaba por ESTADO y un diccionario lo traducía a etiquetas de
+        fase. Eso mentía por partida doble: 'CAPTACION' y 'EN_EVALUACION'
+        salían como dos filas de Fase 1, e 'INTERVENCION' —que ningún código
+        llegaba a escribir— dejaba la Fase 2 en cero en todas las sedes.
+
+        Ahora lee NNA_CASO.FASE, que escribe el cierre de fase del F05.
+        """
         pool = get_pool()
         where, params = self._build_where(sede_id, responsable_id)
         async with pool.acquire() as conn:
             async with conn.cursor() as cur:
                 await cur.execute(
-                    f"""SELECT ESTADO, COUNT(*) AS TOTAL
+                    f"""SELECT FASE, COUNT(*) AS TOTAL
                         FROM NNA_CASO {where}
-                        GROUP BY ESTADO ORDER BY ESTADO""",
+                        GROUP BY FASE
+                        ORDER BY DECODE(FASE, 'I', 1, 'II', 2, 'III', 3, 'EGRESADO', 4, 5)""",
                     params,
                 )
                 return [{"estado": r[0], "total": r[1]} for r in await cur.fetchall()]

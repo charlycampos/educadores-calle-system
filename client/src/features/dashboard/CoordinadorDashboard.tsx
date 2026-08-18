@@ -241,10 +241,10 @@ export const CoordinadorDashboard = () => {
                                     <div>
                                         <div className="flex justify-between text-sm mb-1">
                                             <span className="text-gray-600">Cobertura Intervención (F2)</span>
-                                            <span className="font-bold text-gray-900">{Math.round((stats?.fases?.find((f: any) => f.fase.includes('Fase 2'))?.cantidad / (stats?.totalCasos || 1)) * 100) || 0}%</span>
+                                            <span className="font-bold text-gray-900">{Math.round((stats?.fases?.find((f: any) => f.codigo === 'II')?.cantidad / (stats?.totalCasos || 1)) * 100) || 0}%</span>
                                         </div>
                                         <div className="w-full bg-gray-100 rounded-full h-2">
-                                            <div className="bg-blue-500 h-2 rounded-full" style={{ width: `${Math.round((stats?.fases?.find((f: any) => f.fase.includes('Fase 2'))?.cantidad / (stats?.totalCasos || 1)) * 100) || 0}%` }}></div>
+                                            <div className="bg-blue-500 h-2 rounded-full" style={{ width: `${Math.round((stats?.fases?.find((f: any) => f.codigo === 'II')?.cantidad / (stats?.totalCasos || 1)) * 100) || 0}%` }}></div>
                                         </div>
                                     </div>
                                 </div>
@@ -284,19 +284,19 @@ export const CoordinadorDashboard = () => {
                     />
                     <StatCard
                         title="Diagnóstico (F1)"
-                        value={stats?.fases?.find((f: any) => f.fase.includes('Diagnóstico'))?.cantidad || 0}
+                        value={stats?.fases?.find((f: any) => f.codigo === 'I')?.cantidad || 0}
                         color="text-yellow-600"
                         icon={Target}
                     />
                     <StatCard
                         title="Intervención (F2)"
-                        value={stats?.fases?.find((f: any) => f.fase.includes('Fase 2'))?.cantidad || 0}
+                        value={stats?.fases?.find((f: any) => f.codigo === 'II')?.cantidad || 0}
                         color="text-blue-600"
                         icon={TrendingUp}
                     />
                     <StatCard
                         title="Egresados / Cierre"
-                        value={stats?.fases?.find((f: any) => f.fase.includes('Cierre') || f.fase.includes('Egresados'))?.cantidad || 0}
+                        value={stats?.fases?.find((f: any) => f.codigo === 'EGRESADO')?.cantidad || 0}
                         color="text-green-600"
                         icon={CheckCircle2}
                     />
@@ -417,9 +417,9 @@ export const CoordinadorDashboard = () => {
                                     value={fase.cantidad}
                                     max={totalFases}
                                     color={
-                                        fase.fase.includes('Fase 1') ? 'bg-yellow-500' :
-                                            fase.fase.includes('Fase 2') ? 'bg-blue-500' :
-                                                fase.fase.includes('Fase 3') ? 'bg-green-500' : 'bg-gray-400'
+                                        fase.codigo === 'I' ? 'bg-yellow-500' :
+                                            fase.codigo === 'II' ? 'bg-blue-500' :
+                                                fase.codigo === 'III' ? 'bg-green-500' : 'bg-gray-400'
                                     }
                                 />
                             ))}

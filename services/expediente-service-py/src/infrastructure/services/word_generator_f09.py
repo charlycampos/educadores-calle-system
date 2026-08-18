@@ -12,6 +12,8 @@ está instalada, el que falla es este endpoint y no el arranque del servicio
 entero.
 """
 
+import re
+from html import unescape
 from typing import Optional
 
 MESES_FASE = {1: 3, 2: 15, 3: 6}
@@ -24,21 +26,66 @@ _PIE_INSTITUCIONAL = [
 ]
 
 
+def _a_lineas(texto: Optional[str]) -> list:
+    """
+    Convierte el contenido de un campo a líneas de texto plano.
+
+    Los campos largos del informe se capturan con formato (negrita, cursiva,
+    subrayado y viñetas) y se guardan como HTML. Sin esta conversión el Word
+    saldría con "<ul><li>" impreso dentro del párrafo.
+
+    Los informes anteriores guardaron texto plano con saltos de línea; como no
+    traen etiquetas, pasan tal cual.
+    """
+    bruto = texto or ""
+    if "<" in bruto:
+        # Cada bloque de lista o párrafo termina en un salto antes de limpiar.
+        bruto = re.sub(r"<\s*(li|p|div)[^>]*>", "\n", bruto, flags=re.I)
+        bruto = re.sub(r"<\s*br\s*/?>", "\n", bruto, flags=re.I)
+        bruto = re.sub(r"</\s*(ul|p|div)\s*>", "\n", bruto, flags=re.I)
+        bruto = re.sub(r"<[^>]+>", "", bruto)
+        bruto = unescape(bruto)
+    return [l.strip() for l in bruto.splitlines()]
+
+
 def _viñetas(doc, texto: Optional[str]):
-    """Una línea del textarea = una viñeta. Las líneas en blanco se ignoran."""
-    for linea in (texto or "").splitlines():
-        limpia = linea.strip().lstrip("•-–").strip()
+    """Una línea o un elemento de lista = una viñeta. Las vacías se ignoran."""
+    for linea in _a_lineas(texto):
+        limpia = linea.lstrip("•-–").strip()
         if limpia:
             doc.add_paragraph(limpia, style="List Bullet")
 
 
 def _parrafos(doc, texto: Optional[str]):
+    """
+    Párrafos justificados.
+
+    Las líneas que vienen de una lista conservan su viñeta: si el educador puso
+    viñetas en una sección de párrafo, el informe las respeta.
+    """
     from docx.enum.text import WD_ALIGN_PARAGRAPH
-    for bloque in (texto or "").split("\n\n"):
+
+    bruto = texto or ""
+    es_html = "<" in bruto
+    if es_html:
+        # Se marcan los elementos de lista antes de limpiar las etiquetas para
+        # no perder cuáles eran viñetas.
+        bruto = re.sub(r"<\s*li[^>]*>", "\n• ", bruto, flags=re.I)
+        bruto = "\n".join(_a_lineas(bruto))
+
+    for bloque in bruto.split("\n\n"):
         limpio = bloque.strip()
-        if limpio:
-            p = doc.add_paragraph(limpio)
-            p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        if not limpio:
+            continue
+        for linea in limpio.splitlines():
+            texto_linea = linea.strip()
+            if not texto_linea:
+                continue
+            if texto_linea.startswith("•"):
+                doc.add_paragraph(texto_linea.lstrip("•").strip(), style="List Bullet")
+            else:
+                p = doc.add_paragraph(texto_linea)
+                p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
 
 
 def _titulo_seccion(doc, texto: str):

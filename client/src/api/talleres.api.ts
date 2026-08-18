@@ -21,6 +21,11 @@ export interface ParticipanteTaller {
     logros?: string;
     limitaciones?: string;
     sugerencias?: string;
+    /**
+     * false = los tres campos de arriba vienen heredados de la evaluación
+     * del taller. true = alguien escribió algo distinto para este participante.
+     */
+    evaluacionPropia?: boolean;
     nna?: {
         nombres: string;
         apellidoPaterno: string;
@@ -104,6 +109,22 @@ export interface Taller {
     // Otros campos F7
     numeroPersonasPlanificadas?: number;
     accionesPrevias?: string;
+    /**
+     * Evaluación del taller (Formato 08). Una sola por taller.
+     *
+     * No confundir con `evaluacion` del historial por NNA, que es el texto de
+     * ese chico en ese taller.
+     */
+    evaluacionTaller?: EvaluacionTaller;
+}
+
+export interface EvaluacionTaller {
+    logros: string;
+    limitaciones: string;
+    sugerencias: string;
+    fecha?: string | null;
+    evaluadaPorId?: number | null;
+    evaluado: boolean;
 }
 
 const buildFechaHora = (fecha?: string, hora?: string, fallback = true): string | undefined => {
@@ -337,6 +358,39 @@ export const addParticipantesBulk = async (
         })
     });
     if (!response.ok) throw new Error('Error adding participants');
+    return response.json();
+};
+
+/**
+ * Guarda el Formato 08 — la evaluación del taller.
+ *
+ * Una sola por taller. Los participantes que no tengan evaluación propia
+ * heredan este texto, así el F08 que se archiva en el expediente de cada NNA
+ * sale completo aunque el educador solo haya escrito una vez.
+ */
+export const guardarEvaluacionTaller = async (
+    tallerId: number,
+    data: { logros?: string; limitaciones?: string; sugerencias?: string },
+): Promise<Taller> => {
+    const response = await fetch(`${API_URL}/talleres/${tallerId}/evaluacion`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.detail || 'Error al guardar la evaluación del taller');
+    }
+    return response.json();
+};
+
+/** Quita las evaluaciones personalizadas para que todos hereden la del taller. */
+export const igualarEvaluaciones = async (tallerId: number): Promise<Taller> => {
+    const response = await fetch(`${API_URL}/talleres/${tallerId}/evaluacion/igualar`, {
+        method: 'POST',
+        headers: getHeaders(),
+    });
+    if (!response.ok) throw new Error('Error al igualar las evaluaciones');
     return response.json();
 };
 

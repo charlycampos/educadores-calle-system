@@ -1,5 +1,22 @@
 import React from 'react';
 import { etiquetaParentesco } from '../../../utils/parentesco';
+import { limpiarHtml } from '../../../utils/texto-rico';
+
+/**
+ * Bloque de texto de la ficha impresa.
+ *
+ * Los campos largos se capturan con formato (negrita, cursiva, viñetas) y se
+ * guardan como HTML acotado; impresos como texto plano se verían las etiquetas.
+ * Se vuelve a limpiar aquí porque este componente también recibe fichas
+ * guardadas por otras vías.
+ */
+const TextoRico = ({ html, alto }: { html: string; alto: string }) => (
+    <div
+        className="texto-rico"
+        style={{ minHeight: alto, whiteSpace: 'pre-wrap' }}
+        dangerouslySetInnerHTML={{ __html: limpiarHtml(html || '') }}
+    />
+);
 
 interface Formato12Props {
     nna: any;
@@ -206,7 +223,7 @@ export const Formato12Print = ({ nna, ficha, id = 'formato-12-print' }: Formato1
                     </tr>
                     <tr>
                         <td style={styles.td}>
-                            <div style={{ minHeight: '50px', whiteSpace: 'pre-wrap' }}>{fAntecedentes}</div>
+                            <TextoRico html={fAntecedentes} alto="50px" />
                         </td>
                     </tr>
                 </tbody>
@@ -218,7 +235,7 @@ export const Formato12Print = ({ nna, ficha, id = 'formato-12-print' }: Formato1
                 <tbody>
                     <tr>
                         <td style={styles.td}>
-                            <div style={{ minHeight: '80px', whiteSpace: 'pre-wrap' }}>{fDescripcion}</div>
+                            <TextoRico html={fDescripcion} alto="80px" />
                         </td>
                     </tr>
                 </tbody>
@@ -230,7 +247,7 @@ export const Formato12Print = ({ nna, ficha, id = 'formato-12-print' }: Formato1
                 <tbody>
                     <tr>
                         <td style={styles.td}>
-                            <div style={{ minHeight: '60px', whiteSpace: 'pre-wrap' }}>{fAcuerdos}</div>
+                            <TextoRico html={fAcuerdos} alto="60px" />
                         </td>
                     </tr>
                 </tbody>
@@ -242,7 +259,7 @@ export const Formato12Print = ({ nna, ficha, id = 'formato-12-print' }: Formato1
                 <tbody>
                     <tr>
                         <td style={styles.td}>
-                            <div style={{ minHeight: '50px', whiteSpace: 'pre-wrap' }}>{fObservaciones}</div>
+                            <TextoRico html={fObservaciones} alto="50px" />
                         </td>
                     </tr>
                 </tbody>

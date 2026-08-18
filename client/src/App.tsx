@@ -71,6 +71,7 @@ const MonitorTrasladosPage        = lazy(() => import('./features/dashboard/Moni
 const CoordinadorDerivacionesPage = lazy(() => import('./features/dashboard/CoordinadorDerivacionesPage').then(m => ({ default: m.CoordinadorDerivacionesPage })));
 const CoordinadorCasosPage        = lazy(() => import('./features/dashboard/CoordinadorCasosPage').then(m => ({ default: m.CoordinadorCasosPage })));
 const CoordinadorDiariosPage      = lazy(() => import('./features/dashboard/CoordinadorDiariosPage').then(m => ({ default: m.CoordinadorDiariosPage })));
+const CoordinadorFirmasPage       = lazy(() => import('./features/dashboard/CoordinadorFirmasPage').then(m => ({ default: m.CoordinadorFirmasPage })));
 const EducadorDiariosPage         = lazy(() => import('./features/dashboard/EducadorDiariosPage').then(m => ({ default: m.EducadorDiariosPage })));
 const EducadorCalendarioPage      = lazy(() => import('./features/dashboard/EducadorCalendarioPage').then(m => ({ default: m.EducadorCalendarioPage })));
 
@@ -128,6 +129,13 @@ function App() {
         <Route path="/coordinador/diarios" element={
           <ProtectedRoute>
             <CoordinadorDiariosPage />
+          </ProtectedRoute>
+        } />
+
+        {/* Bandeja de fichas de egreso esperando la firma del coordinador. */}
+        <Route path="/coordinador/firmas" element={
+          <ProtectedRoute>
+            <CoordinadorFirmasPage />
           </ProtectedRoute>
         } />
 

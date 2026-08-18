@@ -1,4 +1,18 @@
 import { marcaDirigido } from '../../../utils/formatos';
+import { limpiarHtml, tieneContenido } from '../../../utils/texto-rico';
+/**
+ * Texto de un campo con formato dentro del formato impreso.
+ *
+ * Los campos largos del taller se capturan con negrita, cursiva, subrayado y
+ * viñetas y se guardan como HTML; impresos como texto plano se verían las
+ * etiquetas.
+ */
+const TextoRico = ({ html, alto }: { html?: string; alto?: string }) =>
+    tieneContenido(html || '')
+        ? <div className="texto-rico" style={{ minHeight: alto, whiteSpace: 'pre-wrap' }}
+               dangerouslySetInnerHTML={{ __html: limpiarHtml(html || '') }} />
+        : <div style={{ minHeight: alto }}>---</div>;
+
 interface Formato7Props {
     taller: any;
     id?: string;
@@ -103,7 +117,7 @@ export const Formato7Print = ({ taller, id = 'formato-7-print' }: Formato7Props)
                             <div style={{ fontSize: '10px', fontStyle: 'italic', marginBottom: '8px' }}>
                                 (Describir cuáles son los resultados que esperamos obtener en la actividad, para después evaluar el logro de metas).
                             </div>
-                            <div style={{ minHeight: '50px', whiteSpace: 'pre-wrap' }}>{taller.objetivo || '---'}</div>
+                            <TextoRico html={taller.objetivo} alto="50px" />
                         </td>
                     </tr>
 
@@ -118,7 +132,7 @@ export const Formato7Print = ({ taller, id = 'formato-7-print' }: Formato7Props)
                         <td colSpan={3} style={cellStyle}>
                             <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>5. ACCIONES A DESARROLLAR:</div>
                             <div style={{ fontSize: '9px', fontStyle: 'italic', marginBottom: '6px' }}>(Acciones realizadas previas al taller)</div>
-                            <div style={{ minHeight: '60px', whiteSpace: 'pre-wrap' }}>{taller.accionesPrevias || '---'}</div>
+                            <TextoRico html={taller.accionesPrevias} alto="60px" />
                         </td>
                     </tr>
 
@@ -139,7 +153,7 @@ export const Formato7Print = ({ taller, id = 'formato-7-print' }: Formato7Props)
                                         <td style={{ ...cellStyle, border: 'none', borderRight: '1px solid black', borderBottom: '1px solid black', textAlign: 'center' }}>{taller.inicioTiempo || '---'}</td>
                                         <td style={{ ...cellStyle, border: 'none', borderRight: '1px solid black', borderBottom: '1px solid black' }}>
                                             <div style={{ fontWeight: 'bold', textDecoration: 'underline', marginBottom: '4px' }}>INICIO</div>
-                                            <div style={{ whiteSpace: 'pre-wrap' }}>{taller.inicioActividad || '---'}</div>
+                                            <TextoRico html={taller.inicioActividad} />
                                         </td>
                                         <td style={{ ...cellStyle, border: 'none', borderBottom: '1px solid black' }}>{taller.inicioMateriales || '---'}</td>
                                     </tr>
@@ -147,7 +161,7 @@ export const Formato7Print = ({ taller, id = 'formato-7-print' }: Formato7Props)
                                         <td style={{ ...cellStyle, border: 'none', borderRight: '1px solid black', borderBottom: '1px solid black', textAlign: 'center' }}>{taller.procesoTiempo || '---'}</td>
                                         <td style={{ ...cellStyle, border: 'none', borderRight: '1px solid black', borderBottom: '1px solid black' }}>
                                             <div style={{ fontWeight: 'bold', textDecoration: 'underline', marginBottom: '4px' }}>PROCESO</div>
-                                            <div style={{ whiteSpace: 'pre-wrap' }}>{taller.procesoActividad || '---'}</div>
+                                            <TextoRico html={taller.procesoActividad} />
                                         </td>
                                         <td style={{ ...cellStyle, border: 'none', borderBottom: '1px solid black' }}>{taller.procesoMateriales || '---'}</td>
                                     </tr>
@@ -155,7 +169,7 @@ export const Formato7Print = ({ taller, id = 'formato-7-print' }: Formato7Props)
                                         <td style={{ ...cellStyle, border: 'none', borderRight: '1px solid black', textAlign: 'center' }}>{taller.cierreTiempo || '---'}</td>
                                         <td style={{ ...cellStyle, border: 'none', borderRight: '1px solid black' }}>
                                             <div style={{ fontWeight: 'bold', textDecoration: 'underline', marginBottom: '4px' }}>CIERRE</div>
-                                            <div style={{ whiteSpace: 'pre-wrap' }}>{taller.cierreActividad || '---'}</div>
+                                            <TextoRico html={taller.cierreActividad} />
                                         </td>
                                         <td style={{ ...cellStyle, border: 'none' }}>{taller.cierreMateriales || '---'}</td>
                                     </tr>

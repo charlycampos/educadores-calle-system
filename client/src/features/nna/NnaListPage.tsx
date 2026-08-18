@@ -5,7 +5,8 @@ import { useAuthStore } from '../../store/auth.store';
 import { ROLES } from '../../config/api';
 import { clsx } from 'clsx';
 import { Plus, Search, FileDown, MoreHorizontal, ArrowRightCircle, Briefcase, FileText, User, Pencil, FolderOpen, FileSignature } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
+import { getCasosAlerta, ETIQUETA_ALERTA } from '../../api/alertas.api';
 import { DerivacionModal } from './components/DerivacionModal';
 import { Button } from '../../components/ui/Button';
 import { PdfViewerModal } from './components/PdfViewerModal';
@@ -31,6 +32,25 @@ export const NnaListPage = () => {
 
     const isNacional = user && [ROLES.ADMIN_NACIONAL, ROLES.MONITOR, ROLES.ESTADISTICO].includes(user.rol);
     const [selectedSede, setSelectedSede] = useState('TODAS');
+
+    // ── Filtro por alerta del tablero (?alerta=sin-f04) ─────────────────────
+    const [searchParams, setSearchParams] = useSearchParams();
+    const alerta = searchParams.get('alerta');
+    const [idsAlerta, setIdsAlerta] = useState<number[] | null>(null);
+
+    useEffect(() => {
+        if (!alerta) { setIdsAlerta(null); return; }
+        getCasosAlerta(alerta as any)
+            .then(setIdsAlerta)
+            // Ante un fallo se deja la lista completa, no vacía: mejor mostrar
+            // de más que hacerle creer al educador que perdió sus casos.
+            .catch(() => setIdsAlerta(null));
+    }, [alerta]);
+
+    const quitarFiltroAlerta = () => {
+        searchParams.delete('alerta');
+        setSearchParams(searchParams, { replace: true });
+    };
 
     // Extraer sedes únicas disponibles
     const sedesDisponibles = Array.from(
@@ -59,6 +79,9 @@ export const NnaListPage = () => {
 
     // Filter Logic
     const filteredNnas = nnas.filter(nna => {
+        // Filtro por alerta del tablero: solo los NNA que el backend marcó.
+        if (idsAlerta && !idsAlerta.includes(nna.id)) return false;
+
         // Filtro de Sede para roles nacionales
         if (isNacional && selectedSede !== 'TODAS') {
             const sedeNna = nna.casos?.[0]?.sede_id ? `Sede ${nna.casos[0].sede_id}` : '';
@@ -140,6 +163,30 @@ export const NnaListPage = () => {
                     </Link>
                 )}
             </div>
+
+            {/* Chip del filtro por alerta.
+                Es imprescindible: sin él el educador ve 5 casos donde antes
+                había 90 y cree que se perdieron. Dice qué se está filtrando,
+                cuántos quedan, y ofrece salir de ahí en un clic. */}
+            {alerta && (
+                <div className="flex items-center gap-2 flex-wrap bg-warning-soft border border-warning/30 px-4 py-2.5 rounded-lg">
+                    <span className="text-[13px] text-warning font-medium">
+                        Filtrando: {ETIQUETA_ALERTA[alerta] || alerta}
+                    </span>
+                    <span className="text-[12px] text-fg-muted">
+                        {idsAlerta === null
+                            ? 'cargando…'
+                            : `${filteredNnas.length} de ${nnas.length} casos`}
+                    </span>
+                    <button
+                        type="button"
+                        onClick={quitarFiltroAlerta}
+                        className="ml-auto text-[12px] font-semibold text-warning hover:underline"
+                    >
+                        Quitar filtro
+                    </button>
+                </div>
+            )}
 
             {/* Filters Bar */}
             <div className="bg-surface p-4 rounded-lg border border-border flex flex-col sm:flex-row gap-3">

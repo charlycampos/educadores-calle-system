@@ -4,22 +4,24 @@ from src.infrastructure.http.middleware.jwt_middleware import get_current_user
 
 router = APIRouter(prefix="/api/stats", tags=["estadísticas"])
 
+# Fases del servicio según la RDE 069-2021 (ver GUIA_OPERATIVA_SEC.md).
+#
+# Este diccionario reemplaza al que traducía NNA_CASO.ESTADO a etiquetas de
+# fase. Eran dos cosas distintas forzadas en una: ESTADO dice la situación
+# administrativa del caso (derivado, cerrado), FASE dice su avance
+# metodológico. Un NNA puede estar en Fase II y derivado a la vez.
 PHASE_LABELS = {
-    "CAPTACION":      "Fase 1: Contacto",
-    "EN_EVALUACION":  "Fase 1: Diagnóstico",
-    "INTERVENCION":   "Fase 2: Intervención",
-    "SEGUIMIENTO":    "Fase 3: Seguimiento",
-    "DERIVADO":       "Derivado",
-    "CERRADO":        "Egresados",
+    "I":        "Fase I: Contacto e Integración",
+    "II":       "Fase II: Restitución de Derechos",
+    "III":      "Fase III: Seguimiento y Egreso",
+    "EGRESADO": "Egresados",
 }
 
 PHASE_COLORS = {
-    "CAPTACION":     "#cbd5e1",
-    "EN_EVALUACION": "#fcd34d",
-    "INTERVENCION":  "#60a5fa",
-    "SEGUIMIENTO":   "#34d399",
-    "DERIVADO":      "#f97316",
-    "CERRADO":       "#94a3b8",
+    "I":        "#fcd34d",
+    "II":       "#60a5fa",
+    "III":      "#34d399",
+    "EGRESADO": "#94a3b8",
 }
 
 
@@ -41,12 +43,17 @@ async def dashboard(user: dict = Depends(get_current_user)):
     alertas = await repo.alertas(filtro_sede, filtro_resp)
     perfil = await repo.distribucion_perfil(filtro_sede)
 
+    # `codigo` es lo que el frontend debe comparar. `fase` es solo la etiqueta
+    # para mostrar: buscar subcadenas dentro de ella ('Fase 2', 'Diagnóstico')
+    # se rompe cada vez que se reescribe la redacción, que es justo lo que pasó.
     fases = [
         {
-            "fase":     PHASE_LABELS.get(e["estado"], e["estado"]),
-            "estado":   e["estado"],
-            "cantidad": e["total"],
-            "color":    PHASE_COLORS.get(e["estado"], "#e2e8f0"),
+            "fase":       PHASE_LABELS.get(e["estado"], e["estado"]),
+            "codigo":     e["estado"],
+            "estado":     e["estado"],
+            "cantidad":   e["total"],
+            "color":      PHASE_COLORS.get(e["estado"], "#e2e8f0"),
+            "plazoMeses": {"I": 3, "II": 15, "III": 6}.get(e["estado"]),
         }
         for e in por_estado
     ]
@@ -55,8 +62,10 @@ async def dashboard(user: dict = Depends(get_current_user)):
     if rol in ("ADMIN_NACIONAL", "COORDINADOR"):
         carga = await repo.carga_por_responsable(sede_id)
 
+    # Casos que ya pasaron a la Fase II. Antes buscaba el estado 'INTERVENCION',
+    # que ningún flujo llegaba a escribir: el KPI valía 0 en todas las sedes.
     eficiencia = 0
-    total_intervencion = next((e["total"] for e in por_estado if e["estado"] == "INTERVENCION"), 0)
+    total_intervencion = next((e["total"] for e in por_estado if e["estado"] == "II"), 0)
     if total > 0:
         eficiencia = round((total_intervencion / total) * 100)
 

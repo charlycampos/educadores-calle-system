@@ -103,3 +103,29 @@ body {
   .text-caption { font-size: 12px; font-weight: 500; line-height: 1.4; }
   .text-micro   { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; }
 }
+
+/* ──────────────────────────────────────────────────────────────
+ * Campos de texto con formato (CampoDictado) y su reflejo impreso.
+ *
+ * Tailwind normaliza `ul` y `li` a lista sin marcador; sin esto el
+ * botón de viñetas parece no hacer nada: la sangría cambia pero no
+ * aparece el punto.
+ * ────────────────────────────────────────────────────────────── */
+.campo-rico ul,
+.texto-rico ul {
+  list-style: disc;
+  padding-left: 1.25rem;
+  margin: 0.25rem 0;
+}
+
+.campo-rico li,
+.texto-rico li { margin: 0.125rem 0; }
+
+.campo-rico b, .campo-rico strong,
+.texto-rico b, .texto-rico strong { font-weight: 700; }
+
+.campo-rico i, .campo-rico em,
+.texto-rico i, .texto-rico em { font-style: italic; }
+
+.campo-rico u, .campo-rico ins,
+.texto-rico u, .texto-rico ins { text-decoration: underline; }

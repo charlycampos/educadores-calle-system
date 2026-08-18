@@ -20,28 +20,53 @@ ORACLE_USER = os.getenv("ORACLE_USER", "sec_user")
 ORACLE_PASSWORD = os.getenv("ORACLE_PASSWORD", "password")
 ORACLE_DSN = os.getenv("ORACLE_DSN", "localhost:1521/XEPDB1")
 
-SQL_FILES = [
-    "auth-service-py/src/infrastructure/db/migrations/009_profesion_y_supervisor.sql",
-    "auth-service/src/infrastructure/db/migrations/001_create_tables.sql",
-    "nna-service-py/src/infrastructure/db/migrations/001_create_tables.sql",
-    "nna-service-py/src/infrastructure/db/migrations/002_add_edad_nna.sql",
-    "nna-service-py/src/infrastructure/db/migrations/003_add_datos_f03_nna.sql",
-    "nna-service-py/src/infrastructure/db/migrations/004_add_victima_explotacion_caso.sql",
-    "expediente-service-py/src/infrastructure/db/migrations/001_create_tables.sql",
-    "expediente-service-py/src/infrastructure/db/migrations/002_create_informe_situacional.sql",
-    "expediente-service-py/src/infrastructure/db/migrations/003_add_estado_informe_situacional.sql",
-    "intervencion-service-py/src/infrastructure/db/migrations/001_create_intervencion_tables.sql",
-    "intervencion-service-py/src/infrastructure/db/migrations/002_create_urgencias_f15.sql",
-    "intervencion-service-py/src/infrastructure/db/migrations/003_add_datos_extra_urgencia.sql",
-    "intervencion-service-py/src/infrastructure/db/migrations/004_add_fecha_termino_seguimiento.sql",
-    "intervencion-service-py/src/infrastructure/db/migrations/005_add_informe_ampliacion_pti.sql",
-    "intervencion-service-py/src/infrastructure/db/migrations/006_add_area_objetivo_accion_pti.sql",
-    "intervencion-service-py/src/infrastructure/db/migrations/007_add_ciclo_vida_plan_trabajo.sql",
-    "intervencion-service-py/src/infrastructure/db/migrations/008_add_gps_diario_campo.sql",
-    "intervencion-service-py/src/infrastructure/db/migrations/009_allow_null_caso_diario.sql",
-    "talleres-service-py/src/infrastructure/db/migrations/001_create_taller_tables.sql",
-    "derivacion-service-py/src/infrastructure/db/migrations/001_create_derivacion.sql"
+import glob
+import re
+
+# ── Descubrimiento automático de migraciones ─────────────────────────────────
+#
+# Antes esto era una lista escrita a mano, y se quedó en la 009. Las migraciones
+# 010 a 013 existían en disco y NUNCA se ejecutaban: cualquier despliegue nuevo
+# arrancaba sin el índice único del F04, sin el tracking de fases y sin las
+# columnas del F13. Nadie se daba cuenta porque en los entornos ya montados
+# esas migraciones se habían corrido a mano.
+#
+# Ahora se descubren solas. Agregar una migración es dejar el archivo en su
+# carpeta con el prefijo numérico; no hay que tocar este archivo.
+
+# El orden entre servicios sí importa: las tablas base primero, porque las
+# demás las referencian con claves foráneas.
+ORDEN_SERVICIOS = [
+    "auth-service-py",
+    "auth-service",
+    "nna-service-py",
+    "expediente-service-py",
+    "intervencion-service-py",
+    "talleres-service-py",
+    "derivacion-service-py",
 ]
+
+
+def _numero(ruta: str) -> int:
+    """Prefijo numérico del archivo: '010_algo.sql' → 10."""
+    m = re.match(r"(\d+)", os.path.basename(ruta))
+    return int(m.group(1)) if m else 999
+
+
+def _descubrir_migraciones() -> list:
+    archivos = []
+    for servicio in ORDEN_SERVICIOS:
+        patron = os.path.join(servicio, "src", "infrastructure", "db", "migrations", "*.sql")
+        # Dentro de cada servicio, por número de migración.
+        encontrados = sorted(glob.glob(patron), key=_numero)
+        # Las variantes _DBEAVER son copias para ejecutar a mano en el editor:
+        # tienen la misma lógica y correrlas duplicaría el trabajo.
+        encontrados = [f for f in encontrados if "_DBEAVER" not in f.upper()]
+        archivos.extend(f.replace(os.sep, "/") for f in encontrados)
+    return archivos
+
+
+SQL_FILES = _descubrir_migraciones()
 
 def run_migrations():
     print(f"==================================================")

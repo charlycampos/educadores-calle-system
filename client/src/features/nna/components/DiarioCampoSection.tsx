@@ -6,6 +6,7 @@ import { useForm } from 'react-hook-form';
 import { Plus, Mic, MicOff, Trash2, Calendar, Clock, MapPin, BookOpen, Camera, FileImage, PenTool, Pencil, Eye, X } from 'lucide-react';
 import { clsx } from 'clsx';
 import { getDiarioByCaso, createEntradaDiario, updateEntradaDiario, deleteEntradaDiario, type EntradaDiario } from '../../../api/diario.api';
+import { CampoDictado } from '../../../components/ui/CampoDictado';
 import { getToken } from '../../../utils/auth';
 import { INTERVENCION_API_URL, EXPEDIENTE_API_URL } from '../../../config/api';
 import { useNnaStore } from '../../../store/nna.store';
@@ -520,82 +521,33 @@ export const DiarioCampoSection: React.FC<Props> = ({ casoId }) => {
                             </div>
                         </div>
 
-                        {/* Narración con voz */}
-                        <div>
-                            <div className="flex items-center justify-between mb-1.5">
-                                <label className="text-[11px] font-bold text-gray-500 uppercase">
-                                    Narración / Descripción de la atención
-                                </label>
-                                {hasSpeech && (
-                                    <button
-                                        type="button"
-                                        onClick={toggleListening}
-                                        className={clsx(
-                                            'flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs transition-all active:scale-95',
-                                            isListening
-                                                ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-200'
-                                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                        )}
-                                    >
-                                        {isListening
-                                            ? <><MicOff size={14} /> Detener</>
-                                            : <><Mic size={14} /> Dictar por voz</>
-                                        }
-                                    </button>
-                                )}
-                            </div>
+                        {/* Los tres campos largos con el componente compartido:
+                            micrófono más negrita, cursiva, subrayado y viñetas. */}
+                        <CampoDictado
+                            label="Narración / Descripción de la atención"
+                            value={narracion || ''}
+                            onChange={v => setValue('actividad', v)}
+                            placeholder="Describa lo observado durante la intervención de campo..."
+                            rows={5}
+                        />
 
-                            <div className="relative">
-                                <textarea
-                                    rows={5}
-                                    value={narracion}
-                                    onChange={(e) => setValue('actividad', e.target.value)}
-                                    placeholder={isListening
-                                        ? '🎤 Escuchando... hable ahora'
-                                        : 'Describa lo observado durante la intervención de campo...'}
-                                    className={clsx(
-                                        'w-full px-3 py-3 border-2 rounded-xl text-sm outline-none resize-none transition-all leading-relaxed',
-                                        isListening
-                                            ? 'border-red-400 bg-red-50 focus:ring-2 focus:ring-red-300'
-                                            : 'border-gray-200 bg-white focus:border-green-400 focus:ring-2 focus:ring-green-100'
-                                    )}
-                                />
-                                {interim && (
-                                    <div className="absolute bottom-2 left-3 right-3 text-xs text-red-400 italic pointer-events-none truncate">
-                                        {interim}…
-                                    </div>
-                                )}
-                            </div>
-                            {hasSpeech && (
-                                <p className="text-[10px] text-gray-400 mt-1">
-                                    Toca <strong>Dictar</strong> y habla — el texto aparece automáticamente.
-                                </p>
-                            )}
-                        </div>
-
-                        {/* Resultados Obtenidos */}
                         <div className="mt-3">
-                            <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">
-                                Resultados Obtenidos (Logros / Acuerdos)
-                            </label>
-                            <textarea
-                                rows={3}
+                            <CampoDictado
+                                label="Resultados Obtenidos (Logros / Acuerdos)"
+                                value={watch('resultadosObtenidos') || ''}
+                                onChange={v => setValue('resultadosObtenidos', v)}
                                 placeholder="Describa los acuerdos, compromisos o resultados logrados..."
-                                {...register('resultadosObtenidos')}
-                                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none resize-none focus:border-green-400 focus:ring-2 focus:ring-green-100"
+                                rows={3}
                             />
                         </div>
 
-                        {/* Observaciones */}
                         <div className="mt-3">
-                            <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">
-                                Observaciones Adicionales
-                            </label>
-                            <textarea
-                                rows={2}
+                            <CampoDictado
+                                label="Observaciones Adicionales"
+                                value={watch('observacionesTexto') || ''}
+                                onChange={v => setValue('observacionesTexto', v)}
                                 placeholder="Comentarios adicionales u observaciones sobre el desarrollo de la sesión..."
-                                {...register('observacionesTexto')}
-                                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none resize-none focus:border-green-400 focus:ring-2 focus:ring-green-100"
+                                rows={2}
                             />
                         </div>
 

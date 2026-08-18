@@ -2,6 +2,7 @@ import { etiquetaParentesco } from '../../../utils/parentesco';
 import { useState, useEffect } from 'react';
 import { confirmar } from '../../../components/ui/ConfirmDialog';
 import { toast } from '../../../components/ui/Toast';
+import { CampoDictado } from '../../../components/ui/CampoDictado';
 import {
     Calendar, MapPin, CheckCircle2, User, Users, Plus, Link2,
     StickyNote, AlertTriangle, Lightbulb, BookOpen,
@@ -423,12 +424,11 @@ export const FichaTalleres = ({ nna }: FichaTalleresProps) => {
                                     />
                                 </div>
                                 <div className="md:col-span-2">
-                                    <label className="text-xs font-bold text-fg-muted uppercase tracking-wider mb-2 block">Objetivo</label>
-                                    <textarea
-                                        required rows={2}
-                                        value={formF7.objetivo}
-                                        onChange={e => setFormF7({ ...formF7, objetivo: e.target.value })}
-                                        className="w-full bg-surface-muted border-2 border-border rounded-[12px] px-4 py-3 focus:outline-none focus:border-primary transition-all"
+                                    <CampoDictado
+                                        label="Objetivo"
+                                        value={formF7.objetivo || ''}
+                                        onChange={v => setFormF7({ ...formF7, objetivo: v })}
+                                        rows={2}
                                         placeholder="Describa el objetivo pedagógico..."
                                     />
                                 </div>
@@ -438,30 +438,27 @@ export const FichaTalleres = ({ nna }: FichaTalleresProps) => {
                                 <h4 className="text-sm font-black text-fg border-l-4 border-primary pl-3">Metodología (Esquema del Taller)</h4>
                                 <div className="space-y-4">
                                     <div>
-                                        <label className="text-[10px] font-bold text-primary uppercase mb-1 block">Inicio (Motivación)</label>
-                                        <textarea
+                                        <CampoDictado
+                                            label="Inicio (Motivación)"
+                                            value={formF7.inicioActividad || ''}
+                                            onChange={v => setFormF7({ ...formF7, inicioActividad: v })}
                                             rows={2}
-                                            value={formF7.inicioActividad}
-                                            onChange={e => setFormF7({ ...formF7, inicioActividad: e.target.value })}
-                                            className="w-full bg-primary-soft/10 border border-primary/20 rounded-[12px] px-4 py-3 focus:outline-none focus:border-primary transition-all text-sm"
                                         />
                                     </div>
                                     <div>
-                                        <label className="text-[10px] font-bold text-primary uppercase mb-1 block">Proceso (Desarrollo)</label>
-                                        <textarea
+                                        <CampoDictado
+                                            label="Proceso (Desarrollo)"
+                                            value={formF7.procesoActividad || ''}
+                                            onChange={v => setFormF7({ ...formF7, procesoActividad: v })}
                                             rows={3}
-                                            value={formF7.procesoActividad}
-                                            onChange={e => setFormF7({ ...formF7, procesoActividad: e.target.value })}
-                                            className="w-full bg-primary-soft/10 border border-primary/20 rounded-[12px] px-4 py-3 focus:outline-none focus:border-primary transition-all text-sm"
                                         />
                                     </div>
                                     <div>
-                                        <label className="text-[10px] font-bold text-primary uppercase mb-1 block">Cierre (Evaluación/Reflexión)</label>
-                                        <textarea
+                                        <CampoDictado
+                                            label="Cierre (Evaluación/Reflexión)"
+                                            value={formF7.cierreActividad || ''}
+                                            onChange={v => setFormF7({ ...formF7, cierreActividad: v })}
                                             rows={2}
-                                            value={formF7.cierreActividad}
-                                            onChange={e => setFormF7({ ...formF7, cierreActividad: e.target.value })}
-                                            className="w-full bg-primary-soft/10 border border-primary/20 rounded-[12px] px-4 py-3 focus:outline-none focus:border-primary transition-all text-sm"
                                         />
                                     </div>
                                 </div>
@@ -562,11 +559,11 @@ export const FichaTalleres = ({ nna }: FichaTalleresProps) => {
                                         <CheckSquare size={16} className="text-success" />
                                         <label className="text-xs font-black text-fg-muted uppercase tracking-widest">5. Logros Alcanzados</label>
                                     </div>
-                                    <textarea
-                                        required={formF8.asistio} rows={3}
-                                        value={formF8.logros}
-                                        onChange={e => setFormF8({ ...formF8, logros: e.target.value })}
-                                        className="w-full bg-surface-muted border-2 border-border rounded-[16px] px-4 py-3 focus:outline-none focus:border-primary transition-all text-sm"
+                                    <CampoDictado
+                                        label=""
+                                        value={formF8.logros || ''}
+                                        onChange={v => setFormF8({ ...formF8, logros: v })}
+                                        rows={3}
                                         placeholder="Describa los avances del NNA..."
                                     />
                                 </div>
@@ -575,11 +572,11 @@ export const FichaTalleres = ({ nna }: FichaTalleresProps) => {
                                         <AlertTriangle size={16} className="text-warning" />
                                         <label className="text-xs font-black text-fg-muted uppercase tracking-widest">6. Limitaciones</label>
                                     </div>
-                                    <textarea
+                                    <CampoDictado
+                                        label=""
+                                        value={formF8.limitaciones || ''}
+                                        onChange={v => setFormF8({ ...formF8, limitaciones: v })}
                                         rows={2}
-                                        value={formF8.limitaciones}
-                                        onChange={e => setFormF8({ ...formF8, limitaciones: e.target.value })}
-                                        className="w-full bg-surface-muted border-2 border-border rounded-[16px] px-4 py-3 focus:outline-none focus:border-primary transition-all text-sm"
                                     />
                                 </div>
                                 <div>
@@ -587,11 +584,11 @@ export const FichaTalleres = ({ nna }: FichaTalleresProps) => {
                                         <Lightbulb size={16} className="text-primary" />
                                         <label className="text-xs font-black text-fg-muted uppercase tracking-widest">7. Sugerencias</label>
                                     </div>
-                                    <textarea
+                                    <CampoDictado
+                                        label=""
+                                        value={formF8.sugerencias || ''}
+                                        onChange={v => setFormF8({ ...formF8, sugerencias: v })}
                                         rows={2}
-                                        value={formF8.sugerencias}
-                                        onChange={e => setFormF8({ ...formF8, sugerencias: e.target.value })}
-                                        className="w-full bg-surface-muted border-2 border-border rounded-[16px] px-4 py-3 focus:outline-none focus:border-primary transition-all text-sm"
                                     />
                                 </div>
                             </div>
